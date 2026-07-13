@@ -38,20 +38,22 @@
   },
   "devDependencies": {
     "@codemirror/language": "^6.10.0",
-    "@codemirror/state": "^6.4.0",
-    "@codemirror/view": "^6.36.0",
+    "@codemirror/state": "6.5.0",
+    "@codemirror/view": "6.38.6",
     "@lezer/common": "^1.2.0",
     "@lezer/markdown": "^1.3.0",
     "@types/node": "^22.0.0",
     "builtin-modules": "^4.0.0",
     "esbuild": "^0.25.0",
-    "obsidian": "latest",
+    "obsidian": "1.13.1",
     "tslib": "^2.8.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
   }
 }
 ```
+
+Note: `obsidian`, `@codemirror/state`, and `@codemirror/view` are pinned together (1.13.1 / 6.5.0 / 6.38.6) because obsidian@1.13.1 declares those exact versions as peer dependencies — floating ranges would eventually fail npm ERESOLVE; bump all three in lockstep.
 
 `tsconfig.json`:
 ```json
