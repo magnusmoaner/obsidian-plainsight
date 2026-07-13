@@ -250,29 +250,16 @@ Expected: FAIL — cannot resolve `../editor/parser`.
 
 **Step 3: Write the implementation**
 
-`src/editor/parser.ts`:
+`src/editor/parser.ts` (uses `@codemirror/language`'s `DocInput` instead of a hand-rolled Input: it reads the Text rope zero-copy, and as an esbuild external provided by Obsidian it adds no bundle cost):
 ```ts
-import { EditorState, StateField, Text } from "@codemirror/state";
-import { ChangedRange, Input, Tree, TreeFragment } from "@lezer/common";
+import { EditorState, StateField } from "@codemirror/state";
+import { ChangedRange, Tree, TreeFragment } from "@lezer/common";
+import { DocInput } from "@codemirror/language";
 import { GFM, parser as baseParser } from "@lezer/markdown";
 
 // Obsidian's own markdown parser has undocumented node names, so we run our
 // own @lezer/markdown parse and never depend on Obsidian editor internals.
 const parser = baseParser.configure([GFM]);
-
-class DocInput implements Input {
-  constructor(readonly doc: Text) {}
-  get length(): number {
-    return this.doc.length;
-  }
-  chunk(from: number): string {
-    return this.doc.sliceString(from, from + 4096);
-  }
-  readonly lineChunks = false;
-  read(from: number, to: number): string {
-    return this.doc.sliceString(from, to);
-  }
-}
 
 interface ParseState {
   tree: Tree;

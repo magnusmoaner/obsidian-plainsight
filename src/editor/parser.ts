@@ -1,24 +1,13 @@
-import { EditorState, StateField, Text } from "@codemirror/state";
-import { ChangedRange, Input, Tree, TreeFragment } from "@lezer/common";
+import { EditorState, StateField } from "@codemirror/state";
+import { ChangedRange, Tree, TreeFragment } from "@lezer/common";
+// DocInput reads the CM6 Text rope chunk-by-chunk with zero copying; it is an
+// esbuild external provided by Obsidian at runtime, so it adds no bundle cost.
+import { DocInput } from "@codemirror/language";
 import { GFM, parser as baseParser } from "@lezer/markdown";
 
 // Obsidian's own markdown parser has undocumented node names, so we run our
 // own @lezer/markdown parse and never depend on Obsidian editor internals.
 const parser = baseParser.configure([GFM]);
-
-class DocInput implements Input {
-  constructor(readonly doc: Text) {}
-  get length(): number {
-    return this.doc.length;
-  }
-  chunk(from: number): string {
-    return this.doc.sliceString(from, from + 4096);
-  }
-  readonly lineChunks = false;
-  read(from: number, to: number): string {
-    return this.doc.sliceString(from, to);
-  }
-}
 
 interface ParseState {
   tree: Tree;
