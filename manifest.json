@@ -1,0 +1,9 @@
+{
+  "id": "wysiwyg-editor",
+  "name": "WYSIWYG Editor",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "True WYSIWYG Markdown editing: syntax never shown, formatting via hotkeys, Markdown stays the file format.",
+  "author": "Magnus",
+  "isDesktopOnly": false
+}
