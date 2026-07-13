@@ -1141,7 +1141,11 @@ Expected: clean. If `editor.cm` typing complains differently than annotated, adj
    - Cmd+B on a selection and on a bare word; Cmd+B again inside removes it.
    - Backspace at the end of a bold span unbolds; backspacing the last char inside removes the construct entirely; undo restores Markdown correctly.
    - Toggle the plugin setting off → raw Markdown returns immediately in open panes.
-5. Third-party compatibility (with the Better Edit plugin enabled, if installed):
+5. Viewport-edge behaviors (known limitations from Task 5 review — verify they're tolerable, not absent):
+   - Scroll slowly through a paragraph containing multi-line emphasis (`**bold\ntext**`): delimiters may show while the construct straddles the viewport edge and hide once fully inside. Acceptable if not jarring.
+   - Search for `**` and jump to an off-screen match (or Cmd+End into a construct): the caret may land inside a delimiter that only becomes atomic once rendered. Note behavior.
+   - Drag-select with autoscroll across formatted text: CM snapshots atomic ranges at mousedown, so oddities near delimiters during a long drag are upstream CM behavior.
+6. Third-party compatibility (with the Better Edit plugin enabled, if installed):
    - `/` slash menu opens and inserting e.g. Heading 1 / bullet / checkbox produces correctly rendered output.
    - Selecting text and using its inline toolbar's B/I buttons yields hidden-delimiter rendering.
    - Its strikethrough/highlight/math buttons produce visible plain Markdown (out of scope — must not crash or half-render).
