@@ -752,7 +752,8 @@ describe("toggleInlineSpec", () => {
   });
 
   test("toggling em inside strong wraps, not unwraps", () => {
-    expect(apply(mkState("**hello world**", 3, 8), "em")).toBe("***hello* world**");
+    // Amended: offsets 3,8 selected "ello " (off by one); "hello" is 2..7.
+    expect(apply(mkState("**hello world**", 2, 7), "em")).toBe("***hello* world**");
   });
 });
 ```
