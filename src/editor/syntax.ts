@@ -3,7 +3,7 @@ import { treeOf } from "./parser";
 
 export type InlineMarkType = "strong" | "em" | "code";
 
-export interface Range {
+export interface TextSpan {
   from: number;
   to: number;
 }
@@ -12,7 +12,7 @@ export interface InlineMark {
   type: InlineMarkType;
   from: number;
   to: number;
-  delims: Range[];
+  delims: TextSpan[];
 }
 
 const CONTAINER_TYPES: Record<string, InlineMarkType> = {
@@ -43,7 +43,7 @@ export function inlineMarksIn(
       // iterate() visits every node touching the range; only report
       // constructs that are fully contained in it.
       if (node.from < from || node.to > to) return;
-      const delims: Range[] = [];
+      const delims: TextSpan[] = [];
       const cursor = node.node.cursor();
       if (cursor.firstChild()) {
         do {
@@ -56,5 +56,6 @@ export function inlineMarksIn(
       // No `return false`: nested constructs inside this one must be found.
     },
   });
+  // Defensive: iterate() is pre-order, so results are already in from-order.
   return result.sort((a, b) => a.from - b.from);
 }

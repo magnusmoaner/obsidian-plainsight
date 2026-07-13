@@ -383,7 +383,7 @@ import { treeOf } from "./parser";
 
 export type InlineMarkType = "strong" | "em" | "code";
 
-export interface Range {
+export interface TextSpan {
   from: number;
   to: number;
 }
@@ -392,7 +392,7 @@ export interface InlineMark {
   type: InlineMarkType;
   from: number;
   to: number;
-  delims: Range[];
+  delims: TextSpan[];
 }
 
 const CONTAINER_TYPES: Record<string, InlineMarkType> = {
@@ -416,7 +416,7 @@ export function inlineMarksIn(
       const type = CONTAINER_TYPES[node.name];
       if (!type) return;
       if (node.from < from || node.to > to) return;
-      const delims: Range[] = [];
+      const delims: TextSpan[] = [];
       for (const child of node.node.children ?? []) {
         // fall through to cursor-based scan below
       }
@@ -454,6 +454,13 @@ git add -A && git commit -m "feat: extract inline mark ranges from the syntax tr
 **Files:**
 - Create: `src/editor/decorations.ts`
 - Test: `src/tests/decorations.test.ts`
+
+**Viewport-boundary constraint:** `inlineMarksIn` drops any construct that
+straddles the query window, and inline marks can span newlines within a
+paragraph. Task 5's per-visible-range calls therefore MUST expand each range
+to whole-line/paragraph boundaries (e.g. `doc.lineAt(from).from` to
+`doc.lineAt(to).to`) before querying, or delimiters will flash unhidden at
+viewport edges.
 
 **Step 1: Write the failing test**
 
