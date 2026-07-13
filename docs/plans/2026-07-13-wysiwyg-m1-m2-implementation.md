@@ -516,11 +516,13 @@ Run: `npm test` — FAIL, module missing.
 
 **Step 3: Write the implementation**
 
-`src/editor/decorations.ts`:
+`src/editor/decorations.ts` (touching delimiter spans are merged because
+atomic-range junctions are dead cursor stops — skipAtomicRanges only moves
+positions strictly inside a range):
 ```ts
 import { EditorState, Range as RangeValue, RangeSet } from "@codemirror/state";
 import { Decoration, DecorationSet } from "@codemirror/view";
-import { InlineMarkType, inlineMarksIn } from "./syntax";
+import { InlineMarkType, TextSpan, inlineMarksIn } from "./syntax";
 
 const hideDelim = Decoration.replace({});
 
@@ -542,15 +544,29 @@ export function buildDecorations(
   from: number,
   to: number
 ): BuiltDecorations {
-  const hidden: RangeValue<Decoration>[] = [];
   const all: RangeValue<Decoration>[] = [];
+  const delims: TextSpan[] = [];
   for (const mark of inlineMarksIn(state, from, to)) {
     all.push(contentMark[mark.type].range(mark.from, mark.to));
-    for (const d of mark.delims) {
+    delims.push(...mark.delims);
+  }
+  // Coalesce touching/overlapping delimiter spans (e.g. ***x*** puts an em
+  // delimiter flush against a strong delimiter). skipAtomicRanges only
+  // relocates positions strictly inside a range, so an unmerged junction
+  // would be a dead cursor stop.
+  delims.sort((a, b) => a.from - b.from || a.to - b.to);
+  const hidden: RangeValue<Decoration>[] = [];
+  for (const d of delims) {
+    const last = hidden[hidden.length - 1];
+    if (last && d.from <= last.to) {
+      if (d.to > last.to) {
+        hidden[hidden.length - 1] = hideDelim.range(last.from, d.to);
+      }
+    } else {
       hidden.push(hideDelim.range(d.from, d.to));
-      all.push(hideDelim.range(d.from, d.to));
     }
   }
+  all.push(...hidden);
   return {
     hidden: RangeSet.of(hidden, true),
     decorations: RangeSet.of(all, true),
@@ -830,6 +846,13 @@ git add -A && git commit -m "feat: toggle strong/em/code via pure transaction sp
 **Files:**
 - Modify: `src/editor/edit-semantics.ts` (replace placeholder)
 - Test: `src/tests/edit-semantics.test.ts`
+
+**Note:** CM6's default `deleteCharBackward` is atomic-range-aware and would
+delete a whole trailing delimiter in one keypress, orphaning the opener
+(`**bold` → syntax pops visible). The `wysiwygKeymap` must therefore bind at
+higher precedence than the default keymaps (`Prec.high`, already specified
+in Task 5), and the tests below must pin the after-closing-delimiter case
+(they do; keep them).
 
 Behavior (pure `backspaceSpec(state) → TransactionSpec | null`, `null` = fall through to default Backspace):
 1. Cursor immediately after a construct (i.e. right after its hidden closing delimiter) → remove both delimiters (unformat), keep content. Never delete a single `*` of a `**`.

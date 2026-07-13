@@ -13,7 +13,8 @@ function ranges(set: RangeSet<Decoration>): Array<[number, number, string]> {
   set.between(0, 1e9, (from, to, value) => {
     out.push([from, to, value.spec.class ?? "replace"]);
   });
-  return out;
+  // between() doesn't formally guarantee sorted visit order across chunks.
+  return out.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
 }
 
 describe("buildDecorations", () => {
@@ -56,5 +57,31 @@ describe("buildDecorations", () => {
       [0, 11, "cm-wys-em"],
       [3, 8, "cm-wys-strong"],
     ]);
+  });
+
+  test("touching delimiter spans are coalesced into one atomic range", () => {
+    // ***x*** — em delims [0,1]/[6,7] touch strong delims [1,3]/[4,6].
+    // skipAtomicRanges only relocates positions strictly inside a range, so
+    // a junction like pos 1 would be a dead cursor stop unless merged.
+    const s = mkState("***x***");
+    const { hidden, decorations } = buildDecorations(s, 0, s.doc.length);
+    expect(ranges(hidden)).toEqual([
+      [0, 3, "replace"],
+      [4, 7, "replace"],
+    ]);
+    const marks = ranges(decorations).filter(([, , cls]) => cls !== "replace");
+    expect(marks).toEqual([
+      [0, 7, "cm-wys-em"],
+      [1, 6, "cm-wys-strong"],
+    ]);
+  });
+
+  test("constructs straddling the window are dropped entirely", () => {
+    // Window contract Task 5 depends on: [0, 8] cuts through the first
+    // strong construct (3..9), so nothing is emitted for it.
+    const s = mkState("aa **bb** cc **dd**");
+    const { hidden, decorations } = buildDecorations(s, 0, 8);
+    expect(ranges(hidden)).toEqual([]);
+    expect(ranges(decorations)).toEqual([]);
   });
 });
