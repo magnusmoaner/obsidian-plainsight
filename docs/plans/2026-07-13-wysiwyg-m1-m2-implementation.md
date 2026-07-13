@@ -646,12 +646,22 @@ class WysiwygView {
   }
 
   private compute(view: EditorView): void {
-    const hidden = [];
-    const decorations = [];
+    // Deviation from the original block: each visible range is expanded to
+    // whole-line boundaries (per the Task 4 viewport-boundary note) and
+    // clipped against the previously covered line end so overlapping
+    // expansions never emit duplicate decorations.
+    const doc = view.state.doc;
+    const parts: BuiltDecorations[] = [];
+    let covered = -1; // end of the last line already queried
+    for (const range of view.visibleRanges) {
+      let from = doc.lineAt(range.from).from;
+      const to = doc.lineAt(range.to).to;
+      if (to <= covered) continue;
+      if (from <= covered) from = covered + 1; // next line start
+      parts.push(buildDecorations(view.state, from, to));
+      covered = to;
+    }
     // Build per visible range; RangeSet.join keeps it viewport-cheap.
-    const parts = view.visibleRanges.map(({ from, to }) =>
-      buildDecorations(view.state, from, to)
-    );
     this.hidden = RangeSet.join(parts.map((p) => p.hidden));
     this.decorations = RangeSet.join(parts.map((p) => p.decorations));
   }
