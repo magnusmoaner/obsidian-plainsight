@@ -1,11 +1,24 @@
 import { EditorState, Prec, TransactionSpec } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { toggleCode, toggleEm, toggleStrong } from "./commands";
-import { InlineMark, inlineMarksIn } from "./syntax";
+import { enclosingInlineMarks, InlineMark } from "./syntax";
 
-function marksAround(state: EditorState, pos: number): InlineMark[] {
-  const line = state.doc.lineAt(pos);
-  return inlineMarksIn(state, line.from, line.to);
+/**
+ * Expand a construct deletion outward through enclosing constructs whose
+ * content it was: deleting the strong in `***a***` must also take the em's
+ * delimiters, or they'd survive as visible `**`.
+ */
+function cascadeDeletion(marks: InlineMark[], target: InlineMark): InlineMark {
+  let result = target;
+  for (const outer of marks) {
+    if (outer === result || outer.delims.length < 2) continue;
+    const open = outer.delims[0];
+    const close = outer.delims[outer.delims.length - 1];
+    if (open.to === result.from && close.from === result.to) {
+      result = outer;
+    }
+  }
+  return result;
 }
 
 export function backspaceSpec(state: EditorState): TransactionSpec | null {
@@ -13,7 +26,9 @@ export function backspaceSpec(state: EditorState): TransactionSpec | null {
   if (!sel.empty || sel.head === 0) return null;
   const head = sel.head;
 
-  for (const mark of marksAround(state, head)) {
+  // Tree-walk (not line-scoped): constructs can span lines. Innermost first.
+  const marks = enclosingInlineMarks(state, head);
+  for (const mark of marks) {
     if (mark.delims.length < 2) continue;
     const open = mark.delims[0];
     const close = mark.delims[mark.delims.length - 1];
@@ -32,13 +47,31 @@ export function backspaceSpec(state: EditorState): TransactionSpec | null {
     }
 
     // Case 2: deleting the only content character → drop the whole construct
-    // so orphaned delimiters like `****` never appear as text.
-    const contentFrom = open.to;
-    const contentTo = close.from;
-    if (head === contentTo && contentTo - contentFrom === 1) {
+    // (cascading outward) so orphaned delimiters never appear as text.
+    if (head === close.from && close.from - open.to === 1) {
+      const target = cascadeDeletion(marks, mark);
       return {
-        changes: [{ from: mark.from, to: mark.to }],
+        changes: [{ from: target.from, to: target.to }],
         userEvent: "delete.format",
+      };
+    }
+
+    // Case 3: cursor at content start, right behind the hidden opening
+    // delimiter. Visually the previous character is whatever precedes the
+    // construct — delete that, not the delimiter. At doc start, unformat.
+    if (open.to === head) {
+      if (mark.from === 0) {
+        return {
+          changes: [
+            { from: open.from, to: open.to },
+            { from: close.from, to: close.to },
+          ],
+          userEvent: "delete.format",
+        };
+      }
+      return {
+        changes: [{ from: mark.from - 1, to: mark.from }],
+        userEvent: "delete.backward",
       };
     }
   }

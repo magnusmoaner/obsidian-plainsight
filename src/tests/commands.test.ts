@@ -66,3 +66,13 @@ describe("toggleInlineSpec", () => {
     expect(apply(mkState("a\n\nb", 0, 4), "strong")).toBe("**a\n\nb**");
   });
 });
+
+describe("toggleInlineSpec on multi-line constructs (line-scoping regression)", () => {
+  test("unwraps with a selection inside a multi-line strong", () => {
+    expect(apply(mkState("**a\nb**", 2, 3), "strong")).toBe("a\nb");
+  });
+
+  test("unwraps with a cursor inside a multi-line strong", () => {
+    expect(apply(mkState("**ab\ncd**", 3), "strong")).toBe("ab\ncd");
+  });
+});

@@ -33,35 +33,44 @@ export default class WysiwygPlugin extends Plugin {
     // handles the hotkeys at higher precedence.
     this.addCommand({
       id: "toggle-strong",
-      name: "Toggle bold (WYSIWYG)",
-      editorCallback: (editor) => this.withView(editor, toggleStrong),
+      name: "Toggle bold",
+      editorCheckCallback: (checking, editor) =>
+        this.withView(checking, editor, toggleStrong),
     });
     this.addCommand({
       id: "toggle-em",
-      name: "Toggle italic (WYSIWYG)",
-      editorCallback: (editor) => this.withView(editor, toggleEm),
+      name: "Toggle italic",
+      editorCheckCallback: (checking, editor) =>
+        this.withView(checking, editor, toggleEm),
     });
     this.addCommand({
       id: "toggle-code",
-      name: "Toggle inline code (WYSIWYG)",
-      editorCallback: (editor) => this.withView(editor, toggleCode),
+      name: "Toggle inline code",
+      editorCheckCallback: (checking, editor) =>
+        this.withView(checking, editor, toggleCode),
     });
 
     this.addCommand({
       id: "dump-syntax-tree",
-      name: "Debug: dump syntax tree",
-      editorCallback: (editor) =>
-        this.withView(editor, (cm) => {
+      name: "Dump syntax tree to console (debug)",
+      editorCheckCallback: (checking, editor) =>
+        this.withView(checking, editor, (cm) => {
           console.log(treeOf(cm.state).toString());
           return true;
         }),
     });
   }
 
-  private withView(editor: Editor, fn: (cm: EditorView) => boolean): void {
+  private withView(
+    checking: boolean,
+    editor: Editor,
+    fn: (cm: EditorView) => boolean
+  ): boolean {
     // editor.cm is Obsidian's undocumented-but-stable CM6 handle.
     const cm = (editor as Editor & { cm?: EditorView }).cm;
-    if (cm) fn(cm);
+    if (!cm) return false;
+    if (checking) return true;
+    return fn(cm);
   }
 
   async loadSettings(): Promise<void> {

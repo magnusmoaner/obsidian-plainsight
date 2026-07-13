@@ -50,6 +50,25 @@ describe("backspaceSpec", () => {
     expect(apply("**a**", 0)).toBeNull();
   });
 
+  test("unformats a multi-line construct (line-scoping regression)", () => {
+    // "**a\nb**" — closing delim on a different line than the opener
+    expect(apply("**a\nb**", 7)).toBe("a\nb");
+  });
+
+  test("backspace at content start deletes the char before the construct", () => {
+    // cursor right after the hidden opening ** — visually after the space
+    expect(apply("hi **bold**", 5)).toBe("hi**bold**");
+  });
+
+  test("backspace at content start of a doc-leading construct unformats", () => {
+    expect(apply("**bold**", 2)).toBe("bold");
+  });
+
+  test("deleting sole content cascades through enclosing constructs", () => {
+    // ***a*** = em(strong(a)); deleting the strong must not orphan the em's *
+    expect(apply("***a***", 4)).toBe("");
+  });
+
   test("non-empty selection falls through", () => {
     const s = EditorState.create({
       doc: "hi **bold**",

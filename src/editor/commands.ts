@@ -4,7 +4,7 @@ import {
   TransactionSpec,
 } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { InlineMark, InlineMarkType, inlineMarksIn } from "./syntax";
+import { enclosingInlineMarks, InlineMark, InlineMarkType } from "./syntax";
 
 const DELIM: Record<InlineMarkType, string> = {
   strong: "**",
@@ -23,14 +23,10 @@ function enclosingMark(
   from: number,
   to: number
 ): InlineMark | null {
-  const lineFrom = state.doc.lineAt(from).from;
-  const lineTo = state.doc.lineAt(to).to;
-  const candidates = inlineMarksIn(state, lineFrom, lineTo).filter(
-    (m) => m.type === type && m.from <= from && m.to >= to
+  // Tree-walk lookup, not a line-scoped window: constructs can span lines.
+  return (
+    enclosingInlineMarks(state, from, to).find((m) => m.type === type) ?? null
   );
-  if (!candidates.length) return null;
-  // Later start = more deeply nested (candidates all contain the selection).
-  return candidates.reduce((a, b) => (b.from >= a.from ? b : a));
 }
 
 /**
