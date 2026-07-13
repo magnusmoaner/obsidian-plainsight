@@ -65,6 +65,12 @@ src/
 - Typing at the very edge of a formatted span goes *outside* the span by default (matching rich-text editors), with the caret-affinity nuance tested explicitly.
 - Unknown/ambiguous syntax: no decoration, plain Markdown, never mutated.
 
+## Third-party compatibility (hard requirements)
+
+- **Never intercept foreign transactions.** Other plugins (e.g. Better Edit's slash commands and inline toolbar) format by inserting raw Markdown via editor transactions. Because our rendering derives purely from the parse tree, their output renders correctly the moment it lands. To keep this true, our behavior changes live only in our own keymap bindings and commands — no global `transactionFilter` that rewrites or blocks edits from other sources.
+- **Better Edit** must keep working: `/`-command insertion (headings, lists, checkbox, quote) and selection-toolbar wrapping both flow through the mechanism above. Buttons producing out-of-scope syntax (strikethrough `~~`, highlight `==`, math `$`) fall back to visible plain Markdown. Verify in every milestone's smoke test.
+- **Tasks plugin notation** (M4): the checkbox widget renders from the actual status character and supports custom statuses (`[/]`, `[-]`, etc. — render them; toggle only cycles `[ ]`↔`[x]`). Toggling rewrites the status character only. Emoji metadata (`📅`, `🔁`, `⏫`, `🆔`) is ordinary text content — rendered as-is, never parsed, never mutated.
+
 ## Testing
 
 - Vitest with CM6 `EditorState`/`EditorView` in jsdom — CodeMirror is testable headlessly.
