@@ -290,7 +290,7 @@ export class SidebarView extends ItemView {
     this.placeRow(nav, "Templates", "layout-template", { kind: "templates" }, 0, templateCount);
 
     const notebooks = folderRows(this.plugin.indexer.folders(), notes, templates, isAttachmentFolder);
-    if (this.navHeading(nav, "Notebooks", "book", "section:notebooks", () => this.newNotebook(isAttachmentFolder))) {
+    if (this.navHeading(nav, "Folders", "folder", "section:notebooks", () => this.newNotebook(isAttachmentFolder))) {
       this.treeSection(nav, notebooks, "notebook", (row) => ({ kind: "notebook", folder: row.path }));
     }
 
@@ -498,7 +498,7 @@ export class SidebarView extends ItemView {
     new NotebookModal(this.app, folders, parent, (path) => {
       void this.app.vault.createFolder(path).then(
         () => this.setPlace({ kind: "notebook", folder: path }),
-        (err: Error) => new Notice(`Couldn't create the notebook: ${err.message}`)
+        (err: Error) => new Notice(`Couldn't create the folder: ${err.message}`)
       );
     }).open();
   }

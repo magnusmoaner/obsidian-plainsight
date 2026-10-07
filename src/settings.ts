@@ -65,7 +65,7 @@ export class WysiwygSettingTab extends PluginSettingTab {
     new Setting(this.containerEl)
       .setName("Notes sidebar")
       .setDesc(
-        "A two-column sidebar: places (shortcuts, notes, tasks, templates, notebooks, tags) " +
+        "A two-column sidebar: places (bookmarks, notes, tasks, attachments, templates, folders, tags) " +
           "and note cards. Turn off the core File explorer to use it in its place."
       )
       .addToggle((toggle) =>

@@ -116,13 +116,13 @@ export class NotebookModal extends Modal {
   }
 
   onOpen(): void {
-    this.titleEl.setText("New notebook");
+    this.titleEl.setText("New folder");
     const error = createDiv({ cls: "ps-modal-error" });
     const submit = () => {
       const problem = folderNameError(this.name);
       const path = normalizePath(this.parent ? `${this.parent}/${this.name.trim()}` : this.name.trim());
       if (problem) return void error.setText(problem);
-      if (this.app.vault.getAbstractFileByPath(path)) return void error.setText("That notebook already exists.");
+      if (this.app.vault.getAbstractFileByPath(path)) return void error.setText("That folder already exists.");
       this.close();
       this.onCreate(path);
     };
