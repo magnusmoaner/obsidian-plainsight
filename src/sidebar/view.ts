@@ -1,4 +1,4 @@
-import { ItemView, Keymap, Menu, Platform, setIcon, TFile, WorkspaceLeaf } from "obsidian";
+import { ItemView, Keymap, Menu, Notice, Platform, setIcon, TFile, TFolder, WorkspaceLeaf } from "obsidian";
 import type WysiwygPlugin from "../main";
 import { cardDate, localISODate } from "./core/format";
 import {
@@ -13,11 +13,19 @@ import {
   taskProgress,
   taskRows,
   TreeRow,
+  visibleRows,
 } from "./core/queries";
 import { taskDisplayText } from "./core/tasks";
 import { isClosed, NoteSummary } from "./core/types";
 import { createNote, openFile, toggleTask, togglePin } from "./actions";
-import { openGlobalSearch, openSettingsTab, readShortcuts, templateOptions } from "./internals";
+import {
+  Bookmark,
+  onBookmarksChanged,
+  openGlobalSearch,
+  openSettingsTab,
+  readBookmarks,
+  templateOptions,
+} from "./internals";
 
 export const SIDEBAR_VIEW = "plainsight-sidebar";
 /** Cards rendered per scroll step; the rest load as the end comes into view. */
@@ -44,6 +52,7 @@ export class SidebarView extends ItemView {
    * saved scroll position still has content to land on. */
   private renderedCount = 0;
   private unsubscribe: (() => void) | null = null;
+  private unsubscribeBookmarks: (() => void) | null = null;
 
   constructor(leaf: WorkspaceLeaf, private plugin: WysiwygPlugin) {
     super(leaf);
@@ -88,12 +97,15 @@ export class SidebarView extends ItemView {
 
     this.makeResizable(divider);
     this.unsubscribe = this.plugin.index.subscribe(() => this.queueRender());
+    // Bookmarks live outside the index; refresh the nav when they change.
+    this.unsubscribeBookmarks = onBookmarksChanged(this.app, () => this.renderNav());
     this.registerEvent(this.app.workspace.on("file-open", () => this.markActive()));
     this.render();
   }
 
   async onClose(): Promise<void> {
     this.unsubscribe?.();
+    this.unsubscribeBookmarks?.();
     this.disconnectObservers();
     if (this.renderTimer !== null) window.clearTimeout(this.renderTimer);
   }
@@ -158,14 +170,9 @@ export class SidebarView extends ItemView {
     newNote.createSpan({ text: "Note" });
     newNote.addEventListener("click", () => void createNote(this.app, this.currentFolder()));
 
-    const shortcuts = readShortcuts(this.app);
-    if (shortcuts && shortcuts.length) {
-      this.navHeading(nav, "Shortcuts", "star");
-      for (const s of shortcuts) {
-        const icon = s.kind === "folder" ? "folder" : s.kind === "search" ? "search" : "file-text";
-        const row = this.navRow(nav, s.title, icon, 1, null, false);
-        row.addEventListener("click", (evt) => this.openShortcut(s.kind, s.target, evt));
-      }
+    const bookmarks = readBookmarks(this.app);
+    if (bookmarks && bookmarks.length && this.navHeading(nav, "Bookmarks", "bookmark", "section:bookmarks")) {
+      for (const b of bookmarks) this.bookmarkRow(nav, b);
     }
 
     const noteCount = notesFor(notes, { kind: "notes" }, unfiltered).length;
@@ -178,22 +185,40 @@ export class SidebarView extends ItemView {
     this.placeRow(nav, "Templates", "layout-template", { kind: "templates" }, 0, templateCount);
 
     const notebooks = folderRows(this.plugin.indexer.folders(), notes, templates);
-    if (notebooks.length) {
-      this.navHeading(nav, "Notebooks", "book");
-      this.treeSection(nav, notebooks, (row) => ({ kind: "notebook", folder: row.path }));
+    if (notebooks.length && this.navHeading(nav, "Notebooks", "book", "section:notebooks")) {
+      this.treeSection(nav, notebooks, "notebook", (row) => ({ kind: "notebook", folder: row.path }));
     }
 
     const tags = tagRows(notes);
-    if (tags.length) {
-      this.navHeading(nav, "Tags", "tag");
-      this.treeSection(nav, tags, (row) => ({ kind: "tag", tag: row.path }));
+    if (tags.length && this.navHeading(nav, "Tags", "tag", "section:tags")) {
+      this.treeSection(nav, tags, "tag", (row) => ({ kind: "tag", tag: row.path }));
     }
   }
 
-  private navHeading(parent: HTMLElement, label: string, icon: string): void {
+  /** A section heading that folds its section. Returns whether it's expanded. */
+  private navHeading(parent: HTMLElement, label: string, icon: string, key: string): boolean {
+    const collapsed = this.isCollapsed(key);
     const el = parent.createDiv("ps-nav-heading");
+    el.toggleClass("is-collapsed", collapsed);
     setIcon(el.createSpan("ps-nav-icon"), icon);
-    el.createSpan({ text: label });
+    el.createSpan({ cls: "ps-nav-label", text: label });
+    setIcon(el.createSpan("ps-nav-chevron"), "chevron-down");
+    el.addEventListener("click", () => this.toggleCollapsed(key));
+    return !collapsed;
+  }
+
+  private isCollapsed(key: string): boolean {
+    return this.plugin.settings.sidebarCollapsed.includes(key);
+  }
+
+  private toggleCollapsed(key: string): void {
+    const list = this.plugin.settings.sidebarCollapsed;
+    const at = list.indexOf(key);
+    if (at === -1) list.push(key);
+    else list.splice(at, 1);
+    // saveData, not saveSettings: no need to reconfigure every editor.
+    void this.plugin.saveData(this.plugin.settings);
+    this.renderNav();
   }
 
   private navRow(
@@ -226,22 +251,60 @@ export class SidebarView extends ItemView {
     row.addEventListener("click", () => this.setPlace(place));
   }
 
-  private treeSection(parent: HTMLElement, rows: TreeRow[], toPlace: (row: TreeRow) => Place): void {
-    // Tree rows are indented without icons.
-    for (const row of rows) {
-      this.placeRow(parent, row.name, null, toPlace(row), row.depth + 1, row.count);
+  /** Indented rows; parents get a chevron that folds their children. */
+  private treeSection(
+    parent: HTMLElement,
+    rows: TreeRow[],
+    keyPrefix: string,
+    toPlace: (row: TreeRow) => Place
+  ): void {
+    const collapsed = new Set(
+      this.plugin.settings.sidebarCollapsed
+        .filter((k) => k.startsWith(`${keyPrefix}:`))
+        .map((k) => k.slice(keyPrefix.length + 1))
+    );
+    for (const row of visibleRows(rows, collapsed)) {
+      const place = toPlace(row);
+      const el = this.navRow(parent, row.name, null, row.depth + 1, row.count, this.isActive(place));
+      el.addEventListener("click", () => this.setPlace(place));
+      if (!row.hasChildren) continue;
+      // The chevron takes the (otherwise empty) icon slot.
+      const chevron = el.querySelector<HTMLElement>(".ps-nav-icon")!;
+      chevron.addClass("ps-nav-chevron");
+      chevron.toggleClass("is-collapsed", row.collapsed);
+      setIcon(chevron, "chevron-down");
+      chevron.addEventListener("click", (evt) => {
+        evt.stopPropagation();
+        this.toggleCollapsed(`${keyPrefix}:${row.path}`);
+      });
     }
   }
 
-  private openShortcut(kind: "file" | "folder" | "search", target: string, evt: MouseEvent): void {
-    if (kind === "folder") {
-      this.setPlace({ kind: "notebook", folder: target });
-    } else if (kind === "search") {
-      openGlobalSearch(this.app, target);
-    } else {
-      const file = this.app.vault.getAbstractFileByPath(target);
-      if (file instanceof TFile) void openFile(this.app, file, Keymap.isModEvent(evt));
-    }
+  private bookmarkRow(parent: HTMLElement, bookmark: Bookmark): void {
+    const icon =
+      bookmark.kind === "folder" ? "folder" : bookmark.kind === "search" ? "search" : "file-text";
+    const target = bookmark.kind === "search" ? null : this.app.vault.getAbstractFileByPath(bookmark.target);
+    // Obsidian keeps a bookmark after its note is deleted; show it, but say so.
+    const missing = bookmark.kind !== "search" && !target;
+    const row = this.navRow(parent, bookmark.title, icon, 1, null, false);
+    row.toggleClass("is-missing", missing);
+    if (missing) row.setAttribute("aria-label", `Missing: ${bookmark.target}`);
+    row.addEventListener("click", (evt) => {
+      if (missing) {
+        new Notice(`"${bookmark.target}" no longer exists. Remove the bookmark in the Bookmarks pane.`);
+      } else if (bookmark.kind === "folder" && target instanceof TFolder) {
+        this.setPlace({ kind: "notebook", folder: target.path });
+      } else if (bookmark.kind === "search") {
+        openGlobalSearch(this.app, bookmark.target);
+      } else if (target instanceof TFile) {
+        // openLinkText honours a heading/block subpath; openFile would not.
+        void this.app.workspace.openLinkText(
+          `${target.path}${bookmark.subpath}`,
+          "",
+          Keymap.isModEvent(evt)
+        );
+      }
+    });
   }
 
   // ---------- divider ----------

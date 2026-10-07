@@ -210,6 +210,37 @@
 .ps-nav-heading {
   margin-top: 10px;
   color: var(--text-muted);
+  cursor: pointer;
+}
+.ps-nav-heading:hover {
+  background: var(--background-modifier-hover);
+}
+/* Fold chevrons: point down when open, right when collapsed. */
+.ps-nav-chevron {
+  display: inline-flex;
+  color: var(--text-faint);
+  transition: transform 0.1s ease-in-out;
+}
+.ps-nav-chevron svg {
+  width: 14px;
+  height: 14px;
+}
+.ps-nav-heading.is-collapsed .ps-nav-chevron,
+.ps-nav-chevron.is-collapsed {
+  transform: rotate(-90deg);
+}
+.ps-nav-item .ps-nav-chevron {
+  cursor: pointer;
+  border-radius: 3px;
+}
+.ps-nav-item .ps-nav-chevron:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+/* A bookmark whose note was deleted: still listed, visibly dead. */
+.ps-nav-item.is-missing {
+  color: var(--text-faint);
+  text-decoration: line-through;
 }
 .ps-nav-item {
   padding-left: calc(8px + var(--ps-depth, 0) * 14px);

@@ -6,10 +6,13 @@ import { App, normalizePath } from "obsidian";
  * expect, so a changed internal hides a feature instead of throwing.
  */
 
-export interface Shortcut {
+export interface Bookmark {
   kind: "file" | "folder" | "search";
   title: string;
+  /** Vault path for file/folder bookmarks, the query for search ones. */
   target: string;
+  /** "#Heading" or "#^block" for bookmarks that point inside a note. */
+  subpath: string;
 }
 
 type Loose = Record<string, unknown> | null | undefined;
@@ -23,26 +26,43 @@ function internalPlugin(app: App, id: string): Loose {
 
 const lastSegment = (path: string) => path.split("/").pop()!.replace(/\.md$/, "");
 
-/** Bookmarks (flattened out of groups), or null if the plugin is off. */
-export function readShortcuts(app: App): Shortcut[] | null {
+/** Bookmarks (flattened out of groups), or null if the core plugin is off. */
+export function readBookmarks(app: App): Bookmark[] | null {
   const items = internalPlugin(app, "bookmarks")?.items;
   if (!Array.isArray(items)) return null;
-  const out: Shortcut[] = [];
+  const out: Bookmark[] = [];
   const walk = (list: unknown[]) => {
     for (const raw of list) {
       const item = raw as Record<string, unknown>;
       const title = typeof item.title === "string" && item.title ? item.title : null;
+      const subpath = typeof item.subpath === "string" ? item.subpath : "";
       if (item.type === "group" && Array.isArray(item.items)) walk(item.items);
       else if (item.type === "file" && typeof item.path === "string")
-        out.push({ kind: "file", target: item.path, title: title ?? lastSegment(item.path) });
+        out.push({ kind: "file", target: item.path, subpath, title: title ?? lastSegment(item.path) });
       else if (item.type === "folder" && typeof item.path === "string")
-        out.push({ kind: "folder", target: item.path, title: title ?? lastSegment(item.path) });
+        out.push({ kind: "folder", target: item.path, subpath: "", title: title ?? lastSegment(item.path) });
       else if (item.type === "search" && typeof item.query === "string")
-        out.push({ kind: "search", target: item.query, title: title ?? item.query });
+        out.push({ kind: "search", target: item.query, subpath: "", title: title ?? item.query });
     }
   };
   walk(items);
   return out;
+}
+
+/**
+ * Call `callback` whenever bookmarks are added, removed, renamed or moved.
+ * The Bookmarks instance is an Events object that triggers "changed" from
+ * its _onItemsChanged. Returns an unsubscribe function, or null if the
+ * plugin is off or the shape is unexpected.
+ */
+export function onBookmarksChanged(app: App, callback: () => void): (() => void) | null {
+  const instance = internalPlugin(app, "bookmarks") as {
+    on?(name: string, cb: () => void): unknown;
+    offref?(ref: unknown): void;
+  } | null;
+  if (typeof instance?.on !== "function" || typeof instance.offref !== "function") return null;
+  const ref = instance.on("changed", callback);
+  return () => instance.offref?.(ref);
 }
 
 export interface TemplateOptions {

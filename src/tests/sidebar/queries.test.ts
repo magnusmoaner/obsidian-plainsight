@@ -6,6 +6,7 @@ import {
   tagRows,
   taskProgress,
   taskRows,
+  visibleRows,
 } from "../../sidebar/core/queries";
 import { note } from "./fixtures";
 
@@ -157,5 +158,40 @@ describe("taskRows", () => {
 
   test("taskProgress counts done and cancelled as closed", () => {
     expect(taskProgress(list[1])).toEqual({ closed: 1, total: 2 });
+  });
+});
+
+describe("visibleRows", () => {
+  const rows = [
+    { path: "A", name: "A", depth: 0, count: 3 },
+    { path: "A/B", name: "B", depth: 1, count: 2 },
+    { path: "A/B/C", name: "C", depth: 2, count: 1 },
+    { path: "A/D", name: "D", depth: 1, count: 1 },
+    { path: "E", name: "E", depth: 0, count: 1 },
+  ];
+  const shown = (collapsed: string[]) =>
+    visibleRows(rows, new Set(collapsed)).map((r) => `${r.path}${r.collapsed ? "+" : ""}`);
+
+  test("nothing collapsed shows everything, marking parents", () => {
+    expect(visibleRows(rows, new Set()).map((r) => r.hasChildren)).toEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+    ]);
+  });
+
+  test("collapsing a parent hides all its descendants, not its siblings", () => {
+    expect(shown(["A/B"])).toEqual(["A", "A/B+", "A/D", "E"]);
+    expect(shown(["A"])).toEqual(["A+", "E"]);
+  });
+
+  test("a collapsed leaf is ignored", () => {
+    expect(shown(["E"])).toEqual(["A", "A/B", "A/B/C", "A/D", "E"]);
+  });
+
+  test("a collapsed row inside a collapsed parent stays hidden", () => {
+    expect(shown(["A", "A/B"])).toEqual(["A+", "E"]);
   });
 });

@@ -9,6 +9,8 @@ export interface WysiwygSettings {
   sidebar: boolean;
   /** Width of the sidebar's nav column, in px. */
   sidebarNavWidth: number;
+  /** Collapsed nav sections and tree nodes, e.g. "section:tags", "notebook:Inbox". */
+  sidebarCollapsed: string[];
 }
 
 export const DEFAULT_SETTINGS: WysiwygSettings = {
@@ -16,6 +18,7 @@ export const DEFAULT_SETTINGS: WysiwygSettings = {
   takeOverRendering: false,
   sidebar: true,
   sidebarNavWidth: 200,
+  sidebarCollapsed: [],
 };
 
 export class WysiwygSettingTab extends PluginSettingTab {

@@ -202,3 +202,28 @@ export function taskRows(
 export function taskProgress(note: NoteSummary): { closed: number; total: number } {
   return { closed: note.tasks.filter(isClosed).length, total: note.tasks.length };
 }
+
+export interface VisibleRow extends TreeRow {
+  /** Has children in the full tree, so it gets a collapse chevron. */
+  hasChildren: boolean;
+  collapsed: boolean;
+}
+
+/**
+ * The rows still visible when the paths in `collapsed` are folded: a
+ * collapsed row stays visible, its descendants don't. Relies on treeRows'
+ * depth-first order, where descendants immediately follow their parent.
+ */
+export function visibleRows(rows: TreeRow[], collapsed: ReadonlySet<string>): VisibleRow[] {
+  const out: VisibleRow[] = [];
+  let hideBelow = Infinity;
+  rows.forEach((row, i) => {
+    if (row.depth > hideBelow) return;
+    hideBelow = Infinity;
+    const hasChildren = (rows[i + 1]?.depth ?? -1) > row.depth;
+    const isCollapsed = hasChildren && collapsed.has(row.path);
+    if (isCollapsed) hideBelow = row.depth;
+    out.push({ ...row, hasChildren, collapsed: isCollapsed });
+  });
+  return out;
+}
