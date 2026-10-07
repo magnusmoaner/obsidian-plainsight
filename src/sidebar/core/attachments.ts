@@ -34,25 +34,21 @@ export function attachmentFolderMatcher(setting: string): (folder: string) => bo
   return (folder) => inFolder(folder, fixed) && folder !== "";
 }
 
-/** A note that belongs with the attachments rather than among notes. */
-export function isCompanion(note: NoteSummary, isAttachmentFolder: (folder: string) => boolean): boolean {
-  return note.extracted || isAttachmentFolder(note.folder);
-}
-
 /**
- * Attachments matching `search`, by file name or by the text extracted from
- * them (`companions`: file path → its extracted-text note), newest first.
+ * Attachments matching `search`, by file name or by any text extracted from
+ * them (`companions`: file path → its extracted-text notes), newest first.
  */
 export function attachmentsFor(
   files: AttachmentFile[],
-  companions: ReadonlyMap<string, NoteSummary>,
+  companions: ReadonlyMap<string, NoteSummary[]>,
   search: string,
   sort: SortKey
 ): AttachmentFile[] {
   const terms = search.toLowerCase().split(/\s+/).filter(Boolean);
   const matches = files.filter((file) => {
     if (!terms.length) return true;
-    const text = `${file.name.toLowerCase()} ${companions.get(file.path)?.searchText ?? ""}`;
+    const extracted = (companions.get(file.path) ?? []).map((n) => n.searchText).join(" ");
+    const text = `${file.name.toLowerCase()} ${extracted}`;
     return terms.every((term) => text.includes(term));
   });
   const byName = (a: AttachmentFile, b: AttachmentFile) =>

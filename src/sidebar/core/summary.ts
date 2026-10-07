@@ -20,13 +20,18 @@ const SEARCH_CAP = 20000;
 
 const FILE_LINK = /(?<!!)\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g;
 
-/** First plain (non-embed) wikilink to a non-note file, e.g. [[scan.pdf]]. */
-export function firstFileLink(text: string): string | null {
+/**
+ * Plain (non-embed) wikilinks whose target has a file extension, e.g.
+ * [[scan.pdf]], in order. Only a syntactic guess — "[[Notes 2026.10]]" also
+ * qualifies — so callers must resolve and check what each one points at.
+ */
+export function fileLinks(text: string): string[] {
+  const out: string[] = [];
   for (const match of text.matchAll(FILE_LINK)) {
     const target = match[1].trim();
-    if (/\.[a-z0-9]{2,5}$/i.test(target) && !/\.md$/i.test(target)) return target;
+    if (/\.[a-z0-9]{2,5}$/i.test(target) && !/\.md$/i.test(target)) out.push(target);
   }
-  return null;
+  return out;
 }
 
 export function firstImage(text: string): string | null {
@@ -73,6 +78,6 @@ export function summarize(facts: FileFacts, text: string): NoteSummary {
     thumbnail: firstImage(text),
     searchText: `${facts.basename} ${tags.join(" ")} ${text.slice(0, SEARCH_CAP)}`.toLowerCase(),
     extracted,
-    sourceLink: extracted ? firstFileLink(text) : null,
+    sourceLinks: extracted ? fileLinks(text) : [],
   };
 }

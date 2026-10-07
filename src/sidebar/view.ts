@@ -20,7 +20,6 @@ import {
   attachmentFolderMatcher,
   attachmentsFor,
   formatSize,
-  isCompanion,
 } from "./core/attachments";
 import { taskDisplayText } from "./core/tasks";
 import { isClosed, NoteSummary } from "./core/types";
@@ -28,6 +27,7 @@ import { createNote, openFile, toggleTask, togglePin } from "./actions";
 import {
   attachmentFolderSetting,
   Bookmark,
+  bookmarksInstance,
   onBookmarksChanged,
   openGlobalSearch,
   openSettingsTab,
@@ -47,8 +47,8 @@ const DOCUMENT_EXTENSIONS = new Set(["md", "canvas", "base"]);
 /** The index split into the user's notes and attachment companions. */
 interface Partitioned {
   notes: NoteSummary[];
-  /** Attachment file path → its extracted-text note. */
-  companions: Map<string, NoteSummary>;
+  /** Attachment file path → the extracted-text notes made from it. */
+  companions: Map<string, NoteSummary[]>;
   isAttachmentFolder: (folder: string) => boolean;
 }
 
@@ -72,6 +72,7 @@ export class SidebarView extends ItemView {
   private renderedCount = 0;
   private unsubscribe: (() => void) | null = null;
   private unsubscribeBookmarks: (() => void) | null = null;
+  private watchedBookmarks: unknown = null;
 
   constructor(leaf: WorkspaceLeaf, private plugin: WysiwygPlugin) {
     super(leaf);
@@ -116,16 +117,16 @@ export class SidebarView extends ItemView {
 
     this.makeResizable(divider);
     this.unsubscribe = this.plugin.index.subscribe(() => this.queueRender());
-    // Bookmarks live outside the index; refresh the nav when they change.
-    this.unsubscribeBookmarks = onBookmarksChanged(this.app, () => this.renderNav());
+    this.watchBookmarks();
     this.registerEvent(this.app.workspace.on("file-open", () => this.markActive()));
-    // The index tracks notes only; attachments come straight from the vault.
+    // The index tracks .md only; everything else (attachments, and bookmarked
+    // canvases/bases) comes straight from the vault, so re-render ourselves.
     const onFile = (file: { path: string }) => {
-      if (!/\.(md|canvas|base)$/i.test(file.path)) this.queueRender();
+      if (!/\.md$/i.test(file.path)) this.queueRender();
     };
-    this.registerEvent(this.app.vault.on("create", onFile));
-    this.registerEvent(this.app.vault.on("delete", onFile));
-    this.registerEvent(this.app.vault.on("rename", onFile));
+    for (const name of ["create", "delete", "rename", "modify"] as const) {
+      this.registerEvent(this.app.vault.on(name as "create", onFile));
+    }
     this.render();
   }
 
@@ -179,25 +180,37 @@ export class SidebarView extends ItemView {
   }
 
   /**
-   * Notes the user wrote, apart from the companions that belong with
-   * attachments: extracted-text notes and anything inside an attachment
-   * folder (per Obsidian's attachment-location setting).
+   * Split the index into the user's notes and attachment companions. A note
+   * is only folded under a file when it is `type: extracted-text` AND one of
+   * its links resolves to an actual attachment — so it has a card to live
+   * on. Everything else stays a note, including notes the user keeps inside
+   * an Attachments folder and extracts whose source is gone: hiding a note
+   * with nowhere else to find it would lose it from the sidebar entirely.
    */
   private partition(): Partitioned {
     const isAttachmentFolder = attachmentFolderMatcher(attachmentFolderSetting(this.app));
     const notes: NoteSummary[] = [];
-    const companions = new Map<string, NoteSummary>();
+    const companions = new Map<string, NoteSummary[]>();
     for (const note of this.plugin.index.all()) {
-      if (!isCompanion(note, isAttachmentFolder)) {
+      const source = note.extracted ? this.sourceFile(note) : null;
+      if (!source) {
         notes.push(note);
         continue;
       }
-      const source = note.sourceLink
-        ? this.app.metadataCache.getFirstLinkpathDest(note.sourceLink, note.path)
-        : null;
-      if (source) companions.set(source.path, note);
+      const list = companions.get(source.path);
+      if (list) list.push(note);
+      else companions.set(source.path, [note]);
     }
     return { notes, companions, isAttachmentFolder };
+  }
+
+  /** The first of a companion's links that resolves to an attachment file. */
+  private sourceFile(note: NoteSummary): TFile | null {
+    for (const link of note.sourceLinks) {
+      const file = this.app.metadataCache.getFirstLinkpathDest(link, note.path);
+      if (file && !DOCUMENT_EXTENSIONS.has(file.extension.toLowerCase())) return file;
+    }
+    return null;
   }
 
   private attachmentFiles(): AttachmentFile[] {
@@ -221,7 +234,22 @@ export class SidebarView extends ItemView {
 
   // ---------- nav column ----------
 
+  /**
+   * Bookmarks live outside the index; refresh the nav when they change. The
+   * listener belongs to the Bookmarks plugin's current instance, which is
+   * replaced when the user toggles that core plugin — so re-attach whenever
+   * the instance differs from the one we're watching.
+   */
+  private watchBookmarks(): void {
+    const instance = bookmarksInstance(this.app);
+    if (instance === this.watchedBookmarks) return;
+    this.unsubscribeBookmarks?.();
+    this.watchedBookmarks = instance;
+    this.unsubscribeBookmarks = onBookmarksChanged(this.app, () => this.renderNav());
+  }
+
   private renderNav(): void {
+    this.watchBookmarks();
     const nav = this.navEl;
     nav.empty();
     const { notes, isAttachmentFolder } = this.partition();
@@ -618,17 +646,18 @@ export class SidebarView extends ItemView {
     this.renderIncrementally(items.length, (i) => {
       const item = items[i];
       if ("label" in item) this.bodyEl.createDiv({ cls: "ps-group-label", text: item.label });
-      else if ("file" in item) this.renderAttachmentCard(item.file, companions.get(item.file.path));
+      else if ("file" in item) this.renderAttachmentCard(item.file, companions.get(item.file.path) ?? []);
     });
   }
 
-  private renderAttachmentCard(file: AttachmentFile, companion: NoteSummary | undefined): void {
+  private renderAttachmentCard(file: AttachmentFile, companions: NoteSummary[]): void {
     const card = this.bodyEl.createDiv({ cls: "ps-card", attr: { "data-path": file.path } });
     card.toggleClass("is-active", this.app.workspace.getActiveFile()?.path === file.path);
     const text = card.createDiv("ps-card-text");
     text.createDiv({ cls: "ps-card-title", text: file.name });
     // The extracted text is the best preview of what the file says.
-    if (companion?.snippet) text.createDiv({ cls: "ps-card-snippet", text: companion.snippet });
+    const snippet = companions.find((c) => c.snippet)?.snippet;
+    if (snippet) text.createDiv({ cls: "ps-card-snippet", text: snippet });
     const meta = text.createDiv("ps-card-meta");
     meta.createSpan({ cls: "ps-card-tag", text: file.extension.toUpperCase() });
     meta.createSpan({ text: formatSize(file.size) });
@@ -650,18 +679,18 @@ export class SidebarView extends ItemView {
     card.addEventListener("contextmenu", (evt) => {
       evt.preventDefault();
       const menu = new Menu();
-      if (companion) {
+      for (const companion of companions) {
         menu.addItem((item) =>
           item
-            .setTitle("Open extracted text")
+            .setTitle(companions.length > 1 ? `Open extracted text: ${companion.title}` : "Open extracted text")
             .setIcon("text")
             .onClick(() => {
               const note = this.app.vault.getAbstractFileByPath(companion.path);
               if (note instanceof TFile) void openFile(this.app, note, false);
             })
         );
-        menu.addSeparator();
       }
+      if (companions.length) menu.addSeparator();
       this.app.workspace.trigger("file-menu", menu, tfile, "plainsight-sidebar");
       menu.showAtMouseEvent(evt);
     });

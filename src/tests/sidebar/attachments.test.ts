@@ -4,7 +4,6 @@ import {
   attachmentFolderMatcher,
   attachmentsFor,
   formatSize,
-  isCompanion,
 } from "../../sidebar/core/attachments";
 import { note } from "./fixtures";
 
@@ -33,19 +32,6 @@ describe("attachmentFolderMatcher", () => {
   });
 });
 
-describe("isCompanion", () => {
-  const m = attachmentFolderMatcher("./Attachments");
-  test("extracted text is a companion wherever it lives", () => {
-    expect(isCompanion(note("Work/x.md", { extracted: true }), m)).toBe(true);
-  });
-  test("any note inside an attachments folder is a companion", () => {
-    expect(isCompanion(note("Work/Attachments/x.md"), m)).toBe(true);
-  });
-  test("an ordinary note is not", () => {
-    expect(isCompanion(note("Work/x.md"), m)).toBe(false);
-  });
-});
-
 describe("attachmentsFor", () => {
   const file = (path: string, mtime: number): AttachmentFile => ({
     path,
@@ -58,7 +44,13 @@ describe("attachmentsFor", () => {
   });
   const files = [file("A/Attachments/brev.pdf", 1), file("A/Attachments/foto.jpg", 2)];
   const companions = new Map([
-    ["A/Attachments/brev.pdf", note("A/Attachments/brev.md", { searchText: "afgørelse om samvær" })],
+    [
+      "A/Attachments/brev.pdf",
+      [
+        note("A/Attachments/brev.md", { searchText: "afgørelse om samvær" }),
+        note("A/Attachments/brev 2.md", { searchText: "genoptagelse" }),
+      ],
+    ],
   ]);
   const names = (list: AttachmentFile[]) => list.map((f) => f.name);
 
@@ -72,6 +64,10 @@ describe("attachmentsFor", () => {
 
   test("search matches the extracted text of the file", () => {
     expect(names(attachmentsFor(files, companions, "samvær", "modified"))).toEqual(["brev.pdf"]);
+  });
+
+  test("search covers every companion of a file, not just one", () => {
+    expect(names(attachmentsFor(files, companions, "genoptagelse", "modified"))).toEqual(["brev.pdf"]);
   });
 
   test("title sort is by name", () => {

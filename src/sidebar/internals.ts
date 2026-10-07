@@ -49,6 +49,11 @@ export function readBookmarks(app: App): Bookmark[] | null {
   return out;
 }
 
+/** The current Bookmarks plugin instance (identity changes on toggle), or null. */
+export function bookmarksInstance(app: App): unknown {
+  return internalPlugin(app, "bookmarks") ?? null;
+}
+
 /**
  * Call `callback` whenever bookmarks are added, removed, renamed or moved.
  * The Bookmarks instance is an Events object that triggers "changed" from

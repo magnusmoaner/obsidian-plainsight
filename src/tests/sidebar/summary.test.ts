@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { FileFacts, firstFileLink, firstImage, summarize } from "../../sidebar/core/summary";
+import { FileFacts, fileLinks, firstImage, summarize } from "../../sidebar/core/summary";
 
 const facts = (over: Partial<FileFacts> = {}): FileFacts => ({
   path: "Inbox/Note.md",
@@ -59,15 +59,20 @@ describe("summarize", () => {
   });
 });
 
-describe("firstFileLink", () => {
-  test("finds the first plain link to a non-note file", () => {
-    expect(firstFileLink("See [[Other note]] and [[Attachments/scan 1.pdf|scan]] then [[b.png]]")).toBe(
-      "Attachments/scan 1.pdf"
-    );
+describe("fileLinks", () => {
+  test("plain links with a file extension, in order", () => {
+    expect(fileLinks("See [[Other note]] and [[Attachments/scan 1.pdf|scan]] then [[b.png]]")).toEqual([
+      "Attachments/scan 1.pdf",
+      "b.png",
+    ]);
   });
 
   test("ignores embeds and note links", () => {
-    expect(firstFileLink("![[pic.png]] [[Note.md]] [[Note]]")).toBeNull();
+    expect(fileLinks("![[pic.png]] [[Note.md]] [[Note]]")).toEqual([]);
+  });
+
+  test("a dotted note name is a candidate too; resolution decides", () => {
+    expect(fileLinks("[[Møde 2026.10.07]] [[scan.pdf]]")).toEqual(["Møde 2026.10.07", "scan.pdf"]);
   });
 });
 
@@ -78,12 +83,12 @@ describe("extracted-text companions", () => {
       "---\ntype: extracted-text\n---\nSource: [[Brev.pdf]]\nText…"
     );
     expect(s.extracted).toBe(true);
-    expect(s.sourceLink).toBe("Brev.pdf");
+    expect(s.sourceLinks).toEqual(["Brev.pdf"]);
   });
 
   test("an ordinary note is not a companion, even if it links a file", () => {
     const s = summarize(facts(), "See [[Brev.pdf]]");
     expect(s.extracted).toBe(false);
-    expect(s.sourceLink).toBeNull();
+    expect(s.sourceLinks).toEqual([]);
   });
 });

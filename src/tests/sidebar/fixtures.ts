@@ -16,7 +16,7 @@ export function note(path: string, over: Partial<NoteSummary> = {}): NoteSummary
     thumbnail: null,
     searchText: path.toLowerCase(),
     extracted: false,
-    sourceLink: null,
+    sourceLinks: [],
     ...over,
   };
 }

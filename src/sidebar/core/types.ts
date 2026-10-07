@@ -33,8 +33,13 @@ export interface NoteSummary {
    * Attachments rather than as a note.
    */
   extracted: boolean;
-  /** For a companion: the link target of the file it was extracted from. */
-  sourceLink: string | null;
+  /**
+   * For a companion: its plain [[links]] that look like files, in order. The
+   * Obsidian layer takes the first that resolves to an attachment as the
+   * source. Several candidates, because a dotted note name ("Notes 2026.10")
+   * looks like a file link until it's resolved.
+   */
+  sourceLinks: string[];
 }
 
 /** Done or cancelled — no longer an open task. */
