@@ -100,6 +100,15 @@ describe("folderRows", () => {
     ]);
   });
 
+  test("excludes folders the predicate rejects, e.g. attachment folders", () => {
+    const withAtt = [note("A/x.md"), note("A/Attachments/c.md")];
+    expect(
+      folderRows(["A", "A/Attachments"], withAtt, null, (f) => f.endsWith("/Attachments")).map(
+        (r) => [r.path, r.count]
+      )
+    ).toEqual([["A", 2]]);
+  });
+
   test("excludes the templates folder", () => {
     expect(folderRows(["A", "Templates"], [note("Templates/t.md")], "Templates")).toEqual([]);
   });

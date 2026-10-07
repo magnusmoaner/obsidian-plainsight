@@ -27,6 +27,14 @@ export interface NoteSummary {
   thumbnail: string | null;
   /** Lower-cased title, tags and body for search, capped in length. */
   searchText: string;
+  /**
+   * A machine-extracted text companion of an attachment (`type:
+   * extracted-text`), not a note the user wrote. Shown with its file under
+   * Attachments rather than as a note.
+   */
+  extracted: boolean;
+  /** For a companion: the link target of the file it was extracted from. */
+  sourceLink: string | null;
 }
 
 /** Done or cancelled — no longer an open task. */

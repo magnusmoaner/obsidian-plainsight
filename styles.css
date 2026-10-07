@@ -481,3 +481,17 @@
 .ps-sidebar.is-mobile.show-list .ps-list {
   display: flex;
 }
+/* Non-image attachments get a file icon where an image would show. */
+.ps-card-fileicon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 64px;
+  border-radius: 4px;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+}
+.ps-card-fileicon svg {
+  width: 28px;
+  height: 28px;
+}

@@ -82,6 +82,17 @@ export function templateOptions(app: App): TemplateOptions {
   };
 }
 
+/**
+ * Obsidian's "Default location for new attachments" (Files & links), as
+ * stored: "/", "./", "./Sub" or "Folder". Read through the same
+ * undocumented-but-stable vault.getConfig as the Live Preview takeover.
+ */
+export function attachmentFolderSetting(app: App): string {
+  const vault = app.vault as unknown as { getConfig?(key: string): unknown };
+  const value = vault.getConfig?.("attachmentFolderPath");
+  return typeof value === "string" ? value : "/";
+}
+
 export function openGlobalSearch(app: App, query: string): boolean {
   const search = internalPlugin(app, "global-search") as { openGlobalSearch?(q: string): void } | null;
   if (typeof search?.openGlobalSearch !== "function") return false;

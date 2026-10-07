@@ -18,6 +18,17 @@ const IMAGE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
 const EMBED = /!\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]|!\[[^\]]*\]\(([^)\s]+)[^)]*\)/g;
 const SEARCH_CAP = 20000;
 
+const FILE_LINK = /(?<!!)\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g;
+
+/** First plain (non-embed) wikilink to a non-note file, e.g. [[scan.pdf]]. */
+export function firstFileLink(text: string): string | null {
+  for (const match of text.matchAll(FILE_LINK)) {
+    const target = match[1].trim();
+    if (/\.[a-z0-9]{2,5}$/i.test(target) && !/\.md$/i.test(target)) return target;
+  }
+  return null;
+}
+
 export function firstImage(text: string): string | null {
   for (const match of text.matchAll(EMBED)) {
     const target = (match[1] ?? safeDecode(match[2])).trim();
@@ -48,6 +59,7 @@ export function normalizeTags(tags: string[]): string[] {
 export function summarize(facts: FileFacts, text: string): NoteSummary {
   const tags = normalizeTags(facts.tags);
   const pinned = facts.frontmatter?.pinned;
+  const extracted = facts.frontmatter?.type === "extracted-text";
   return {
     path: facts.path,
     title: facts.basename,
@@ -60,5 +72,7 @@ export function summarize(facts: FileFacts, text: string): NoteSummary {
     tasks: parseTasks(text),
     thumbnail: firstImage(text),
     searchText: `${facts.basename} ${tags.join(" ")} ${text.slice(0, SEARCH_CAP)}`.toLowerCase(),
+    extracted,
+    sourceLink: extracted ? firstFileLink(text) : null,
   };
 }

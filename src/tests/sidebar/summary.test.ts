@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { FileFacts, firstImage, summarize } from "../../sidebar/core/summary";
+import { FileFacts, firstFileLink, firstImage, summarize } from "../../sidebar/core/summary";
 
 const facts = (over: Partial<FileFacts> = {}): FileFacts => ({
   path: "Inbox/Note.md",
@@ -56,5 +56,34 @@ describe("summarize", () => {
     expect(summarize(facts({ frontmatter: { pinned: "true" } }), "").pinned).toBe(true);
     expect(summarize(facts({ frontmatter: { pinned: "yes" } }), "").pinned).toBe(false);
     expect(summarize(facts(), "").pinned).toBe(false);
+  });
+});
+
+describe("firstFileLink", () => {
+  test("finds the first plain link to a non-note file", () => {
+    expect(firstFileLink("See [[Other note]] and [[Attachments/scan 1.pdf|scan]] then [[b.png]]")).toBe(
+      "Attachments/scan 1.pdf"
+    );
+  });
+
+  test("ignores embeds and note links", () => {
+    expect(firstFileLink("![[pic.png]] [[Note.md]] [[Note]]")).toBeNull();
+  });
+});
+
+describe("extracted-text companions", () => {
+  test("flags the note and records its source file", () => {
+    const s = summarize(
+      facts({ frontmatter: { type: "extracted-text" } }),
+      "---\ntype: extracted-text\n---\nSource: [[Brev.pdf]]\nText…"
+    );
+    expect(s.extracted).toBe(true);
+    expect(s.sourceLink).toBe("Brev.pdf");
+  });
+
+  test("an ordinary note is not a companion, even if it links a file", () => {
+    const s = summarize(facts(), "See [[Brev.pdf]]");
+    expect(s.extracted).toBe(false);
+    expect(s.sourceLink).toBeNull();
   });
 });

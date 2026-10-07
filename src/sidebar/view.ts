@@ -15,10 +15,18 @@ import {
   TreeRow,
   visibleRows,
 } from "./core/queries";
+import {
+  AttachmentFile,
+  attachmentFolderMatcher,
+  attachmentsFor,
+  formatSize,
+  isCompanion,
+} from "./core/attachments";
 import { taskDisplayText } from "./core/tasks";
 import { isClosed, NoteSummary } from "./core/types";
 import { createNote, openFile, toggleTask, togglePin } from "./actions";
 import {
+  attachmentFolderSetting,
   Bookmark,
   onBookmarksChanged,
   openGlobalSearch,
@@ -31,7 +39,18 @@ export const SIDEBAR_VIEW = "plainsight-sidebar";
 /** Cards rendered per scroll step; the rest load as the end comes into view. */
 const BATCH = 100;
 
-type ListItem = { label: string } | { note: NoteSummary };
+type ListItem = { label: string } | { note: NoteSummary } | { file: AttachmentFile };
+
+/** Not attachments: notes, canvases and bases are documents in their own right. */
+const DOCUMENT_EXTENSIONS = new Set(["md", "canvas", "base"]);
+
+/** The index split into the user's notes and attachment companions. */
+interface Partitioned {
+  notes: NoteSummary[];
+  /** Attachment file path → its extracted-text note. */
+  companions: Map<string, NoteSummary>;
+  isAttachmentFolder: (folder: string) => boolean;
+}
 
 /** Two columns: places on the left, the selected place's notes or tasks on the right. */
 export class SidebarView extends ItemView {
@@ -100,6 +119,13 @@ export class SidebarView extends ItemView {
     // Bookmarks live outside the index; refresh the nav when they change.
     this.unsubscribeBookmarks = onBookmarksChanged(this.app, () => this.renderNav());
     this.registerEvent(this.app.workspace.on("file-open", () => this.markActive()));
+    // The index tracks notes only; attachments come straight from the vault.
+    const onFile = (file: { path: string }) => {
+      if (!/\.(md|canvas|base)$/i.test(file.path)) this.queueRender();
+    };
+    this.registerEvent(this.app.vault.on("create", onFile));
+    this.registerEvent(this.app.vault.on("delete", onFile));
+    this.registerEvent(this.app.vault.on("rename", onFile));
     this.render();
   }
 
@@ -152,6 +178,43 @@ export class SidebarView extends ItemView {
     return { sort: this.sort, search, templatesFolder: templateOptions(this.app).folder };
   }
 
+  /**
+   * Notes the user wrote, apart from the companions that belong with
+   * attachments: extracted-text notes and anything inside an attachment
+   * folder (per Obsidian's attachment-location setting).
+   */
+  private partition(): Partitioned {
+    const isAttachmentFolder = attachmentFolderMatcher(attachmentFolderSetting(this.app));
+    const notes: NoteSummary[] = [];
+    const companions = new Map<string, NoteSummary>();
+    for (const note of this.plugin.index.all()) {
+      if (!isCompanion(note, isAttachmentFolder)) {
+        notes.push(note);
+        continue;
+      }
+      const source = note.sourceLink
+        ? this.app.metadataCache.getFirstLinkpathDest(note.sourceLink, note.path)
+        : null;
+      if (source) companions.set(source.path, note);
+    }
+    return { notes, companions, isAttachmentFolder };
+  }
+
+  private attachmentFiles(): AttachmentFile[] {
+    return this.app.vault
+      .getFiles()
+      .filter((f) => !DOCUMENT_EXTENSIONS.has(f.extension.toLowerCase()))
+      .map((f) => ({
+        path: f.path,
+        name: f.name,
+        folder: !f.parent || f.parent.isRoot() ? "" : f.parent.path,
+        extension: f.extension.toLowerCase(),
+        size: f.stat.size,
+        mtime: f.stat.mtime,
+        ctime: f.stat.ctime,
+      }));
+  }
+
   private currentFolder(): string | null {
     return this.place.kind === "notebook" ? this.place.folder : null;
   }
@@ -161,7 +224,7 @@ export class SidebarView extends ItemView {
   private renderNav(): void {
     const nav = this.navEl;
     nav.empty();
-    const notes = this.plugin.index.all();
+    const { notes, isAttachmentFolder } = this.partition();
     const templates = templateOptions(this.app).folder;
     const unfiltered = this.queryOptions("");
 
@@ -182,9 +245,10 @@ export class SidebarView extends ItemView {
       : null;
     this.placeRow(nav, "Notes", "file-text", { kind: "notes" }, 0, noteCount);
     this.placeRow(nav, "Tasks", "check-circle-2", { kind: "tasks" }, 0, openTasks);
+    this.placeRow(nav, "Attachments", "paperclip", { kind: "attachments" }, 0, this.attachmentFiles().length);
     this.placeRow(nav, "Templates", "layout-template", { kind: "templates" }, 0, templateCount);
 
-    const notebooks = folderRows(this.plugin.indexer.folders(), notes, templates);
+    const notebooks = folderRows(this.plugin.indexer.folders(), notes, templates, isAttachmentFolder);
     if (notebooks.length && this.navHeading(nav, "Notebooks", "book", "section:notebooks")) {
       this.treeSection(nav, notebooks, "notebook", (row) => ({ kind: "notebook", folder: row.path }));
     }
@@ -351,6 +415,8 @@ export class SidebarView extends ItemView {
 
     if (this.place.kind === "tasks") {
       this.renderTasks();
+    } else if (this.place.kind === "attachments") {
+      this.renderAttachments();
     } else if (this.place.kind === "templates" && !templateOptions(this.app).folder) {
       this.renderHeader("Templates", null);
       const empty = this.bodyEl.createDiv("ps-empty");
@@ -364,7 +430,7 @@ export class SidebarView extends ItemView {
   }
 
   private renderNotes(): void {
-    const list = notesFor(this.plugin.index.all(), this.place, this.queryOptions());
+    const list = notesFor(this.partition().notes, this.place, this.queryOptions());
     this.renderHeader(this.placeTitle(), list.length);
     if (!list.length) {
       this.bodyEl.createDiv({ cls: "ps-empty", text: this.search ? "No matches" : "No notes" });
@@ -378,7 +444,7 @@ export class SidebarView extends ItemView {
     this.renderIncrementally(items.length, (i) => {
       const item = items[i];
       if ("label" in item) this.bodyEl.createDiv({ cls: "ps-group-label", text: item.label });
-      else this.renderCard(item.note);
+      else if ("note" in item) this.renderCard(item.note);
     });
   }
 
@@ -457,6 +523,8 @@ export class SidebarView extends ItemView {
         return "Tasks";
       case "templates":
         return "Templates";
+      case "attachments":
+        return "Attachments";
       case "notebook":
         return this.place.folder.split("/").pop()!;
       case "tag":
@@ -534,6 +602,71 @@ export class SidebarView extends ItemView {
     return file ? this.app.vault.getResourcePath(file) : null;
   }
 
+  private renderAttachments(): void {
+    const { companions } = this.partition();
+    const files = attachmentsFor(this.attachmentFiles(), companions, this.search, this.sort);
+    this.renderHeader("Attachments", files.length);
+    if (!files.length) {
+      this.bodyEl.createDiv({ cls: "ps-empty", text: this.search ? "No matches" : "No attachments" });
+      return;
+    }
+    const items: ListItem[] = [];
+    for (const group of groupNotes(files, this.sort)) {
+      if (group.label) items.push({ label: group.label });
+      for (const file of group.notes) items.push({ file });
+    }
+    this.renderIncrementally(items.length, (i) => {
+      const item = items[i];
+      if ("label" in item) this.bodyEl.createDiv({ cls: "ps-group-label", text: item.label });
+      else if ("file" in item) this.renderAttachmentCard(item.file, companions.get(item.file.path));
+    });
+  }
+
+  private renderAttachmentCard(file: AttachmentFile, companion: NoteSummary | undefined): void {
+    const card = this.bodyEl.createDiv({ cls: "ps-card", attr: { "data-path": file.path } });
+    card.toggleClass("is-active", this.app.workspace.getActiveFile()?.path === file.path);
+    const text = card.createDiv("ps-card-text");
+    text.createDiv({ cls: "ps-card-title", text: file.name });
+    // The extracted text is the best preview of what the file says.
+    if (companion?.snippet) text.createDiv({ cls: "ps-card-snippet", text: companion.snippet });
+    const meta = text.createDiv("ps-card-meta");
+    meta.createSpan({ cls: "ps-card-tag", text: file.extension.toUpperCase() });
+    meta.createSpan({ text: formatSize(file.size) });
+    meta.createSpan({ cls: "ps-card-date", text: cardDate(this.sort === "created" ? file.ctime : file.mtime) });
+    const parent = file.folder.split("/").filter((p) => !/^attachments$/i.test(p)).pop();
+    if (parent) meta.createSpan({ text: parent });
+
+    const tfile = this.app.vault.getAbstractFileByPath(file.path);
+    if (!(tfile instanceof TFile)) return;
+    if (/^(png|jpe?g|gif|webp|svg|bmp|avif)$/.test(file.extension)) {
+      card
+        .createDiv("ps-card-thumb")
+        .createEl("img", { attr: { src: this.app.vault.getResourcePath(tfile), loading: "lazy", alt: "" } });
+    } else {
+      setIcon(card.createDiv("ps-card-thumb ps-card-fileicon"), file.extension === "pdf" ? "file-text" : "file");
+    }
+
+    card.addEventListener("click", (evt) => void openFile(this.app, tfile, Keymap.isModEvent(evt)));
+    card.addEventListener("contextmenu", (evt) => {
+      evt.preventDefault();
+      const menu = new Menu();
+      if (companion) {
+        menu.addItem((item) =>
+          item
+            .setTitle("Open extracted text")
+            .setIcon("text")
+            .onClick(() => {
+              const note = this.app.vault.getAbstractFileByPath(companion.path);
+              if (note instanceof TFile) void openFile(this.app, note, false);
+            })
+        );
+        menu.addSeparator();
+      }
+      this.app.workspace.trigger("file-menu", menu, tfile, "plainsight-sidebar");
+      menu.showAtMouseEvent(evt);
+    });
+  }
+
   /** Cheap highlight update when a note is opened elsewhere. */
   private markActive(): void {
     const active = this.app.workspace.getActiveFile()?.path;
@@ -547,7 +680,7 @@ export class SidebarView extends ItemView {
   private renderTasks(): void {
     const today = localISODate();
     const rows = taskRows(
-      this.plugin.index.all(),
+      this.partition().notes,
       this.taskFilter,
       today,
       templateOptions(this.app).folder

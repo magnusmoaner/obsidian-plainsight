@@ -5,7 +5,8 @@ export type Place =
   | { kind: "notebook"; folder: string }
   | { kind: "tag"; tag: string }
   | { kind: "tasks" }
-  | { kind: "templates" };
+  | { kind: "templates" }
+  | { kind: "attachments" };
 
 export type SortKey = "modified" | "created" | "title";
 
@@ -15,9 +16,16 @@ export interface QueryOptions {
   templatesFolder: string | null;
 }
 
-export interface NoteGroup {
+export interface NoteGroup<T = NoteSummary> {
   label: string;
-  notes: NoteSummary[];
+  notes: T[];
+}
+
+/** What month grouping needs; NoteSummary and AttachmentFile both fit. */
+interface Dated {
+  mtime: number;
+  ctime: number;
+  pinned?: boolean;
 }
 
 function inPlace(note: NoteSummary, place: Place, templates: string | null): boolean {
@@ -38,6 +46,8 @@ function inPlace(note: NoteSummary, place: Place, templates: string | null): boo
       return isTemplate;
     case "tasks":
       return note.tasks.length > 0;
+    case "attachments":
+      return false; // files, not notes: listed by attachmentsFor
   }
 }
 
@@ -65,8 +75,8 @@ export function notesFor(notes: NoteSummary[], place: Place, opts: QueryOptions)
 }
 
 /** Pinned notes first, then (for date sorts) one group per month. */
-export function groupNotes(sorted: NoteSummary[], sort: SortKey): NoteGroup[] {
-  const groups: NoteGroup[] = [];
+export function groupNotes<T extends Dated>(sorted: T[], sort: SortKey): NoteGroup<T>[] {
+  const groups: NoteGroup<T>[] = [];
   const pinned = sorted.filter((n) => n.pinned);
   const rest = sorted.filter((n) => !n.pinned);
   if (pinned.length) groups.push({ label: "Pinned Notes", notes: pinned });
@@ -75,7 +85,7 @@ export function groupNotes(sorted: NoteSummary[], sort: SortKey): NoteGroup[] {
     groups.push({ label: "", notes: rest });
     return groups;
   }
-  let current: NoteGroup | null = null;
+  let current: NoteGroup<T> | null = null;
   for (const n of rest) {
     const label = new Date(sort === "created" ? n.ctime : n.mtime).toLocaleString("en-US", {
       month: "long",
@@ -125,16 +135,20 @@ function treeRows(counts: Map<string, number>): TreeRow[] {
   return rows;
 }
 
-/** Notebooks: folders holding notes (directly or below), templates excluded. */
+/**
+ * Notebooks: folders holding notes (directly or below). Templates and any
+ * folder `exclude` rejects (attachment folders) are left out.
+ */
 export function folderRows(
   folders: string[],
   notes: NoteSummary[],
-  templatesFolder: string | null
+  templatesFolder: string | null,
+  exclude: (folder: string) => boolean = () => false
 ): TreeRow[] {
   const counts = new Map<string, number>();
   const countUnder = (folder: string) => notes.filter((n) => inFolder(n.folder, folder)).length;
   for (const folder of folders) {
-    if (!folder || (templatesFolder && inFolder(folder, templatesFolder))) continue;
+    if (!folder || (templatesFolder && inFolder(folder, templatesFolder)) || exclude(folder)) continue;
     const count = countUnder(folder);
     if (count > 0) counts.set(folder, count);
   }
