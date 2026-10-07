@@ -4,56 +4,93 @@
  * (Obsidian's processFrontMatter would drop comments and change quoting).
  */
 
-const FRONTMATTER = /^---(\r?\n)(?:([\s\S]*?)\r?\n)?---(?=\r?\n|$)/;
+import { prependFrontmatter, readFrontmatter, writeFrontmatter } from "./frontmatter";
 
 /** A clean tag from user input, or null if Obsidian wouldn't accept it. */
 export function normalizeTag(input: string): string | null {
   const tag = input.trim().replace(/^#+/, "").replace(/^\/+|\/+$/g, "");
   if (!tag) return null;
-  // Obsidian tags: letters (any script), digits, _ - / — and not all digits.
-  if (!/^[\p{L}\p{N}_\-/]+$/u.test(tag)) return null;
+  // Obsidian tags: letters/marks of any script, digits, emoji, _ - / — and
+  // not only digits. No spaces or punctuation.
+  if (!/^[\p{L}\p{M}\p{N}\p{Extended_Pictographic}\u200d\ufe0f_\-/]+$/u.test(tag)) return null;
   if (/^[\d/]+$/.test(tag)) return null;
   return tag;
 }
 
-const clean = (value: string) => value.trim().replace(/^["']|["']$/g, "").replace(/^#/, "").toLowerCase();
+const unquote = (value: string) => value.trim().replace(/^(["'])(.*)\1$/, "$2");
+const same = (value: string, tag: string) =>
+  unquote(value).replace(/^#/, "").toLowerCase() === tag.toLowerCase();
 
-/** Add `tag` to the note's `tags` property, keeping whatever style it uses. */
-export function addTag(text: string, tag: string): string {
-  const fm = FRONTMATTER.exec(text);
-  if (!fm) {
-    const eol = text.includes("\r\n") ? "\r\n" : "\n";
-    return `---${eol}tags:${eol}  - ${tag}${eol}---${eol}${text}`;
-  }
-  const [block, eol, body = ""] = fm;
-  const rest = text.slice(block.length);
-  const lines = body ? body.split(/\r?\n/) : [];
-  const wanted = tag.toLowerCase();
-  const at = lines.findIndex((l) => /^tags:/.test(l));
+/** A list item we can compare safely: plain, or fully quoted — no comment. */
+const SAFE_ITEM = /^(?:"[^"]*"|'[^']*'|[^#"'[\]{},][^#"'[\]{}]*?)\s*$/;
+const ITEM = /^(\s*)-\s+(.*)$/;
+const BLANK_OR_COMMENT = /^\s*(#.*)?$/;
 
+/**
+ * Add `tag` to the note's tags property by editing only its lines, in the
+ * style the note already uses. Recognised shapes: no tags key, a block list
+ * (any consistent indent, incl. column 0), a one-line `[a, b]` list without
+ * quotes or comments, and a single plain word. Returns the text unchanged
+ * when the tag is already there, and **null for anything else** —
+ * comments, multi-line flow lists, quoted commas, mixed indents — rather
+ * than risk writing YAML that no longer parses (which would make Obsidian
+ * drop every property of the note).
+ */
+export function addTag(text: string, tag: string): string | null {
+  const fm = readFrontmatter(text);
+  if (!fm) return prependFrontmatter(text, ["tags:", `  - ${tag}`]);
+  const { lines } = fm;
+  // Obsidian reads the first key matching /^tags?$/i.
+  const at = lines.findIndex((l) => /^tags?\s*:/i.test(l));
   if (at === -1) {
     lines.push("tags:", `  - ${tag}`);
-  } else {
-    const value = lines[at].slice("tags:".length).trim();
-    if (value === "") {
-      // Block list (possibly empty) on the following indented "- " lines.
-      let end = at + 1;
-      while (end < lines.length && /^\s+-\s/.test(lines[end])) end++;
-      const items = lines.slice(at + 1, end);
-      if (items.some((l) => clean(l.replace(/^\s+-\s/, "")) === wanted)) return text;
-      const indent = items.length ? items[items.length - 1].match(/^\s+/)![0] : "  ";
-      lines.splice(end, 0, `${indent}- ${tag}`);
-    } else if (value.startsWith("[") && value.endsWith("]")) {
-      const items = value.slice(1, -1).split(",").map((v) => v.trim()).filter(Boolean);
-      if (items.some((v) => clean(v) === wanted)) return text;
-      lines[at] = `tags: [${[...items, tag].join(", ")}]`;
-    } else {
-      const items = value.split(",").map((v) => v.trim()).filter(Boolean);
-      if (items.some((v) => clean(v) === wanted)) return text;
-      lines[at] = `tags: [${[...items, tag].join(", ")}]`;
-    }
+    return writeFrontmatter(fm);
   }
-  return `---${eol}${lines.join(eol)}${eol}---${rest}`;
+  const colon = lines[at].indexOf(":");
+  const key = lines[at].slice(0, colon).trimEnd();
+  const value = lines[at].slice(colon + 1).trim();
+
+  if (value === "") {
+    let end = at + 1;
+    let indent: string | null = null;
+    const items: string[] = [];
+    for (; end < lines.length; end++) {
+      const m = ITEM.exec(lines[end]);
+      if (!m) break;
+      if (indent !== null && m[1] !== indent) return null; // mixed indents
+      if (!SAFE_ITEM.test(m[2])) return null;
+      indent = m[1];
+      items.push(m[2]);
+    }
+    // Comments or blank lines followed by more items: the list continues
+    // in a shape we don't edit.
+    for (let i = end; i < lines.length && BLANK_OR_COMMENT.test(lines[i]); i++) {
+      if (ITEM.test(lines[i + 1] ?? "")) return null;
+    }
+    // An indented non-item line right after the key (nested map, block
+    // scalar) isn't a list at all.
+    if (!items.length && end < lines.length && /^\s+\S/.test(lines[end])) return null;
+    if (items.some((item) => same(item, tag))) return text;
+    lines.splice(end, 0, `${indent ?? "  "}- ${tag}`);
+    return writeFrontmatter(fm);
+  }
+
+  const flow = /^\[([^\]#"'[{}]*)\]$/.exec(value);
+  if (flow) {
+    const items = flow[1].split(",").map((v) => v.trim()).filter(Boolean);
+    if (items.some((item) => same(item, tag))) return text;
+    lines[at] = `${key}: [${[...items, tag].join(", ")}]`;
+    return writeFrontmatter(fm);
+  }
+
+  // A single plain word. Anything with spaces, commas, quotes or comments
+  // has ambiguous meaning to Obsidian; leave it for the user.
+  if (/^[^\s#"'[\]{},:]+$/.test(value)) {
+    if (same(value, tag)) return text;
+    lines[at] = `${key}: [${value}, ${tag}]`;
+    return writeFrontmatter(fm);
+  }
+  return null;
 }
 
 /** Append `line` as the file's last line, keeping its line-ending style. */

@@ -477,7 +477,9 @@ export class SidebarView extends ItemView {
   /** The default task note; the first time (or if it's gone), ask and remember. */
   private taskNote(): Promise<TFile | null> {
     const current = this.app.vault.getAbstractFileByPath(this.plugin.settings.defaultTaskNote);
-    if (current instanceof TFile) return Promise.resolve(current);
+    // Only a Markdown note: appending a task line to a canvas, base or PDF
+    // would corrupt it.
+    if (current instanceof TFile && current.extension === "md") return Promise.resolve(current);
     return new Promise((resolve) => {
       new NotePickerModal(this.app, "Choose the note new tasks are added to", (file) => {
         this.plugin.settings.defaultTaskNote = file.path;
@@ -510,7 +512,15 @@ export class SidebarView extends ItemView {
       return;
     }
     new TagModal(this.app, file.basename, existing, (tag) => {
-      void addTagToNote(this.app, file, tag).then(() => this.setPlace({ kind: "tag", tag: tag.toLowerCase() }));
+      void addTagToNote(this.app, file, tag).then((added) => {
+        if (added) this.setPlace({ kind: "tag", tag: tag.toLowerCase() });
+        else
+          new Notice(
+            `"${file.basename}" has a tags property Plainsight won't edit automatically ` +
+              "(comments or a multi-line list). Add the tag in the note's Properties instead.",
+            8000
+          );
+      });
     }).open();
   }
 

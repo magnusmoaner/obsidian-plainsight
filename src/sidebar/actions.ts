@@ -66,9 +66,22 @@ export async function addTaskLine(app: App, file: TFile, line: string): Promise<
   await app.vault.process(file, (data) => appendLine(data, line.trim()));
 }
 
-/** Add a tag to the note's tags property, editing only that property. */
-export async function addTagToNote(app: App, file: TFile, tag: string): Promise<void> {
-  await app.vault.process(file, (data) => addTag(data, tag));
+/**
+ * Add a tag to the note's tags property, editing only that property.
+ * Returns false — and writes nothing — when the property is in a shape
+ * addTag won't edit safely (comments, multi-line lists, …).
+ */
+export async function addTagToNote(app: App, file: TFile, tag: string): Promise<boolean> {
+  let refused = false;
+  await app.vault.process(file, (data) => {
+    const next = addTag(data, tag);
+    if (next === null) {
+      refused = true;
+      return data;
+    }
+    return next;
+  });
+  return !refused;
 }
 
 function availablePath(app: App, folder: string, base: string): string {

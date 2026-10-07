@@ -297,6 +297,22 @@
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
+/* Touch screens have no hover: keep the chevron and "+" visible there. */
+@media (hover: none) {
+  .ps-fold-slot .ps-fold-icon {
+    opacity: 0;
+  }
+  .ps-fold-slot .ps-nav-chevron {
+    opacity: 1;
+  }
+  .ps-nav-add {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .ps-nav-count:has(~ .ps-nav-add) {
+    opacity: 0;
+  }
+}
 /* The count fades out where the "+" fades in, keeping its width. */
 .ps-nav-count {
   transition: opacity 0.1s ease-in-out;

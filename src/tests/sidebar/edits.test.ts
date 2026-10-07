@@ -14,6 +14,11 @@ describe("normalizeTag", () => {
   test("allows unicode, digits, - _ and nesting", () => {
     expect(normalizeTag("sag-2026_ø/år")).toBe("sag-2026_ø/år");
   });
+  test("allows combining marks and emoji, as Obsidian does", () => {
+    expect(normalizeTag("e\u0301tude")).toBe("e\u0301tude");
+    expect(normalizeTag("हिन्दी")).toBe("हिन्दी");
+    expect(normalizeTag("🚀launch")).toBe("🚀launch");
+  });
 });
 
 describe("addTag", () => {
@@ -82,4 +87,56 @@ describe("folderNameError", () => {
     expect(folderNameError("a:b")).not.toBeNull();
     expect(folderNameError(".hidden")).not.toBeNull();
   });
+});
+
+describe("addTag: shapes it edits", () => {
+  test("a zero-indent block list keeps its zero indent", () => {
+    expect(addTag("---\ntags:\n- a\n- b\ntitle: x\n---\nB", "new")).toBe(
+      "---\ntags:\n- a\n- b\n- new\ntitle: x\n---\nB"
+    );
+  });
+
+  test("Tags: and tag: keys are used, not duplicated", () => {
+    expect(addTag("---\nTags:\n  - a\n---\nB", "new")).toBe("---\nTags:\n  - a\n  - new\n---\nB");
+    expect(addTag("---\ntag: a\n---\nB", "new")).toBe("---\ntag: [a, new]\n---\nB");
+  });
+
+  test("a byte-order mark doesn't cause a second frontmatter block", () => {
+    expect(addTag("\uFEFF---\ntitle: x\n---\nB", "new")).toBe(
+      "\uFEFF---\ntitle: x\ntags:\n  - new\n---\nB"
+    );
+  });
+
+  test("a top-level comment after the list is left alone", () => {
+    expect(addTag("---\ntags:\n  - a\n# about x\nx: 1\n---\nB", "new")).toBe(
+      "---\ntags:\n  - a\n  - new\n# about x\nx: 1\n---\nB"
+    );
+  });
+
+  test("quoted block items are compared without their quotes", () => {
+    const text = "---\ntags:\n  - 'new'\n---\nB";
+    expect(addTag(text, "new")).toBe(text);
+  });
+});
+
+describe("addTag: shapes it refuses (null) rather than risk breaking YAML", () => {
+  const refuses = [
+    ["a trailing comment on a flow list", "---\ntags: [a] # x\n---\nB"],
+    ["a comment as the value", "---\ntags: # mine\n  - a\n---\nB"],
+    ["a multi-line flow list", "---\ntags: [a,\n  b]\n---\nB"],
+    ["a quoted comma inside a flow list", '---\ntags: ["a,b"]\n---\nB'],
+    ["a comment line inside a block list", "---\ntags:\n  - a\n  # c\n  - b\n---\nB"],
+    ["a blank line inside a block list", "---\ntags:\n  - a\n\n  - b\n---\nB"],
+    ["mixed indents in a block list", "---\ntags:\n  - a\n    - b\n---\nB"],
+    ["a comment after a block item", "---\ntags:\n  - a # why\n---\nB"],
+    ["a space-separated string", "---\ntags: a b\n---\nB"],
+    ["a comma-separated string", "---\ntags: a, b\n---\nB"],
+    ["a quoted scalar", '---\ntags: "a"\n---\nB'],
+    ["a nested map under tags", "---\ntags:\n  key: v\n---\nB"],
+  ];
+  for (const [name, text] of refuses) {
+    test(name, () => {
+      expect(addTag(text, "new")).toBeNull();
+    });
+  }
 });

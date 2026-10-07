@@ -1,6 +1,7 @@
-// The body group is optional so an empty block (`---\n---`) is still frontmatter.
-const FRONTMATTER = /^---(\r?\n)(?:([\s\S]*?)\r?\n)?---(?=\r?\n|$)/;
-const PINNED_LINE = /^pinned:[^\n\r]*(\r?\n)?/m;
+import { prependFrontmatter, readFrontmatter, writeFrontmatter } from "./frontmatter";
+
+// Top-level key only: an indented "pinned:" belongs to a nested value.
+const PINNED = /^pinned:/;
 
 /**
  * Set or clear `pinned: true` by editing that one line of the frontmatter as
@@ -9,23 +10,15 @@ const PINNED_LINE = /^pinned:[^\n\r]*(\r?\n)?/m;
  * that pinning touches nothing else.
  */
 export function setPinned(text: string, pinned: boolean): string {
-  const fm = FRONTMATTER.exec(text);
-  if (!fm) {
-    if (!pinned) return text;
-    const eol = text.includes("\r\n") ? "\r\n" : "\n";
-    return `---${eol}pinned: true${eol}---${eol}${text}`;
-  }
-  const [block, eol, body = ""] = fm;
-  const rest = text.slice(block.length);
-  const hasLine = PINNED_LINE.test(body);
+  const fm = readFrontmatter(text);
+  if (!fm) return pinned ? prependFrontmatter(text, ["pinned: true"]) : text;
+  const at = fm.lines.findIndex((l) => PINNED.test(l));
   if (pinned) {
-    const next = hasLine
-      ? body.replace(/^pinned:[^\n\r]*/m, "pinned: true")
-      : `${body}${body ? eol : ""}pinned: true`;
-    return `---${eol}${next}${eol}---${rest}`;
+    if (at === -1) fm.lines.push("pinned: true");
+    else fm.lines[at] = "pinned: true";
+  } else {
+    if (at === -1) return text;
+    fm.lines.splice(at, 1);
   }
-  if (!hasLine) return text;
-  // Remove the line together with its line break (or the preceding one if it was last).
-  const next = body.replace(PINNED_LINE, "").replace(/\r?\n$/, "");
-  return `---${eol}${next}${next ? eol : ""}---${rest}`;
+  return writeFrontmatter(fm);
 }

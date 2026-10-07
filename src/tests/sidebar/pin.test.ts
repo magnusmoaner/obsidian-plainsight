@@ -57,3 +57,14 @@ describe("setPinned round trips", () => {
     expect(setPinned(setPinned(text, true), false)).toBe(text);
   });
 });
+
+describe("setPinned with a byte-order mark", () => {
+  test("edits the existing block instead of adding a second one", () => {
+    expect(setPinned("﻿---\ntitle: x\n---\nBody", true)).toBe(
+      "﻿---\ntitle: x\npinned: true\n---\nBody"
+    );
+  });
+  test("a new block goes after the mark", () => {
+    expect(setPinned("﻿Body", true)).toBe("﻿---\npinned: true\n---\nBody");
+  });
+});
