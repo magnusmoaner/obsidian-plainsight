@@ -5,11 +5,17 @@ export interface WysiwygSettings {
   enabled: boolean;
   /** Force Source mode so this plugin is the only renderer. */
   takeOverRendering: boolean;
+  /** Show the Plainsight notes sidebar. */
+  sidebar: boolean;
+  /** Width of the sidebar's nav column, in px. */
+  sidebarNavWidth: number;
 }
 
 export const DEFAULT_SETTINGS: WysiwygSettings = {
   enabled: true,
   takeOverRendering: false,
+  sidebar: true,
+  sidebarNavWidth: 200,
 };
 
 export class WysiwygSettingTab extends PluginSettingTab {
@@ -47,6 +53,19 @@ export class WysiwygSettingTab extends PluginSettingTab {
             this.plugin.settings.takeOverRendering = value;
             await this.plugin.saveSettings();
           })
+      );
+
+    new Setting(this.containerEl)
+      .setName("Notes sidebar")
+      .setDesc(
+        "A two-column sidebar: places (shortcuts, notes, tasks, templates, notebooks, tags) " +
+          "and note cards. Turn off the core File explorer to use it in its place."
+      )
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.sidebar).onChange(async (value) => {
+          this.plugin.settings.sidebar = value;
+          await this.plugin.saveSettings();
+        })
       );
   }
 }

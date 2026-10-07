@@ -6,6 +6,7 @@ import {
   Menu,
   Notice,
   Plugin,
+  WorkspaceLeaf,
 } from "obsidian";
 import { CALLOUT_TYPES, calloutMenu } from "./editor/callout";
 import { enclosingCallout } from "./editor/syntax";
@@ -17,6 +18,9 @@ import {
 } from "./editor/commands";
 import { wysiwyg } from "./editor/extension";
 import { treeOf } from "./editor/parser";
+import { NoteIndex } from "./sidebar/core/note-index";
+import { Indexer } from "./sidebar/indexer";
+import { SIDEBAR_VIEW, SidebarView } from "./sidebar/view";
 import {
   DEFAULT_SETTINGS,
   WysiwygSettings,
@@ -35,6 +39,8 @@ export default class WysiwygPlugin extends Plugin {
   private extensions: Extension[] = [];
   /** Live Preview setting as we found it, restored when we hand control back. */
   private savedLivePreview: boolean | null = null;
+  readonly index = new NoteIndex();
+  indexer!: Indexer;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -125,6 +131,19 @@ export default class WysiwygPlugin extends Plugin {
           return true;
         }),
     });
+
+    this.indexer = new Indexer(this.app, this.index);
+    this.registerView(SIDEBAR_VIEW, (leaf: WorkspaceLeaf) => new SidebarView(leaf, this));
+    this.addCommand({
+      id: "open-sidebar",
+      name: "Open notes sidebar",
+      callback: () => void this.openSidebar(),
+    });
+    this.app.workspace.onLayoutReady(async () => {
+      await this.indexer.build();
+      this.indexer.start((ref) => this.registerEvent(ref));
+      if (this.settings.sidebar) await this.openSidebar();
+    });
   }
 
   /** Map a rendered callout back to its source line and rewrite `[!type]`.
@@ -168,6 +187,24 @@ export default class WysiwygPlugin extends Plugin {
     await this.saveData(this.settings);
     this.refreshExtensions();
     this.applyRenderingMode();
+    this.applySidebarSetting();
+  }
+
+  async openSidebar(): Promise<void> {
+    const { workspace } = this.app;
+    let leaf = workspace.getLeavesOfType(SIDEBAR_VIEW)[0];
+    if (!leaf) {
+      const left = workspace.getLeftLeaf(false);
+      if (!left) return;
+      await left.setViewState({ type: SIDEBAR_VIEW, active: true });
+      leaf = left;
+    }
+    await workspace.revealLeaf(leaf);
+  }
+
+  private applySidebarSetting(): void {
+    if (!this.settings.sidebar) this.app.workspace.detachLeavesOfType(SIDEBAR_VIEW);
+    else if (this.app.workspace.layoutReady) void this.openSidebar();
   }
 
   onunload(): void {
