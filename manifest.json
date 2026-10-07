@@ -1,9 +1,9 @@
 {
-  "id": "wysiwyg-editor",
-  "name": "WYSIWYG Editor",
+  "id": "plainsight",
+  "name": "Plainsight",
   "version": "0.1.0",
   "minAppVersion": "1.5.0",
-  "description": "True WYSIWYG Markdown editing: syntax never shown, formatting via hotkeys, Markdown stays the file format.",
+  "description": "Calm, syntax-free Markdown editing: formatting renders as you type, syntax stays hidden, and Markdown remains the file format.",
   "author": "Magnus",
   "isDesktopOnly": false
 }

@@ -1,7 +1,7 @@
 {
-  "name": "obsidian-wysiwyg-editor",
+  "name": "plainsight",
   "version": "0.1.0",
-  "description": "True WYSIWYG Markdown editing for Obsidian",
+  "description": "Calm, syntax-free Markdown editing and an Evernote-like sidebar for Obsidian",
   "main": "main.js",
   "license": "MIT",
   "scripts": {

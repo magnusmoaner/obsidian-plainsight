@@ -1,8 +1,8 @@
-# Obsidian WYSIWYG Editor
+# Plainsight
 
-A CodeMirror 6 extension for Obsidian that provides a more fully rendered, WYSIWYG-style Markdown editing experience while preserving ordinary Markdown files as the source of truth.
+An Obsidian plugin for a calm, document-like note experience. Markdown renders without its syntax while you edit, and ordinary Markdown files remain the source of truth. A two-column notes sidebar (notebooks, tags, tasks, note cards) is planned.
 
-> **Status:** Project bootstrap. Implementation has not started.
+> **Status:** In development. Shipped: inline marks (bold, italic, code), headings, and callouts. Next: wikilinks, frontmatter, lists, and the sidebar. See `docs/plans/`.
 
 ## Goal
 

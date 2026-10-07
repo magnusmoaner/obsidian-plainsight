@@ -5,7 +5,7 @@ import { join } from "path";
 
 const dest =
   process.env.OBSIDIAN_PLUGIN_DIR ??
-  "/Users/magnus/Library/Mobile Documents/iCloud~md~obsidian/Documents/moaner./.obsidian/plugins/wysiwyg-editor";
+  "/Users/magnus/Library/Mobile Documents/iCloud~md~obsidian/Documents/moaner./.obsidian/plugins/plainsight";
 
 mkdirSync(dest, { recursive: true });
 for (const file of ["main.js", "manifest.json", "styles.css"]) {
