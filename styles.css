@@ -354,9 +354,9 @@
 .ps-back:hover {
   background: var(--background-modifier-hover);
 }
+/* Wraps Obsidian's SearchComponent, which brings its own pill styling. */
 .ps-search {
   margin: 0 14px 8px;
-  width: calc(100% - 28px);
 }
 .ps-filters {
   display: flex;

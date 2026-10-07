@@ -1,4 +1,15 @@
-import { ItemView, Keymap, Menu, Notice, Platform, setIcon, TFile, TFolder, WorkspaceLeaf } from "obsidian";
+import {
+  ItemView,
+  Keymap,
+  Menu,
+  Notice,
+  Platform,
+  SearchComponent,
+  setIcon,
+  TFile,
+  TFolder,
+  WorkspaceLeaf,
+} from "obsidian";
 import type WysiwygPlugin from "../main";
 import { cardDate, localISODate } from "./core/format";
 import {
@@ -104,17 +115,16 @@ export class SidebarView extends ItemView {
     const divider = root.createDiv("ps-divider");
     const list = root.createDiv("ps-list");
     this.headerEl = list.createDiv("ps-list-header");
-    // Built once: re-creating the input on every render would steal focus mid-typing.
-    const search = list.createEl("input", {
-      cls: "ps-search",
-      type: "search",
-      placeholder: "Search",
-    });
-    search.addEventListener("input", () => {
-      this.search = search.value;
-      this.resetScroll();
-      this.renderList();
-    });
+    // Obsidian's own SearchComponent: the same pill, magnifier and clear
+    // button as its other search fields. Built once — re-creating it on
+    // every render would steal focus mid-typing.
+    new SearchComponent(list.createDiv("ps-search"))
+      .setPlaceholder("Search")
+      .onChange((value) => {
+        this.search = value;
+        this.resetScroll();
+        this.renderList();
+      });
     this.filtersEl = list.createDiv("ps-filters");
     this.bodyEl = list.createDiv("ps-list-body");
 
