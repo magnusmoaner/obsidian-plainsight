@@ -21,6 +21,7 @@ import { treeOf } from "./editor/parser";
 import { NoteIndex } from "./sidebar/core/note-index";
 import { Indexer } from "./sidebar/indexer";
 import { SIDEBAR_VIEW, SidebarView } from "./sidebar/view";
+import { readBookmarks, removeBookmark } from "./sidebar/internals";
 import {
   DEFAULT_SETTINGS,
   WysiwygSettings,
@@ -137,6 +138,21 @@ export default class WysiwygPlugin extends Plugin {
 
     this.indexer = new Indexer(this.app, this.index);
     this.registerView(SIDEBAR_VIEW, (leaf: WorkspaceLeaf) => new SidebarView(leaf, this));
+    this.addCommand({
+      id: "remove-dead-bookmarks",
+      name: "Remove bookmarks to deleted notes",
+      callback: () => {
+        const dead = (readBookmarks(this.app) ?? []).filter(
+          (b) => b.kind !== "search" && !this.app.vault.getAbstractFileByPath(b.target)
+        );
+        const removed = dead.filter((b) => removeBookmark(this.app, b)).length;
+        new Notice(
+          dead.length === 0
+            ? "No bookmarks point to deleted notes."
+            : `Removed ${removed} of ${dead.length} bookmark${dead.length === 1 ? "" : "s"} to deleted notes.`
+        );
+      },
+    });
     this.addCommand({
       id: "open-sidebar",
       name: "Open notes sidebar",
