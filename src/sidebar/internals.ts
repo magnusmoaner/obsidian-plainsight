@@ -13,6 +13,8 @@ export interface Bookmark {
   target: string;
   /** "#Heading" or "#^block" for bookmarks that point inside a note. */
   subpath: string;
+  /** The plugin's own item object; removeBookmark needs this exact reference. */
+  raw: unknown;
 }
 
 type Loose = Record<string, unknown> | null | undefined;
@@ -38,15 +40,28 @@ export function readBookmarks(app: App): Bookmark[] | null {
       const subpath = typeof item.subpath === "string" ? item.subpath : "";
       if (item.type === "group" && Array.isArray(item.items)) walk(item.items);
       else if (item.type === "file" && typeof item.path === "string")
-        out.push({ kind: "file", target: item.path, subpath, title: title ?? lastSegment(item.path) });
+        out.push({ kind: "file", target: item.path, subpath, title: title ?? lastSegment(item.path), raw });
       else if (item.type === "folder" && typeof item.path === "string")
-        out.push({ kind: "folder", target: item.path, subpath: "", title: title ?? lastSegment(item.path) });
+        out.push({ kind: "folder", target: item.path, subpath: "", title: title ?? lastSegment(item.path), raw });
       else if (item.type === "search" && typeof item.query === "string")
-        out.push({ kind: "search", target: item.query, subpath: "", title: title ?? item.query });
+        out.push({ kind: "search", target: item.query, subpath: "", title: title ?? item.query, raw });
     }
   };
   walk(items);
   return out;
+}
+
+/**
+ * Remove a bookmark through the Bookmarks plugin, which finds its group,
+ * saves, and fires "changed". This is the only way to delete a bookmark to a
+ * deleted note: the core Bookmarks pane hides those. Returns false if the
+ * API isn't there.
+ */
+export function removeBookmark(app: App, bookmark: Bookmark): boolean {
+  const instance = internalPlugin(app, "bookmarks") as { removeItem?(item: unknown): void } | null;
+  if (typeof instance?.removeItem !== "function") return false;
+  instance.removeItem(bookmark.raw);
+  return true;
 }
 
 /** The current Bookmarks plugin instance (identity changes on toggle), or null. */

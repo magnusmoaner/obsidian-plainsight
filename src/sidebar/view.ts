@@ -32,6 +32,7 @@ import {
   openGlobalSearch,
   openSettingsTab,
   readBookmarks,
+  removeBookmark,
   templateOptions,
 } from "./internals";
 
@@ -380,10 +381,27 @@ export class SidebarView extends ItemView {
     const missing = bookmark.kind !== "search" && !target;
     const row = this.navRow(parent, bookmark.title, icon, 1, null, false);
     row.toggleClass("is-missing", missing);
-    if (missing) row.setAttribute("aria-label", `Missing: ${bookmark.target}`);
+    if (missing) row.setAttribute("aria-label", `Deleted: ${bookmark.target}. Click to remove the bookmark.`);
+    const menu = (evt: MouseEvent) => {
+      evt.preventDefault();
+      const m = new Menu();
+      m.addItem((item) =>
+        item
+          .setTitle("Remove bookmark")
+          .setIcon("bookmark-minus")
+          .onClick(() => {
+            if (!removeBookmark(this.app, bookmark)) {
+              new Notice("Couldn't remove it: the Bookmarks plugin didn't respond as expected.");
+            }
+          })
+      );
+      m.showAtMouseEvent(evt);
+    };
+    row.addEventListener("contextmenu", menu);
     row.addEventListener("click", (evt) => {
       if (missing) {
-        new Notice(`"${bookmark.target}" no longer exists. Remove the bookmark in the Bookmarks pane.`);
+        // Nothing to open; offer the one useful action right here.
+        menu(evt);
       } else if (bookmark.kind === "folder" && target instanceof TFolder) {
         this.setPlace({ kind: "notebook", folder: target.path });
       } else if (bookmark.kind === "search") {
