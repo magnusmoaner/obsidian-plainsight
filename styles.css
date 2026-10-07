@@ -222,33 +222,67 @@
   transition: transform 0.1s ease-in-out;
 }
 .ps-nav-chevron svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 .ps-nav-chevron.is-collapsed {
   transform: rotate(-90deg);
 }
-/* Foldable rows show their icon normally and the fold chevron on hover. */
+/*
+ * Hover affordances must not reflow the row: the fold chevron and the icon
+ * share one fixed 16px box (stacked, swapped by opacity), and the "+" sits
+ * absolutely at the right edge over the count, also swapped by opacity.
+ * Nothing toggles display, so the row's size never changes on hover.
+ */
+.ps-nav-heading,
+.ps-nav-item {
+  position: relative;
+  min-height: 28px;
+  box-sizing: border-box;
+}
 .ps-fold-slot {
   position: relative;
+  width: 16px;
+  height: 16px;
+}
+.ps-fold-slot > span {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.1s ease-in-out, transform 0.1s ease-in-out;
+}
+.ps-fold-slot svg {
+  width: 16px;
+  height: 16px;
 }
 .ps-fold-slot .ps-nav-chevron {
-  display: none;
+  opacity: 0;
 }
 .is-foldable:hover .ps-fold-slot .ps-fold-icon {
-  display: none;
+  opacity: 0;
 }
 .is-foldable:hover .ps-fold-slot .ps-nav-chevron {
-  display: inline-flex;
+  opacity: 1;
 }
-/* "+" at the right of Notebooks, Tags and Tasks, on hover only. */
+/* "+" at the right of Tasks, Folders and Tags, shown on hover. */
 .ps-nav-add {
-  display: none;
-  margin-left: auto;
-  padding: 1px;
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
   border-radius: 4px;
   color: var(--text-muted);
   cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s ease-in-out;
 }
 .ps-nav-add svg {
   width: 16px;
@@ -256,16 +290,19 @@
 }
 .ps-nav-heading:hover .ps-nav-add,
 .ps-nav-item:hover .ps-nav-add {
-  display: inline-flex;
+  opacity: 1;
+  pointer-events: auto;
 }
 .ps-nav-add:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
-/* A row with both a count and a "+": the "+" replaces the count on hover. */
-.ps-nav-item:hover .ps-nav-add ~ .ps-nav-count,
+/* The count fades out where the "+" fades in, keeping its width. */
+.ps-nav-count {
+  transition: opacity 0.1s ease-in-out;
+}
 .ps-nav-item:hover .ps-nav-count:has(~ .ps-nav-add) {
-  display: none;
+  opacity: 0;
 }
 .ps-modal-error {
   min-height: 1.2em;
