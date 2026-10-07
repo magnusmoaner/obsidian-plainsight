@@ -1,3 +1,41 @@
+/* Heading lines. Values come from the active Obsidian theme's own heading
+   variables so headings match Reading view; the fallbacks only matter outside
+   Obsidian (tests, standalone CM). */
+.cm-wys-heading {
+  font-weight: var(--heading-formatting, 600);
+  line-height: var(--line-height-tight, 1.3);
+}
+.cm-wys-h1 {
+  font-size: var(--h1-size, 1.802em);
+  font-weight: var(--h1-weight, 700);
+  color: var(--h1-color, inherit);
+}
+.cm-wys-h2 {
+  font-size: var(--h2-size, 1.602em);
+  font-weight: var(--h2-weight, 600);
+  color: var(--h2-color, inherit);
+}
+.cm-wys-h3 {
+  font-size: var(--h3-size, 1.424em);
+  font-weight: var(--h3-weight, 600);
+  color: var(--h3-color, inherit);
+}
+.cm-wys-h4 {
+  font-size: var(--h4-size, 1.266em);
+  font-weight: var(--h4-weight, 600);
+  color: var(--h4-color, inherit);
+}
+.cm-wys-h5 {
+  font-size: var(--h5-size, 1.125em);
+  font-weight: var(--h5-weight, 600);
+  color: var(--h5-color, inherit);
+}
+.cm-wys-h6 {
+  font-size: var(--h6-size, 1em);
+  font-weight: var(--h6-weight, 600);
+  color: var(--h6-color, inherit);
+}
+
 .cm-wys-strong { font-weight: 700; }
 .cm-wys-em { font-style: italic; }
 .cm-wys-code {
@@ -6,3 +44,111 @@
   border-radius: 3px;
   padding: 0 2px;
 }
+
+/* Stands in for the hidden `[!type]` token and opens the type picker. */
+.cm-wys-callout-icon {
+  position: absolute;
+  top: 0.35em;
+  right: 0.5em;
+  cursor: pointer;
+  padding: 0 0.4em;
+  border-radius: 4px;
+  font-size: 0.9em;
+  line-height: 1.4;
+  user-select: none;
+  background-color: var(--background-secondary, rgba(0, 0, 0, 0.06));
+  opacity: 0.65;
+}
+.cm-wys-callout-icon:hover {
+  opacity: 1;
+}
+
+/* Same control on the rendered box, where Obsidian puts "Edit this block". */
+.callout {
+  position: relative;
+}
+.cm-wys-callout-menu {
+  position: absolute;
+  top: 0.4em;
+  right: 0.5em;
+  cursor: pointer;
+  padding: 0 0.4em;
+  border-radius: 4px;
+  line-height: 1.4;
+  background-color: var(--background-secondary, rgba(0, 0, 0, 0.06));
+  opacity: 0;
+  transition: opacity 0.1s ease-in-out;
+}
+.callout:hover .cm-wys-callout-menu {
+  opacity: 0.65;
+}
+.cm-wys-callout-menu:hover {
+  opacity: 1;
+}
+
+/* Callout box for the editing state.
+   Obsidian renders a callout as a replacing block widget (cm-embed-block) and
+   hands the source lines back only while you are editing them. These rules
+   apply exactly in that window, so the box no longer vanishes mid-edit.
+
+   Every colour carries a literal RGB fallback: Obsidian's --callout-* vars are
+   not reliably in scope on a .cm-line, and without a fallback the whole
+   rgba() is invalid and the box silently does not render at all. */
+.cm-wys-callout {
+  --cw: 158, 158, 158;
+  background-color: rgba(var(--cw), 0.1);
+  border-left: 1px solid rgba(var(--cw), 0.35);
+  border-right: 1px solid rgba(var(--cw), 0.35);
+  padding-left: 0.9em;
+  padding-right: 0.9em;
+}
+/* Each line is its own block, so only the end lines close the box. */
+.cm-wys-callout-first {
+  position: relative;
+  border-top: 1px solid rgba(var(--cw), 0.35);
+  border-top-left-radius: var(--callout-radius, 8px);
+  border-top-right-radius: var(--callout-radius, 8px);
+  padding-top: 0.6em;
+  font-weight: 600;
+  color: rgb(var(--cw));
+}
+.cm-wys-callout-last {
+  border-bottom: 1px solid rgba(var(--cw), 0.35);
+  border-bottom-left-radius: var(--callout-radius, 8px);
+  border-bottom-right-radius: var(--callout-radius, 8px);
+  padding-bottom: 0.6em;
+}
+.cm-wys-callout .cm-wys-callout-icon {
+  color: rgb(var(--cw));
+}
+
+/* Literal RGB triples, not Obsidian's --callout-* vars: those do not resolve
+   to an "r, g, b" triple here, which makes every rgba() using them invalid and
+   silently drops the whole box. Values match Obsidian's default palette. */
+.cm-wys-callout-quote,
+.cm-wys-callout-cite { --cw: 158, 158, 158; }
+.cm-wys-callout-note { --cw: 8, 109, 221; }
+.cm-wys-callout-info { --cw: 2, 122, 255; }
+.cm-wys-callout-todo { --cw: 2, 122, 255; }
+.cm-wys-callout-tip,
+.cm-wys-callout-hint { --cw: 0, 191, 188; }
+.cm-wys-callout-important { --cw: 8, 109, 221; }
+.cm-wys-callout-check,
+.cm-wys-callout-success,
+.cm-wys-callout-done { --cw: 8, 185, 78; }
+.cm-wys-callout-question,
+.cm-wys-callout-help,
+.cm-wys-callout-faq { --cw: 236, 117, 0; }
+.cm-wys-callout-warning,
+.cm-wys-callout-caution,
+.cm-wys-callout-attention { --cw: 236, 117, 0; }
+.cm-wys-callout-failure,
+.cm-wys-callout-fail,
+.cm-wys-callout-missing { --cw: 233, 49, 71; }
+.cm-wys-callout-danger,
+.cm-wys-callout-error { --cw: 233, 49, 71; }
+.cm-wys-callout-bug { --cw: 233, 49, 71; }
+.cm-wys-callout-example { --cw: 120, 82, 238; }
+.cm-wys-callout-abstract,
+.cm-wys-callout-summary,
+.cm-wys-callout-tldr { --cw: 0, 191, 188; }

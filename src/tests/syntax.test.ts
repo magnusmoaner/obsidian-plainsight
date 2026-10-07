@@ -1,7 +1,13 @@
 import { describe, expect, test } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { markdownTree } from "../editor/parser";
-import { inlineMarksIn } from "../editor/syntax";
+import {
+  calloutsIn,
+  enclosingCallout,
+  enclosingHeading,
+  headingsIn,
+  inlineMarksIn,
+} from "../editor/syntax";
 
 function mkState(doc: string): EditorState {
   return EditorState.create({ doc, extensions: [markdownTree] });
@@ -110,5 +116,152 @@ describe("inlineMarksIn", () => {
     // strikethrough is out of scope for M2; nothing should be returned
     expect(inlineMarksIn(mkState("~~x~~"), 0, 5)).toEqual([]);
     expect(inlineMarksIn(s, 0, s.doc.length)).toEqual([]);
+  });
+});
+
+describe("headingsIn", () => {
+  test("reports level, content start and the hidden opening marker", () => {
+    const s = mkState("## Title");
+    expect(headingsIn(s, 0, s.doc.length)).toEqual([
+      {
+        level: 2,
+        from: 0,
+        to: 8,
+        contentFrom: 3,
+        delims: [{ from: 0, to: 3 }],
+      },
+    ]);
+  });
+
+  test("hides every space between the marker and the text", () => {
+    const s = mkState("###   Spaced");
+    expect(headingsIn(s, 0, s.doc.length)[0]).toMatchObject({
+      level: 3,
+      contentFrom: 6,
+      delims: [{ from: 0, to: 6 }],
+    });
+  });
+
+  test("hides a closing sequence together with the space before it", () => {
+    const s = mkState("## Closed ##");
+    expect(headingsIn(s, 0, s.doc.length)[0].delims).toEqual([
+      { from: 0, to: 3 },
+      { from: 9, to: 12 },
+    ]);
+  });
+
+  test("an emptied heading keeps its hidden marker", () => {
+    const s = mkState("# ");
+    expect(headingsIn(s, 0, s.doc.length)[0]).toMatchObject({
+      level: 1,
+      contentFrom: 2,
+      delims: [{ from: 0, to: 2 }],
+    });
+  });
+
+  test("a bare # with no space is not yet a heading", () => {
+    // Lezer already calls this ATXHeading1. Hiding it would blank the
+    // character mid-keystroke and flash it back on the next one.
+    expect(headingsIn(mkState("#"), 0, 1)).toEqual([]);
+    expect(headingsIn(mkState("#NoSpace"), 0, 8)).toEqual([]);
+  });
+
+  test("setext headings are left alone", () => {
+    const s = mkState("Title\n=====");
+    expect(headingsIn(s, 0, s.doc.length)).toEqual([]);
+  });
+
+  test("finds every heading in a multi-line document", () => {
+    const s = mkState("# One\n\ntext\n\n### Three");
+    expect(headingsIn(s, 0, s.doc.length).map((h) => h.level)).toEqual([1, 3]);
+  });
+
+  test("drops headings straddling the window", () => {
+    const s = mkState("# Heading\n\npara");
+    expect(headingsIn(s, 0, 5)).toEqual([]);
+  });
+});
+
+describe("enclosingHeading", () => {
+  test("found from inside the text", () => {
+    expect(enclosingHeading(mkState("## Title"), 5)?.level).toBe(2);
+  });
+
+  test("found at the content start and at the line end", () => {
+    const s = mkState("## Title");
+    expect(enclosingHeading(s, 3)?.contentFrom).toBe(3);
+    expect(enclosingHeading(s, 8)?.level).toBe(2);
+  });
+
+  test("found on a heading that is not the first line", () => {
+    const s = mkState("para\n\n# Later");
+    expect(enclosingHeading(s, 8)?.level).toBe(1);
+  });
+
+  test("null inside a paragraph", () => {
+    expect(enclosingHeading(mkState("just text"), 4)).toBeNull();
+  });
+});
+
+describe("calloutsIn", () => {
+  test("detects type, token range and per-line quote marks", () => {
+    const s = mkState("> [!quote] Title\n> body");
+    expect(calloutsIn(s, 0, s.doc.length)).toEqual([
+      {
+        type: "quote",
+        from: 0,
+        to: 23,
+        tokenFrom: 2,
+        titleFrom: 11,
+        quoteMarks: [
+          { from: 0, to: 2 },
+          { from: 17, to: 19 },
+        ],
+      },
+    ]);
+  });
+
+  test("lowercases the type", () => {
+    const s = mkState("> [!WARNING] T");
+    expect(calloutsIn(s, 0, s.doc.length)[0].type).toBe("warning");
+  });
+
+  test("a plain blockquote is not a callout", () => {
+    expect(calloutsIn(mkState("> just a quote"), 0, 14)).toEqual([]);
+  });
+
+  test("a quote whose text merely contains a link is not a callout", () => {
+    const s = mkState("> see [!not-a-callout] here");
+    expect(calloutsIn(s, 0, s.doc.length)).toEqual([]);
+  });
+
+  test("a titleless callout still reports a title position", () => {
+    const s = mkState("> [!note]\n> body");
+    expect(calloutsIn(s, 0, s.doc.length)[0]).toMatchObject({
+      type: "note",
+      tokenFrom: 2,
+      titleFrom: 9,
+    });
+  });
+
+  test("finds several callouts and drops ones straddling the window", () => {
+    const s = mkState("> [!tip] A\n\n> [!note] B");
+    expect(calloutsIn(s, 0, s.doc.length).map((c) => c.type)).toEqual([
+      "tip",
+      "note",
+    ]);
+    expect(calloutsIn(s, 0, 5)).toEqual([]);
+  });
+});
+
+describe("enclosingCallout", () => {
+  test("found from the body of the callout", () => {
+    const s = mkState("> [!quote] Title\n> body");
+    expect(enclosingCallout(s, 21)?.type).toBe("quote");
+  });
+
+  test("null outside any callout", () => {
+    const s = mkState("> [!quote] T\n\nafter");
+    expect(enclosingCallout(s, 16)).toBeNull();
   });
 });

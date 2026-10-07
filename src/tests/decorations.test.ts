@@ -85,3 +85,105 @@ describe("buildDecorations", () => {
     expect(ranges(decorations)).toEqual([]);
   });
 });
+
+describe("buildDecorations on headings", () => {
+  test("hides the marker and styles the line", () => {
+    const s = mkState("## Title");
+    const { hidden, decorations } = buildDecorations(s, 0, s.doc.length);
+    expect(ranges(hidden)).toEqual([[0, 3, "replace"]]);
+    expect(ranges(decorations)).toContainEqual([
+      0,
+      0,
+      "cm-wys-heading cm-wys-h2",
+    ]);
+  });
+
+  test("line decoration anchors to the heading's own line, not the window", () => {
+    const s = mkState("para\n\n# Later");
+    const { decorations } = buildDecorations(s, 0, s.doc.length);
+    expect(ranges(decorations)).toContainEqual([
+      6,
+      6,
+      "cm-wys-heading cm-wys-h1",
+    ]);
+  });
+
+  test("hides a closing sequence too", () => {
+    const s = mkState("# Closed #");
+    expect(ranges(buildDecorations(s, 0, s.doc.length).hidden)).toEqual([
+      [0, 2, "replace"],
+      [8, 10, "replace"],
+    ]);
+  });
+
+  test("inline marks inside a heading still render", () => {
+    const s = mkState("# a **b**");
+    const { hidden, decorations } = buildDecorations(s, 0, s.doc.length);
+    expect(ranges(hidden)).toEqual([
+      [0, 2, "replace"],
+      [4, 6, "replace"],
+      [7, 9, "replace"],
+    ]);
+    expect(ranges(decorations)).toContainEqual([4, 9, "cm-wys-strong"]);
+  });
+
+  test("a bare # is not decorated", () => {
+    const s = mkState("#");
+    const { hidden, decorations } = buildDecorations(s, 0, s.doc.length);
+    expect(ranges(hidden)).toEqual([]);
+    expect(ranges(decorations)).toEqual([]);
+  });
+});
+
+describe("buildDecorations on callouts", () => {
+  test("hides every quote mark and replaces the type token", () => {
+    const s = mkState("> [!quote] Title\n> body");
+    const { hidden, decorations } = buildDecorations(s, 0, s.doc.length);
+    // Quote marks hidden; the token range is atomic but rendered by the widget.
+    expect(ranges(hidden)).toEqual([
+      [0, 2, "replace"],
+      [2, 11, "replace"],
+      [17, 19, "replace"],
+    ]);
+    // Exactly one decoration over the token — the widget, not a plain hide.
+    const overToken = ranges(decorations).filter(
+      ([f, t]) => f === 2 && t === 11
+    );
+    expect(overToken).toHaveLength(1);
+  });
+
+  test("puts a box line decoration on every line, ends marked", () => {
+    const s = mkState("> [!info] T\n> a\n> b");
+    const classes = ranges(buildDecorations(s, 0, s.doc.length).decorations)
+      .filter(([, , c]) => c.startsWith("cm-wys-callout"))
+      .map(([f, , c]) => [f, c]);
+    expect(classes).toEqual([
+      [0, "cm-wys-callout cm-wys-callout-info cm-wys-callout-first"],
+      [12, "cm-wys-callout cm-wys-callout-info"],
+      [16, "cm-wys-callout cm-wys-callout-info cm-wys-callout-last"],
+    ]);
+  });
+
+  test("a single-line callout is both first and last", () => {
+    const s = mkState("> [!tip] Only");
+    const classes = ranges(buildDecorations(s, 0, s.doc.length).decorations)
+      .filter(([, , c]) => c.startsWith("cm-wys-callout"))
+      .map(([, , c]) => c);
+    expect(classes).toEqual([
+      "cm-wys-callout cm-wys-callout-tip cm-wys-callout-first cm-wys-callout-last",
+    ]);
+  });
+
+  test("plain blockquotes are left completely alone", () => {
+    const s = mkState("> just a quote\n> more");
+    const { hidden, decorations } = buildDecorations(s, 0, s.doc.length);
+    expect(ranges(hidden)).toEqual([]);
+    expect(ranges(decorations)).toEqual([]);
+  });
+
+  test("inline marks inside a callout body still render", () => {
+    const s = mkState("> [!note] T\n> a **b**");
+    const { decorations } = buildDecorations(s, 0, s.doc.length);
+    expect(ranges(decorations)).toContainEqual([16, 21, "cm-wys-strong"]);
+  });
+});

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { EditorState, EditorSelection } from "@codemirror/state";
 import { markdownTree } from "../editor/parser";
-import { toggleInlineSpec } from "../editor/commands";
+import { setHeadingSpec, toggleInlineSpec } from "../editor/commands";
 
 function mkState(doc: string, anchor: number, head?: number): EditorState {
   return EditorState.create({
@@ -74,5 +74,72 @@ describe("toggleInlineSpec on multi-line constructs (line-scoping regression)", 
 
   test("unwraps with a cursor inside a multi-line strong", () => {
     expect(apply(mkState("**ab\ncd**", 3), "strong")).toBe("ab\ncd");
+  });
+});
+
+function heading(state: EditorState, level: number): string | null {
+  const spec = setHeadingSpec(state, level);
+  if (!spec) return null;
+  return state.update(spec).state.doc.toString();
+}
+
+describe("setHeadingSpec", () => {
+  test("converts a paragraph line into a heading", () => {
+    expect(heading(mkState("Title", 3), 2)).toBe("## Title");
+  });
+
+  test("changes the level of an existing heading, keeping the space", () => {
+    expect(heading(mkState("## Title", 5), 4)).toBe("#### Title");
+  });
+
+  test("re-applying the current level toggles back to a paragraph", () => {
+    expect(heading(mkState("## Title", 5), 2)).toBe("Title");
+  });
+
+  test("level 0 removes the heading", () => {
+    expect(heading(mkState("### Title", 6), 0)).toBe("Title");
+  });
+
+  test("level 0 on a paragraph is a no-op", () => {
+    expect(heading(mkState("Title", 3), 0)).toBeNull();
+  });
+
+  test("removes a closing sequence along with the opener", () => {
+    expect(heading(mkState("## Title ##", 5), 0)).toBe("Title");
+  });
+
+  test("converts an empty line", () => {
+    expect(heading(mkState("a\n\nb", 2), 1)).toBe("a\n# \nb");
+  });
+
+  test("applies to every line the selection touches", () => {
+    expect(heading(mkState("one\ntwo", 1, 5), 3)).toBe("### one\n### two");
+  });
+
+  test("leaves list and quote lines untouched", () => {
+    // Prefixing `# ` inside these produces garbage Markdown; boring failure
+    // until M4/M5 teach the command about block containers.
+    expect(heading(mkState("- item", 3), 1)).toBeNull();
+    expect(heading(mkState("> quoted", 4), 1)).toBeNull();
+  });
+
+  test("changes the level of an indented heading", () => {
+    // Up to three leading spaces are legal before the marker; the `#`s start
+    // at the node position, not the line start.
+    expect(heading(mkState("   ## Title", 8), 1)).toBe("   # Title");
+  });
+
+  test("leaves the caret in the text, past the inserted marker", () => {
+    const s = mkState("Title", 0);
+    const after = s.update(setHeadingSpec(s, 2)!).state;
+    // Caret must land at 3 (start of "Title"), not 0 — typing at 0 would put
+    // characters in front of the `#` and break the heading.
+    expect(after.selection.main.head).toBe(3);
+  });
+
+  test("preserves the caret's position within the text", () => {
+    const s = mkState("Title", 3);
+    const after = s.update(setHeadingSpec(s, 1)!).state;
+    expect(after.selection.main.head).toBe(5);
   });
 });

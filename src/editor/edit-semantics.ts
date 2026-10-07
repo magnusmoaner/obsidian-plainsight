@@ -1,7 +1,7 @@
 import { EditorState, Prec, TransactionSpec } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
-import { toggleCode, toggleEm, toggleStrong } from "./commands";
-import { enclosingInlineMarks, InlineMark } from "./syntax";
+import { setHeading, toggleCode, toggleEm, toggleStrong } from "./commands";
+import { enclosingHeading, enclosingInlineMarks, InlineMark } from "./syntax";
 
 /**
  * Expand a construct deletion outward through enclosing constructs whose
@@ -25,6 +25,18 @@ export function backspaceSpec(state: EditorState): TransactionSpec | null {
   const sel = state.selection.main;
   if (!sel.empty || sel.head === 0) return null;
   const head = sel.head;
+
+  // Caret at the start of heading text: the visible line begins here, so
+  // Backspace means "this is no longer a heading" — drop the whole hidden
+  // `## ` (and any closing ` ##`) rather than eating one `#` and revealing
+  // the rest as text.
+  const heading = enclosingHeading(state, head);
+  if (heading && head === heading.contentFrom) {
+    return {
+      changes: heading.delims.map((d) => ({ from: d.from, to: d.to })),
+      userEvent: "delete.format",
+    };
+  }
 
   // Tree-walk (not line-scoped): constructs can span lines. Innermost first.
   const marks = enclosingInlineMarks(state, head);
@@ -93,5 +105,11 @@ export const wysiwygKeymap = Prec.high(
     { key: "Mod-b", run: toggleStrong },
     { key: "Mod-i", run: toggleEm },
     { key: "Mod-`", run: toggleCode },
+    // Mod-Alt-N, not Mod-N: Obsidian binds Cmd+1..8 to tab switching, and this
+    // keymap would shadow it whenever the editor has focus.
+    ...[0, 1, 2, 3, 4, 5, 6].map((level) => ({
+      key: `Mod-Alt-${level}`,
+      run: setHeading(level),
+    })),
   ])
 );

@@ -1,6 +1,13 @@
 import { EditorState, Range as RangeValue, RangeSet } from "@codemirror/state";
 import { Decoration, DecorationSet } from "@codemirror/view";
-import { InlineMarkType, TextSpan, inlineMarksIn } from "./syntax";
+import { CalloutIconWidget } from "./callout";
+import {
+  InlineMarkType,
+  TextSpan,
+  calloutsIn,
+  headingsIn,
+  inlineMarksIn,
+} from "./syntax";
 
 const hideDelim = Decoration.replace({});
 
@@ -9,6 +16,29 @@ const contentMark: Record<InlineMarkType, Decoration> = {
   em: Decoration.mark({ class: "cm-wys-em" }),
   code: Decoration.mark({ class: "cm-wys-code" }),
 };
+
+// Line rather than mark decorations: the whole line takes the heading's size,
+// so an emptied heading (`# ` alone) keeps its height instead of collapsing.
+const headingLine = [1, 2, 3, 4, 5, 6].map((level) =>
+  Decoration.line({ class: `cm-wys-heading cm-wys-h${level}` })
+);
+
+// One decoration per line; CSS joins them into a continuous box (side borders
+// throughout, top/bottom and radii on the end lines). This only ever renders
+// while Obsidian has handed the source lines back, so it never competes with
+// Obsidian's own cm-embed-block rendering of the same callout.
+function calloutLine(type: string, first: boolean, last: boolean): Decoration {
+  return Decoration.line({
+    class: [
+      "cm-wys-callout",
+      `cm-wys-callout-${type}`,
+      first ? "cm-wys-callout-first" : "",
+      last ? "cm-wys-callout-last" : "",
+    ]
+      .filter(Boolean)
+      .join(" "),
+  });
+}
 
 export interface BuiltDecorations {
   /** Replace decorations over delimiter tokens — also used as atomic ranges. */
@@ -24,6 +54,33 @@ export function buildDecorations(
 ): BuiltDecorations {
   const all: RangeValue<Decoration>[] = [];
   const delims: TextSpan[] = [];
+  // Spans that are atomic but must not get a plain hide decoration, because
+  // something else already renders them (the callout widget).
+  const atomicOnly: TextSpan[] = [];
+  for (const callout of calloutsIn(state, from, to)) {
+    all.push(
+      Decoration.replace({
+        widget: new CalloutIconWidget(callout.type),
+      }).range(callout.tokenFrom, callout.titleFrom)
+    );
+    atomicOnly.push({ from: callout.tokenFrom, to: callout.titleFrom });
+    delims.push(...callout.quoteMarks);
+
+    const firstLine = state.doc.lineAt(callout.from).number;
+    const lastLine = state.doc.lineAt(callout.to).number;
+    for (let n = firstLine; n <= lastLine; n++) {
+      all.push(
+        calloutLine(callout.type, n === firstLine, n === lastLine).range(
+          state.doc.line(n).from
+        )
+      );
+    }
+  }
+  for (const heading of headingsIn(state, from, to)) {
+    const lineStart = state.doc.lineAt(heading.from).from;
+    all.push(headingLine[heading.level - 1].range(lineStart));
+    delims.push(...heading.delims);
+  }
   for (const mark of inlineMarksIn(state, from, to)) {
     all.push(contentMark[mark.type].range(mark.from, mark.to));
     delims.push(...mark.delims);
@@ -45,8 +102,13 @@ export function buildDecorations(
     }
   }
   all.push(...hidden);
+  // atomicOnly joins the caret-skipping set but not the rendered set; only the
+  // positions matter to EditorView.atomicRanges, not the decoration values.
+  const atomic = hidden.concat(
+    atomicOnly.map((s) => hideDelim.range(s.from, s.to))
+  );
   return {
-    hidden: RangeSet.of(hidden, true),
+    hidden: RangeSet.of(atomic, true),
     decorations: RangeSet.of(all, true),
   };
 }

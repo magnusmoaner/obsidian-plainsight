@@ -78,3 +78,33 @@ describe("backspaceSpec", () => {
     expect(backspaceSpec(s)).toBeNull();
   });
 });
+
+describe("backspaceSpec on headings", () => {
+  test("backspace at the start of heading text unformats it", () => {
+    expect(apply("## Title", 3)).toBe("Title");
+  });
+
+  test("goes straight to a paragraph, not down one level", () => {
+    expect(apply("#### Deep", 5)).toBe("Deep");
+  });
+
+  test("takes the closing sequence with it", () => {
+    expect(apply("## Title ##", 3)).toBe("Title");
+  });
+
+  test("empties a heading that has no text left", () => {
+    expect(apply("# ", 2)).toBe("");
+  });
+
+  test("works on a heading below the first line", () => {
+    expect(apply("para\n\n# Later", 8)).toBe("para\n\nLater");
+  });
+
+  test("backspace inside heading text falls through", () => {
+    expect(apply("## Title", 6)).toBeNull();
+  });
+
+  test("inline marks inside a heading still unformat", () => {
+    expect(apply("# a **b**", 9)).toBe("# a b");
+  });
+});
