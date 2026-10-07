@@ -40,6 +40,9 @@ export class SidebarView extends ItemView {
   private bodyEl!: HTMLElement;
   private observers: IntersectionObserver[] = [];
   private renderTimer: number | null = null;
+  /** Items rendered so far; re-renders restore at least this many so the
+   * saved scroll position still has content to land on. */
+  private renderedCount = 0;
   private unsubscribe: (() => void) | null = null;
 
   constructor(leaf: WorkspaceLeaf, private plugin: WysiwygPlugin) {
@@ -77,6 +80,7 @@ export class SidebarView extends ItemView {
     });
     search.addEventListener("input", () => {
       this.search = search.value;
+      this.resetScroll();
       this.renderList();
     });
     this.filtersEl = list.createDiv("ps-filters");
@@ -104,6 +108,12 @@ export class SidebarView extends ItemView {
   }
 
   private render(): void {
+    // A renamed or deleted notebook would otherwise leave an empty list whose
+    // "New note" targets a folder that no longer exists.
+    if (this.place.kind === "notebook" && !this.plugin.indexer.folders().includes(this.place.folder)) {
+      this.place = { kind: "notes" };
+      this.resetScroll();
+    }
     this.contentEl.toggleClass("show-list", this.mobilePane === "list");
     this.renderNav();
     this.renderList();
@@ -112,7 +122,14 @@ export class SidebarView extends ItemView {
   private setPlace(place: Place): void {
     this.place = place;
     this.mobilePane = "list";
+    this.resetScroll();
     this.render();
+  }
+
+  /** A new place, sort, filter or search starts at the top again. */
+  private resetScroll(): void {
+    this.renderedCount = 0;
+    this.bodyEl.scrollTop = 0;
   }
 
   private isActive(place: Place): boolean {
@@ -152,10 +169,7 @@ export class SidebarView extends ItemView {
     }
 
     const noteCount = notesFor(notes, { kind: "notes" }, unfiltered).length;
-    const openTasks = notes.reduce(
-      (n, note) => n + note.tasks.filter((t) => !isClosed(t)).length,
-      0
-    );
+    const openTasks = taskRows(notes, "open", localISODate(), templates).length;
     const templateCount = templates
       ? notesFor(notes, { kind: "templates" }, unfiltered).length
       : null;
@@ -308,9 +322,12 @@ export class SidebarView extends ItemView {
   /** Render `count` items in batches as the user scrolls, not all at once. */
   private renderIncrementally(count: number, renderAt: (i: number) => void): void {
     let next = 0;
+    let size = Math.max(BATCH, this.renderedCount);
     const step = () => {
-      const end = Math.min(next + BATCH, count);
+      const end = Math.min(next + size, count);
       for (; next < end; next++) renderAt(next);
+      this.renderedCount = next;
+      size = BATCH;
       if (next >= count) return;
       const sentinel = this.bodyEl.createDiv("ps-sentinel");
       const observer = new IntersectionObserver(
@@ -360,6 +377,7 @@ export class SidebarView extends ItemView {
             .setChecked(this.sort === key)
             .onClick(() => {
               this.sort = key;
+              this.resetScroll();
               this.renderList();
             })
         );
@@ -465,7 +483,12 @@ export class SidebarView extends ItemView {
 
   private renderTasks(): void {
     const today = localISODate();
-    const rows = taskRows(this.plugin.index.all(), this.taskFilter, today);
+    const rows = taskRows(
+      this.plugin.index.all(),
+      this.taskFilter,
+      today,
+      templateOptions(this.app).folder
+    );
     this.renderHeader("Tasks", rows.length);
 
     const filters: Array<[TaskFilter, string]> = [
@@ -478,6 +501,7 @@ export class SidebarView extends ItemView {
       tab.toggleClass("is-active", this.taskFilter === key);
       tab.addEventListener("click", () => {
         this.taskFilter = key;
+        this.resetScroll();
         this.renderList();
       });
     }
@@ -492,7 +516,12 @@ export class SidebarView extends ItemView {
       const box = row.createEl("input", { type: "checkbox", cls: "task-list-item-checkbox" });
       box.checked = isClosed(task);
       box.addEventListener("click", (evt) => evt.stopPropagation());
-      box.addEventListener("change", () => void toggleTask(this.app, note.path, task.line, task.text));
+      box.addEventListener("change", async () => {
+        // On success the index update re-renders the row. When nothing was
+        // written (stale line, or Tasks declined), put the box back.
+        const written = await toggleTask(this.app, note.path, task);
+        if (!written) box.checked = isClosed(task);
+      });
 
       const body = row.createDiv("ps-task-body");
       body.createDiv({ cls: "ps-task-text", text: taskDisplayText(task.text) || task.text });

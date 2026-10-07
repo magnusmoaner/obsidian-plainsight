@@ -1,6 +1,8 @@
 import { App, moment, Notice, normalizePath, PaneType, TFile, WorkspaceLeaf } from "obsidian";
 import { applyTemplate } from "./core/format";
-import { toggleTaskLine } from "./core/tasks";
+import { setPinned } from "./core/pin";
+import { matchTaskLine, toggleTaskLine } from "./core/tasks";
+import { TaskItem } from "./core/types";
 import { templateOptions, tasksToggle } from "./internals";
 
 // Obsidian types its moment export as the namespace, which isn't callable
@@ -9,34 +11,32 @@ const now = moment as unknown as () => { format(pattern: string): string };
 
 /*
  * Every write the sidebar makes. Each changes exactly what it names — one
- * task line, one frontmatter key, or a new file — and nothing else, so
+ * task line, one frontmatter line, or a new file — and nothing else, so
  * Tasks-plugin metadata (📅 🔁 ⏫ 🆔 …) passes through untouched.
  */
 
 /**
- * Toggle the task on `lineNo`, but only if that line still holds the task we
- * rendered (`expectedText`). If the note changed underneath us, do nothing
- * rather than tick the wrong line.
+ * Toggle the task on `lineNo`, but only if that line is still exactly the
+ * task we rendered (same status, same text). If the note changed underneath
+ * us, write nothing rather than tick — or let the Tasks plugin rewrite — the
+ * wrong line. Returns whether the file was changed, so the caller can reset
+ * its checkbox when it wasn't.
  */
-export async function toggleTask(
-  app: App,
-  path: string,
-  lineNo: number,
-  expectedText: string
-): Promise<void> {
+export async function toggleTask(app: App, path: string, task: TaskItem): Promise<boolean> {
   const file = app.vault.getAbstractFileByPath(path);
-  if (!(file instanceof TFile)) return;
+  if (!(file instanceof TFile)) return false;
+  let written = false;
   let stale = false;
   await app.vault.process(file, (data) => {
     const lines = data.split("\n");
-    const line = lines[lineNo];
-    const bare = line?.replace(/\r$/, "");
-    if (bare === undefined || !bare.trimEnd().endsWith(expectedText)) {
+    const line = lines[task.line];
+    const current = line === undefined ? null : matchTaskLine(line);
+    if (!current || current.status !== task.status || current.text !== task.text) {
       stale = true;
       return data;
     }
     const cr = line.endsWith("\r") ? "\r" : "";
-    const viaTasks = tasksToggle(app, bare, path);
+    const viaTasks = tasksToggle(app, line.replace(/\r$/, ""), path);
     const next =
       viaTasks !== null
         ? viaTasks
@@ -45,17 +45,19 @@ export async function toggleTask(
             .join("\n")
         : toggleTaskLine(line);
     if (next === null || next === line) return data;
-    lines[lineNo] = next;
+    lines[task.line] = next;
+    written = true;
     return lines.join("\n");
   });
-  if (stale) new Notice("That note changed. The task list has been refreshed.");
+  if (stale) new Notice("That task moved or changed in its note, so nothing was ticked.");
+  return written;
 }
 
+/** Flip `pinned: true` by editing that one frontmatter line (see setPinned). */
 export async function togglePin(app: App, file: TFile): Promise<void> {
-  await app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
-    if (fm.pinned === true || fm.pinned === "true") delete fm.pinned;
-    else fm.pinned = true;
-  });
+  const pinned = app.metadataCache.getFileCache(file)?.frontmatter?.pinned;
+  const isPinned = pinned === true || pinned === "true";
+  await app.vault.process(file, (data) => setPinned(data, !isPinned));
 }
 
 function availablePath(app: App, folder: string, base: string): string {

@@ -146,6 +146,15 @@ describe("taskRows", () => {
     expect(keys(taskRows(list, "done", "2026-10-07"))).toEqual(["b.md:1", "a.md:1"]);
   });
 
+  test("tasks inside the templates folder are excluded", () => {
+    const withTemplate = [...list, note("Templates/t.md", { tasks: [t(0, " ")] })];
+    expect(keys(taskRows(withTemplate, "open", "2026-10-07", "Templates"))).toEqual([
+      "b.md:0",
+      "a.md:0",
+      "a.md:2",
+    ]);
+  });
+
   test("taskProgress counts done and cancelled as closed", () => {
     expect(taskProgress(list[1])).toEqual({ closed: 1, total: 2 });
   });

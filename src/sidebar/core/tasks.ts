@@ -28,6 +28,12 @@ export function parseTasks(text: string): TaskItem[] {
   return tasks;
 }
 
+/** The status and text of a task line, or null if it isn't one. */
+export function matchTaskLine(line: string): { status: string; text: string } | null {
+  const match = TASK_LINE.exec(line.replace(/\r$/, ""));
+  return match ? { status: match[2], text: match[4].trim() } : null;
+}
+
 export function taskDisplayText(text: string): string {
   return text.split(TASKS_FIELD)[0].trim();
 }

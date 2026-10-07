@@ -5,16 +5,35 @@ import { NoteSummary } from "./core/types";
 
 /** Keeps a NoteIndex in step with the vault. */
 export class Indexer {
+  /** Set by any vault event; tells build() its snapshot may be out of date. */
+  private dirty = false;
+
   constructor(private app: App, private index: NoteIndex) {}
 
+  /**
+   * Full rebuild. Call after start(): events that land while files are being
+   * read would be overwritten by the older snapshot, so if any arrive we read
+   * again (cachedRead makes the repeat cheap). Bounded so a vault that never
+   * stops changing can't spin forever; the live events still apply after.
+   */
   async build(): Promise<void> {
-    const files = this.app.vault.getMarkdownFiles();
-    this.index.replaceAll(await Promise.all(files.map((f) => this.summarizeFile(f))));
+    for (let attempt = 0; attempt < 3; attempt++) {
+      this.dirty = false;
+      const files = this.app.vault.getMarkdownFiles();
+      const summaries = await Promise.all(files.map((f) => this.summarizeFile(f).catch(() => null)));
+      this.index.replaceAll(summaries.filter((s): s is NoteSummary => s !== null));
+      if (!this.dirty) return;
+    }
   }
 
-  /** Call once, inside onLayoutReady, after build(). */
+  /** Call once, inside onLayoutReady, before build(). */
   start(register: (ref: EventRef) => void): void {
     const { vault, metadataCache } = this.app;
+    const mark = () => (this.dirty = true);
+    for (const name of ["create", "delete", "rename", "modify"] as const) {
+      register(vault.on(name as "create", mark));
+    }
+    register(metadataCache.on("changed", mark));
     // 'changed' carries the new text, so no extra read is needed. On first
     // launch, notes indexed before their metadata existed get their tags here.
     register(
@@ -53,8 +72,11 @@ export class Indexer {
   }
 
   private async upsert(file: TAbstractFile): Promise<void> {
-    if (file instanceof TFile && file.extension === "md") {
+    if (!(file instanceof TFile) || file.extension !== "md") return;
+    try {
       this.index.set(await this.summarizeFile(file));
+    } catch {
+      // Deleted or renamed again before the read finished; that event wins.
     }
   }
 

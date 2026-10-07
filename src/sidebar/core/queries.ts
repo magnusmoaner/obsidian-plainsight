@@ -170,9 +170,20 @@ export interface TaskRow {
   task: TaskItem;
 }
 
-/** `today` is a local YYYY-MM-DD string, so comparison is plain string order. */
-export function taskRows(notes: NoteSummary[], filter: TaskFilter, today: string): TaskRow[] {
-  const rows = notes.flatMap((note) => note.tasks.map((task) => ({ note, task })));
+/**
+ * `today` is a local YYYY-MM-DD string, so comparison is plain string order.
+ * Templates are excluded: their placeholder `- [ ]` lines aren't real tasks,
+ * and ticking one would edit the template.
+ */
+export function taskRows(
+  notes: NoteSummary[],
+  filter: TaskFilter,
+  today: string,
+  templatesFolder: string | null = null
+): TaskRow[] {
+  const rows = notes
+    .filter((note) => templatesFolder === null || !inFolder(note.folder, templatesFolder))
+    .flatMap((note) => note.tasks.map((task) => ({ note, task })));
   const keep = rows.filter(({ task }) => {
     if (filter === "done") return isClosed(task);
     if (isClosed(task)) return false;

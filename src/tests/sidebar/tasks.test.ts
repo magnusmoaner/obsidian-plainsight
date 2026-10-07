@@ -1,5 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { parseTasks, taskDisplayText, toggleTaskLine } from "../../sidebar/core/tasks";
+import {
+  matchTaskLine,
+  parseTasks,
+  taskDisplayText,
+  toggleTaskLine,
+} from "../../sidebar/core/tasks";
 
 describe("parseTasks", () => {
   test("finds tasks with line numbers and statuses", () => {
@@ -63,5 +68,23 @@ describe("toggleTaskLine", () => {
 
   test("returns null for a line that is not a task", () => {
     expect(toggleTaskLine("- just a list item")).toBeNull();
+  });
+});
+
+describe("matchTaskLine", () => {
+  test("returns status and trimmed text", () => {
+    expect(matchTaskLine("  - [x] Pay 📅 2026-10-09 \r")).toEqual({
+      status: "x",
+      text: "Pay 📅 2026-10-09",
+    });
+  });
+
+  test("an empty task has empty text", () => {
+    expect(matchTaskLine("- [ ]")).toEqual({ status: " ", text: "" });
+  });
+
+  test("null for headings and plain list items", () => {
+    expect(matchTaskLine("## Notes")).toBeNull();
+    expect(matchTaskLine("- item")).toBeNull();
   });
 });

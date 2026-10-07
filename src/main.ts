@@ -41,9 +41,12 @@ export default class WysiwygPlugin extends Plugin {
   private savedLivePreview: boolean | null = null;
   readonly index = new NoteIndex();
   indexer!: Indexer;
+  /** The sidebar setting as last acted on; null until loaded. */
+  private sidebarApplied: boolean | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
+    this.sidebarApplied = this.settings.sidebar;
     this.refreshExtensions();
     this.applyRenderingMode();
     this.registerEditorExtension(this.extensions);
@@ -140,8 +143,9 @@ export default class WysiwygPlugin extends Plugin {
       callback: () => void this.openSidebar(),
     });
     this.app.workspace.onLayoutReady(async () => {
-      await this.indexer.build();
+      // Listen first, then build: build() re-reads if anything changed meanwhile.
       this.indexer.start((ref) => this.registerEvent(ref));
+      await this.indexer.build();
       if (this.settings.sidebar) await this.openSidebar();
     });
   }
@@ -202,7 +206,11 @@ export default class WysiwygPlugin extends Plugin {
     await workspace.revealLeaf(leaf);
   }
 
+  /** Act only when the sidebar setting itself changed: re-opening on every
+   * save would re-expand a collapsed sidebar and steal focus. */
   private applySidebarSetting(): void {
+    if (this.settings.sidebar === this.sidebarApplied) return;
+    this.sidebarApplied = this.settings.sidebar;
     if (!this.settings.sidebar) this.app.workspace.detachLeavesOfType(SIDEBAR_VIEW);
     else if (this.app.workspace.layoutReady) void this.openSidebar();
   }
