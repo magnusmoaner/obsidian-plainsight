@@ -127,15 +127,29 @@ export function openSettingsTab(app: App, tabId: string): void {
   setting?.openTabById(tabId);
 }
 
+function tasksApi(app: App): Record<string, unknown> | undefined {
+  const plugins = (app as unknown as { plugins?: { plugins?: Record<string, { apiV1?: unknown }> } })
+    .plugins?.plugins;
+  return plugins?.["obsidian-tasks-plugin"]?.apiV1 as Record<string, unknown> | undefined;
+}
+
+/**
+ * Open the Tasks plugin's own "Create task" dialog (due, scheduled, priority,
+ * recurrence…). Resolves to the finished task line, or "" if cancelled.
+ * Returns null when the Tasks API isn't available.
+ */
+export function tasksCreateModal(app: App): Promise<string> | null {
+  const api = tasksApi(app) as { createTaskLineModal?(): Promise<string> } | undefined;
+  return typeof api?.createTaskLineModal === "function" ? api.createTaskLineModal() : null;
+}
+
 /**
  * Toggle through the Tasks plugin so done dates and recurrence follow its
  * rules. Returns the replacement text (several lines for a recurring task),
  * or null when the API is unavailable.
  */
 export function tasksToggle(app: App, line: string, path: string): string | null {
-  const plugins = (app as unknown as { plugins?: { plugins?: Record<string, { apiV1?: unknown }> } })
-    .plugins?.plugins;
-  const api = plugins?.["obsidian-tasks-plugin"]?.apiV1 as
+  const api = tasksApi(app) as
     | { executeToggleTaskDoneCommand?(line: string, path: string): string }
     | undefined;
   if (typeof api?.executeToggleTaskDoneCommand !== "function") return null;

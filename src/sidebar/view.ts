@@ -23,7 +23,8 @@ import {
 } from "./core/attachments";
 import { taskDisplayText } from "./core/tasks";
 import { isClosed, NoteSummary } from "./core/types";
-import { createNote, openFile, toggleTask, togglePin } from "./actions";
+import { addTagToNote, addTaskLine, createNote, openFile, toggleTask, togglePin } from "./actions";
+import { NotebookModal, NotePickerModal, TagModal, TaskModal } from "./modals";
 import {
   attachmentFolderSetting,
   Bookmark,
@@ -33,6 +34,7 @@ import {
   openSettingsTab,
   readBookmarks,
   removeBookmark,
+  tasksCreateModal,
   templateOptions,
 } from "./internals";
 
@@ -273,31 +275,60 @@ export class SidebarView extends ItemView {
       ? notesFor(notes, { kind: "templates" }, unfiltered).length
       : null;
     this.placeRow(nav, "Notes", "file-text", { kind: "notes" }, 0, noteCount);
-    this.placeRow(nav, "Tasks", "check-circle-2", { kind: "tasks" }, 0, openTasks);
+    this.placeRow(nav, "Tasks", "check-circle-2", { kind: "tasks" }, 0, openTasks, () => void this.newTask());
     this.placeRow(nav, "Attachments", "paperclip", { kind: "attachments" }, 0, this.attachmentFiles().length);
     this.placeRow(nav, "Templates", "layout-template", { kind: "templates" }, 0, templateCount);
 
     const notebooks = folderRows(this.plugin.indexer.folders(), notes, templates, isAttachmentFolder);
-    if (notebooks.length && this.navHeading(nav, "Notebooks", "book", "section:notebooks")) {
+    if (this.navHeading(nav, "Notebooks", "book", "section:notebooks", () => this.newNotebook(isAttachmentFolder))) {
       this.treeSection(nav, notebooks, "notebook", (row) => ({ kind: "notebook", folder: row.path }));
     }
 
     const tags = tagRows(notes);
-    if (tags.length && this.navHeading(nav, "Tags", "tag", "section:tags")) {
+    if (this.navHeading(nav, "Tags", "tag", "section:tags", () => this.newTag(tags.map((t) => t.path)))) {
       this.treeSection(nav, tags, "tag", (row) => ({ kind: "tag", tag: row.path }));
     }
   }
 
-  /** A section heading that folds its section. Returns whether it's expanded. */
-  private navHeading(parent: HTMLElement, label: string, icon: string, key: string): boolean {
+  /**
+   * A section heading that folds its section. Its icon turns into a fold
+   * chevron on hover; `onAdd` adds a "+" on the right, also shown on hover.
+   * Returns whether the section is expanded.
+   */
+  private navHeading(
+    parent: HTMLElement,
+    label: string,
+    icon: string,
+    key: string,
+    onAdd?: (evt: MouseEvent) => void
+  ): boolean {
     const collapsed = this.isCollapsed(key);
-    const el = parent.createDiv("ps-nav-heading");
+    const el = parent.createDiv("ps-nav-heading is-foldable");
     el.toggleClass("is-collapsed", collapsed);
-    setIcon(el.createSpan("ps-nav-icon"), icon);
+    this.foldSlot(el, icon, collapsed);
     el.createSpan({ cls: "ps-nav-label", text: label });
-    setIcon(el.createSpan("ps-nav-chevron"), "chevron-down");
+    if (onAdd) this.addButton(el, `New ${label.toLowerCase().replace(/s$/, "")}`, onAdd);
     el.addEventListener("click", () => this.toggleCollapsed(key));
     return !collapsed;
+  }
+
+  /** Icon slot that shows `icon` normally and a fold chevron on hover. */
+  private foldSlot(row: HTMLElement, icon: string | null, collapsed: boolean): HTMLElement {
+    const slot = row.createSpan("ps-nav-icon ps-fold-slot");
+    if (icon) setIcon(slot.createSpan("ps-fold-icon"), icon);
+    const chevron = slot.createSpan("ps-nav-chevron");
+    chevron.toggleClass("is-collapsed", collapsed);
+    setIcon(chevron, "chevron-down");
+    return slot;
+  }
+
+  private addButton(row: HTMLElement, label: string, onAdd: (evt: MouseEvent) => void): void {
+    const plus = row.createSpan({ cls: "ps-nav-add", attr: { "aria-label": label } });
+    setIcon(plus, "plus-circle");
+    plus.addEventListener("click", (evt) => {
+      evt.stopPropagation();
+      onAdd(evt);
+    });
   }
 
   private isCollapsed(key: string): boolean {
@@ -338,9 +369,11 @@ export class SidebarView extends ItemView {
     icon: string | null,
     place: Place,
     depth: number,
-    count: number | null
+    count: number | null,
+    onAdd?: (evt: MouseEvent) => void
   ): void {
     const row = this.navRow(parent, label, icon, depth, count, this.isActive(place));
+    if (onAdd) this.addButton(row, `New ${label.toLowerCase().replace(/s$/, "")}`, onAdd);
     row.addEventListener("click", () => this.setPlace(place));
   }
 
@@ -361,12 +394,11 @@ export class SidebarView extends ItemView {
       const el = this.navRow(parent, row.name, null, row.depth + 1, row.count, this.isActive(place));
       el.addEventListener("click", () => this.setPlace(place));
       if (!row.hasChildren) continue;
-      // The chevron takes the (otherwise empty) icon slot.
-      const chevron = el.querySelector<HTMLElement>(".ps-nav-icon")!;
-      chevron.addClass("ps-nav-chevron");
-      chevron.toggleClass("is-collapsed", row.collapsed);
-      setIcon(chevron, "chevron-down");
-      chevron.addEventListener("click", (evt) => {
+      // Replace the empty icon slot with one that shows a chevron on hover.
+      el.addClass("is-foldable");
+      const slot = this.foldSlot(el, null, row.collapsed);
+      el.querySelector(".ps-nav-icon")!.replaceWith(slot);
+      slot.addEventListener("click", (evt) => {
         evt.stopPropagation();
         this.toggleCollapsed(`${keyPrefix}:${row.path}`);
       });
@@ -415,6 +447,61 @@ export class SidebarView extends ItemView {
         );
       }
     });
+  }
+
+  // ---------- "+" flows ----------
+
+  /** Tasks' own dialog when available; the result is appended to the task note. */
+  private async newTask(): Promise<void> {
+    const target = await this.taskNote();
+    if (!target) return;
+    const fromTasks = tasksCreateModal(this.app);
+    const line = fromTasks
+      ? await fromTasks
+      : await new Promise<string>((resolve) => new TaskModal(this.app, resolve).open());
+    if (!line.trim()) return; // cancelled
+    await addTaskLine(this.app, target, line);
+    new Notice(`Task added to ${target.basename}`);
+  }
+
+  /** The default task note; the first time (or if it's gone), ask and remember. */
+  private taskNote(): Promise<TFile | null> {
+    const current = this.app.vault.getAbstractFileByPath(this.plugin.settings.defaultTaskNote);
+    if (current instanceof TFile) return Promise.resolve(current);
+    return new Promise((resolve) => {
+      new NotePickerModal(this.app, "Choose the note new tasks are added to", (file) => {
+        this.plugin.settings.defaultTaskNote = file.path;
+        void this.plugin.saveData(this.plugin.settings);
+        new Notice(`New tasks will go to ${file.basename}. Change it in Plainsight settings.`);
+        resolve(file);
+      }).open();
+    });
+  }
+
+  private newNotebook(isAttachmentFolder: (folder: string) => boolean): void {
+    const templates = templateOptions(this.app).folder;
+    const folders = this.plugin.indexer
+      .folders()
+      .filter((f) => !isAttachmentFolder(f) && !(templates && (f === templates || f.startsWith(`${templates}/`))))
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true }));
+    const parent = this.place.kind === "notebook" ? this.place.folder : "";
+    new NotebookModal(this.app, folders, parent, (path) => {
+      void this.app.vault.createFolder(path).then(
+        () => this.setPlace({ kind: "notebook", folder: path }),
+        (err: Error) => new Notice(`Couldn't create the notebook: ${err.message}`)
+      );
+    }).open();
+  }
+
+  private newTag(existing: string[]): void {
+    const file = this.app.workspace.getActiveFile();
+    if (!file || file.extension !== "md") {
+      new Notice("Open a note first: a new tag is added to the note you're in.");
+      return;
+    }
+    new TagModal(this.app, file.basename, existing, (tag) => {
+      void addTagToNote(this.app, file, tag).then(() => this.setPlace({ kind: "tag", tag: tag.toLowerCase() }));
+    }).open();
   }
 
   // ---------- divider ----------

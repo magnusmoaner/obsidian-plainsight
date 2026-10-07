@@ -225,9 +225,52 @@
   width: 14px;
   height: 14px;
 }
-.ps-nav-heading.is-collapsed .ps-nav-chevron,
 .ps-nav-chevron.is-collapsed {
   transform: rotate(-90deg);
+}
+/* Foldable rows show their icon normally and the fold chevron on hover. */
+.ps-fold-slot {
+  position: relative;
+}
+.ps-fold-slot .ps-nav-chevron {
+  display: none;
+}
+.is-foldable:hover .ps-fold-slot .ps-fold-icon {
+  display: none;
+}
+.is-foldable:hover .ps-fold-slot .ps-nav-chevron {
+  display: inline-flex;
+}
+/* "+" at the right of Notebooks, Tags and Tasks, on hover only. */
+.ps-nav-add {
+  display: none;
+  margin-left: auto;
+  padding: 1px;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.ps-nav-add svg {
+  width: 16px;
+  height: 16px;
+}
+.ps-nav-heading:hover .ps-nav-add,
+.ps-nav-item:hover .ps-nav-add {
+  display: inline-flex;
+}
+.ps-nav-add:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+/* A row with both a count and a "+": the "+" replaces the count on hover. */
+.ps-nav-item:hover .ps-nav-add ~ .ps-nav-count,
+.ps-nav-item:hover .ps-nav-count:has(~ .ps-nav-add) {
+  display: none;
+}
+.ps-modal-error {
+  min-height: 1.2em;
+  color: var(--text-error);
+  font-size: var(--font-ui-smaller);
 }
 .ps-nav-item .ps-nav-chevron {
   cursor: pointer;
@@ -359,9 +402,9 @@
 }
 .ps-card {
   display: flex;
-  gap: 10px;
-  padding: 12px;
-  border-bottom: 1px solid var(--background-modifier-border);
+  gap: 12px;
+  padding: 14px;
+  margin-bottom: 8px;
   border-radius: 8px;
   cursor: pointer;
 }
@@ -443,10 +486,11 @@
 /* Task rows */
 .ps-task {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: flex-start;
-  padding: 8px;
-  border-bottom: 1px solid var(--background-modifier-border);
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  border-radius: 8px;
   cursor: pointer;
 }
 .ps-task:hover {
@@ -456,6 +500,7 @@
   min-width: 0;
 }
 .ps-task-meta {
+  margin-top: 3px;
   display: flex;
   gap: 8px;
   color: var(--text-faint);

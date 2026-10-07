@@ -1,4 +1,5 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
+import { NoteSuggest } from "./sidebar/modals";
 import type WysiwygPlugin from "./main";
 
 export interface WysiwygSettings {
@@ -11,6 +12,8 @@ export interface WysiwygSettings {
   sidebarNavWidth: number;
   /** Collapsed nav sections and tree nodes, e.g. "section:tags", "notebook:Inbox". */
   sidebarCollapsed: string[];
+  /** Note that the sidebar's "+" on Tasks appends new tasks to; "" = ask. */
+  defaultTaskNote: string;
 }
 
 export const DEFAULT_SETTINGS: WysiwygSettings = {
@@ -19,6 +22,7 @@ export const DEFAULT_SETTINGS: WysiwygSettings = {
   sidebar: true,
   sidebarNavWidth: 200,
   sidebarCollapsed: [],
+  defaultTaskNote: "",
 };
 
 export class WysiwygSettingTab extends PluginSettingTab {
@@ -70,5 +74,20 @@ export class WysiwygSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
+
+    new Setting(this.containerEl)
+      .setName("Default note for new tasks")
+      .setDesc("Where the sidebar's + on Tasks adds new tasks. Leave empty to be asked the first time.")
+      .addText((text) => {
+        text.setPlaceholder("e.g. Tasks.md").setValue(this.plugin.settings.defaultTaskNote);
+        text.onChange(async (value) => {
+          this.plugin.settings.defaultTaskNote = value.trim();
+          await this.plugin.saveData(this.plugin.settings);
+        });
+        new NoteSuggest(this.app, text.inputEl, async (file) => {
+          this.plugin.settings.defaultTaskNote = file.path;
+          await this.plugin.saveData(this.plugin.settings);
+        });
+      });
   }
 }

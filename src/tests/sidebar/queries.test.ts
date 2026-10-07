@@ -93,10 +93,16 @@ describe("folderRows", () => {
   const list = [note("A/x.md"), note("A/B/y.md"), note("A B/z.md"), note("root.md")];
 
   test("indented tree, parents before children, counts include descendants", () => {
-    expect(folderRows(["A", "A/B", "A B", "Attachments"], list, null)).toEqual([
+    expect(folderRows(["A", "A/B", "A B"], list, null)).toEqual([
       { path: "A", name: "A", depth: 0, count: 2 },
       { path: "A/B", name: "B", depth: 1, count: 1 },
       { path: "A B", name: "A B", depth: 0, count: 1 },
+    ]);
+  });
+
+  test("empty folders are notebooks too (a new one has no notes yet)", () => {
+    expect(folderRows(["Empty"], [], null)).toEqual([
+      { path: "Empty", name: "Empty", depth: 0, count: 0 },
     ]);
   });
 
@@ -110,7 +116,7 @@ describe("folderRows", () => {
   });
 
   test("excludes the templates folder", () => {
-    expect(folderRows(["A", "Templates"], [note("Templates/t.md")], "Templates")).toEqual([]);
+    expect(folderRows(["Templates"], [note("Templates/t.md")], "Templates")).toEqual([]);
   });
 });
 

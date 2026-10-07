@@ -1,5 +1,6 @@
 import { App, moment, Notice, normalizePath, PaneType, TFile, WorkspaceLeaf } from "obsidian";
 import { applyTemplate } from "./core/format";
+import { addTag, appendLine } from "./core/edits";
 import { setPinned } from "./core/pin";
 import { matchTaskLine, toggleTaskLine } from "./core/tasks";
 import { TaskItem } from "./core/types";
@@ -58,6 +59,16 @@ export async function togglePin(app: App, file: TFile): Promise<void> {
   const pinned = app.metadataCache.getFileCache(file)?.frontmatter?.pinned;
   const isPinned = pinned === true || pinned === "true";
   await app.vault.process(file, (data) => setPinned(data, !isPinned));
+}
+
+/** Append a finished task line (e.g. from the Tasks dialog) to `file`. */
+export async function addTaskLine(app: App, file: TFile, line: string): Promise<void> {
+  await app.vault.process(file, (data) => appendLine(data, line.trim()));
+}
+
+/** Add a tag to the note's tags property, editing only that property. */
+export async function addTagToNote(app: App, file: TFile, tag: string): Promise<void> {
+  await app.vault.process(file, (data) => addTag(data, tag));
 }
 
 function availablePath(app: App, folder: string, base: string): string {

@@ -136,8 +136,9 @@ function treeRows(counts: Map<string, number>): TreeRow[] {
 }
 
 /**
- * Notebooks: folders holding notes (directly or below). Templates and any
- * folder `exclude` rejects (attachment folders) are left out.
+ * Notebooks: every folder except templates and those `exclude` rejects
+ * (attachment folders). Empty folders are included — a brand-new notebook
+ * has no notes yet — and counts include notes in subfolders.
  */
 export function folderRows(
   folders: string[],
@@ -149,10 +150,10 @@ export function folderRows(
   const countUnder = (folder: string) => notes.filter((n) => inFolder(n.folder, folder)).length;
   for (const folder of folders) {
     if (!folder || (templatesFolder && inFolder(folder, templatesFolder)) || exclude(folder)) continue;
-    const count = countUnder(folder);
-    if (count > 0) counts.set(folder, count);
+    counts.set(folder, countUnder(folder));
   }
-  // Keep every ancestor of a kept folder, or its children would be orphaned.
+  // An excluded parent (an attachment folder holding a real notebook) would
+  // orphan its children; keep the ancestors of every kept folder.
   for (const folder of [...counts.keys()]) {
     for (let p = parentOf(folder); p; p = parentOf(p)) {
       if (!counts.has(p)) counts.set(p, countUnder(p));
