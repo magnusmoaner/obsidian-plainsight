@@ -505,6 +505,11 @@
   color: var(--text-normal);
   text-decoration: underline;
 }
+.ps-filter-count {
+  margin-left: 5px;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
 .ps-filter.is-active {
   background: var(--background-modifier-active-hover);
   font-weight: 600;

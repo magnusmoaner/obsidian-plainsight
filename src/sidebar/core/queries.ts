@@ -1,4 +1,4 @@
-import { inFolder, isClosed, NoteSummary, TaskItem } from "./types";
+import { inFolder, isClosed, NoteKind, NoteSummary, TaskItem } from "./types";
 
 export type Place =
   | { kind: "notes" }
@@ -14,6 +14,8 @@ export interface QueryOptions {
   sort: SortKey;
   search: string;
   templatesFolder: string | null;
+  /** Only this kind (note / board / canvas); undefined or null = all. */
+  kind?: NoteKind | null;
 }
 
 export interface NoteGroup<T = NoteSummary> {
@@ -70,6 +72,7 @@ function comparator(sort: SortKey) {
 
 export function notesFor(notes: NoteSummary[], place: Place, opts: QueryOptions): NoteSummary[] {
   return notes
+    .filter((n) => !opts.kind || n.kind === opts.kind)
     .filter((n) => inPlace(n, place, opts.templatesFolder) && matchesSearch(n, opts.search))
     .sort(comparator(opts.sort));
 }
@@ -379,3 +382,55 @@ export function groupTaskRows(rows: TaskRow[], by: TaskGrouping, today: string):
 }
 
 export const TASK_GROUPINGS: TaskGrouping[] = ["due", "folder", "note", "board", "none"];
+
+export type NoteGrouping = "date" | "folder" | "kind" | "none";
+export const NOTE_GROUPINGS: NoteGrouping[] = ["date", "folder", "kind", "none"];
+
+const KIND_LABELS: Record<NoteKind, string> = { note: "Notes", board: "Kanban boards", canvas: "Canvases" };
+const KIND_ORDER: NoteKind[] = ["note", "board", "canvas"];
+
+/** How many of `notes` there are of each kind, for the filter chips. */
+export function kindCounts(notes: NoteSummary[]): Record<NoteKind, number> {
+  const counts: Record<NoteKind, number> = { note: 0, board: 0, canvas: 0 };
+  for (const n of notes) counts[n.kind]++;
+  return counts;
+}
+
+/**
+ * Group sorted notes for the list. Pinned notes always come first, in their
+ * own group; the rest by month (date — no months under a title sort), by
+ * folder (vault root first, then alphabetical), by kind (notes, boards,
+ * canvases) or not at all. Order within a group is kept.
+ */
+export function groupNotesBy(sorted: NoteSummary[], sort: SortKey, by: NoteGrouping): NoteGroup[] {
+  if (by === "date") return groupNotes(sorted, sort);
+  const groups: NoteGroup[] = [];
+  const pinned = sorted.filter((n) => n.pinned);
+  const rest = sorted.filter((n) => !n.pinned);
+  if (pinned.length) groups.push({ label: "Pinned Notes", notes: pinned });
+  if (!rest.length) return groups;
+  if (by === "none") {
+    groups.push({ label: "", notes: rest });
+    return groups;
+  }
+  const buckets = new Map<string, NoteSummary[]>();
+  for (const n of rest) {
+    const key = by === "folder" ? n.folder : n.kind;
+    const list = buckets.get(key);
+    if (list) list.push(n);
+    else buckets.set(key, [n]);
+  }
+  const keys = [...buckets.keys()];
+  if (by === "folder") {
+    keys.sort((a, b) =>
+      a === "" ? -1 : b === "" ? 1 : a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+    );
+  } else {
+    keys.sort((a, b) => KIND_ORDER.indexOf(a as NoteKind) - KIND_ORDER.indexOf(b as NoteKind));
+  }
+  for (const key of keys) {
+    const label = by === "folder" ? key || "Vault root" : KIND_LABELS[key as NoteKind];
+    groups.push({ label, notes: buckets.get(key)! });
+  }
+  return groups;
+}

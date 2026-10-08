@@ -2,6 +2,8 @@ import { describe, expect, test } from "vitest";
 import {
   folderRows,
   groupNotes,
+  groupNotesBy,
+  kindCounts,
   notesFor,
   tagRows,
   taskProgress,
@@ -341,5 +343,50 @@ describe("groupTaskRows", () => {
   test("none is one unlabelled group, or nothing", () => {
     expect(labels(groupTaskRows([row("a.md", null)], "none", today))).toEqual([":1"]);
     expect(groupTaskRows([], "none", today)).toEqual([]);
+  });
+});
+
+describe("note kinds and grouping", () => {
+  const list = [
+    note("Work/a.md", { mtime: 3 }),
+    note("Work/Board.md", { mtime: 2, kind: "board" }),
+    note("Map.canvas", { mtime: 1, kind: "canvas" }),
+    note("Home/p.md", { mtime: 4, pinned: true }),
+  ];
+  const sorted = notesFor(list, { kind: "notes" }, { sort: "modified", search: "", templatesFolder: null });
+  const labels = (groups: { label: string; notes: unknown[] }[]) => groups.map((g) => `${g.label}:${g.notes.length}`);
+
+  test("the kind filter narrows the list", () => {
+    const boards = notesFor(list, { kind: "notes" }, { sort: "modified", search: "", templatesFolder: null, kind: "board" });
+    expect(boards.map((n) => n.path)).toEqual(["Work/Board.md"]);
+  });
+
+  test("kindCounts counts each kind", () => {
+    expect(kindCounts(list)).toEqual({ note: 2, board: 1, canvas: 1 });
+  });
+
+  test("group by folder: pinned first, root first, then alphabetical", () => {
+    expect(labels(groupNotesBy(sorted, "modified", "folder"))).toEqual([
+      "Pinned Notes:1",
+      "Vault root:1",
+      "Work:2",
+    ]);
+  });
+
+  test("group by kind: notes, boards, canvases", () => {
+    expect(labels(groupNotesBy(sorted, "modified", "kind"))).toEqual([
+      "Pinned Notes:1",
+      "Notes:1",
+      "Kanban boards:1",
+      "Canvases:1",
+    ]);
+  });
+
+  test("no grouping keeps pinned on top", () => {
+    expect(labels(groupNotesBy(sorted, "modified", "none"))).toEqual(["Pinned Notes:1", ":3"]);
+  });
+
+  test("date grouping is the month grouping", () => {
+    expect(groupNotesBy(sorted, "modified", "date")).toEqual(groupNotes(sorted, "modified"));
   });
 });

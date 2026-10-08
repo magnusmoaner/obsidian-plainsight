@@ -18,6 +18,10 @@ export interface WysiwygSettings {
   boardCardsInTasks: boolean;
   /** How the Tasks page groups rows. */
   taskGroupBy: "due" | "folder" | "note" | "board" | "none";
+  /** Note lists: which kind to show ("all", "note", "board", "canvas"). */
+  noteKindFilter: "all" | "note" | "board" | "canvas";
+  /** How note lists group cards. */
+  noteGroupBy: "date" | "folder" | "kind" | "none";
 }
 
 export const DEFAULT_SETTINGS: WysiwygSettings = {
@@ -29,6 +33,8 @@ export const DEFAULT_SETTINGS: WysiwygSettings = {
   defaultTaskNote: "",
   boardCardsInTasks: false,
   taskGroupBy: "due",
+  noteKindFilter: "all",
+  noteGroupBy: "date",
 };
 
 export class WysiwygSettingTab extends PluginSettingTab {

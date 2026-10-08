@@ -17,6 +17,10 @@ import {
   filterTaskRows,
   folderRows,
   groupNotes,
+  groupNotesBy,
+  kindCounts,
+  NOTE_GROUPINGS,
+  NoteGrouping,
   groupTaskRows,
   TASK_GROUPINGS,
   TaskGrouping,
@@ -705,14 +709,22 @@ export class SidebarView extends ItemView {
   }
 
   private renderNotes(): void {
-    const list = notesFor(this.partition().notes, this.place, this.queryOptions());
+    const settings = this.plugin.settings;
+    const everything = notesFor(this.partition().notes, this.place, this.queryOptions());
+    const counts = kindCounts(everything);
+    // A remembered kind this place doesn't have would show an empty list
+    // with no visible cause; fall back to all.
+    const kind = settings.noteKindFilter !== "all" && counts[settings.noteKindFilter] ? settings.noteKindFilter : null;
+    const list = kind ? everything.filter((n) => n.kind === kind) : everything;
+    const grouping: NoteGrouping = NOTE_GROUPINGS.includes(settings.noteGroupBy) ? settings.noteGroupBy : "date";
     this.renderHeader(this.placeTitle(), list.length);
+    this.kindChips(counts, kind);
     if (!list.length) {
       this.bodyEl.createDiv({ cls: "ps-empty", text: this.search ? "No matches" : "No notes" });
       return;
     }
     const items: ListItem[] = [];
-    for (const group of groupNotes(list, this.sort)) {
+    for (const group of groupNotesBy(list, this.sort, grouping)) {
       if (group.label) items.push({ label: group.label });
       for (const note of group.notes) items.push({ note });
     }
@@ -721,6 +733,30 @@ export class SidebarView extends ItemView {
       if ("label" in item) this.bodyEl.createDiv({ cls: "ps-group-label", text: item.label });
       else if ("note" in item) this.renderCard(item.note);
     });
+  }
+
+  /**
+   * All · Notes · Boards · Canvases, with counts. Shown only when the place
+   * holds more than one kind — a folder of plain notes needs no filter.
+   */
+  private kindChips(counts: Record<"note" | "board" | "canvas", number>, active: string | null): void {
+    const kinds = (["note", "board", "canvas"] as const).filter((k) => counts[k] > 0);
+    if (kinds.length < 2) return;
+    const labels = { note: "Notes", board: "Boards", canvas: "Canvases" };
+    const chip = (label: string, value: "all" | "note" | "board" | "canvas", count: number) => {
+      const el = this.filtersEl.createDiv({ cls: "ps-filter" });
+      el.createSpan({ text: label });
+      el.createSpan({ cls: "ps-filter-count", text: String(count) });
+      el.toggleClass("is-active", (active ?? "all") === value);
+      el.addEventListener("click", () => {
+        this.plugin.settings.noteKindFilter = value;
+        void this.plugin.saveData(this.plugin.settings);
+        this.resetScroll();
+        this.renderList();
+      });
+    };
+    chip("All", "all", counts.note + counts.board + counts.canvas);
+    for (const k of kinds) chip(labels[k], k, counts[k]);
   }
 
   /** Render `count` items in batches as the user scrolls, not all at once. */
@@ -769,6 +805,11 @@ export class SidebarView extends ItemView {
       setIcon(group, "group");
       group.addEventListener("click", (evt) => this.groupMenu(evt));
       return;
+    }
+    if (this.place.kind !== "attachments") {
+      const group = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "Group by" } });
+      setIcon(group, "group");
+      group.addEventListener("click", (evt) => this.noteGroupMenu(evt));
     }
     const sort = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "Sort" } });
     setIcon(sort, "arrow-up-down");
@@ -1018,6 +1059,31 @@ export class SidebarView extends ItemView {
         }
       })
     );
+  }
+
+  private noteGroupMenu(evt: MouseEvent): void {
+    const menu = new Menu();
+    const options: Array<[NoteGrouping, string, string]> = [
+      ["date", "Date", "calendar"],
+      ["folder", "Folder", "folder"],
+      ["kind", "Type", "shapes"],
+      ["none", "No grouping", "list"],
+    ];
+    for (const [key, label, icon] of options) {
+      menu.addItem((item) =>
+        item
+          .setTitle(label)
+          .setIcon(icon)
+          .setChecked(this.plugin.settings.noteGroupBy === key)
+          .onClick(() => {
+            this.plugin.settings.noteGroupBy = key;
+            void this.plugin.saveData(this.plugin.settings);
+            this.resetScroll();
+            this.renderList();
+          })
+      );
+    }
+    menu.showAtMouseEvent(evt);
   }
 
   private groupMenu(evt: MouseEvent): void {
