@@ -40,6 +40,16 @@ class ListSuggest extends AbstractInputSuggest<string> {
   }
 }
 
+/**
+ * A note that can take appended task lines: Markdown and not a Kanban board
+ * (a board's tasks are its cards; a line appended after its settings block
+ * would land in the wrong place and be hidden from the Tasks page).
+ */
+export function canHoldTasks(app: App, file: TFile): boolean {
+  if (file.extension !== "md") return false;
+  return app.metadataCache.getFileCache(file)?.frontmatter?.["kanban-plugin"] === undefined;
+}
+
 /** Type-ahead over the vault's notes, for the default-task-note setting. */
 export class NoteSuggest extends AbstractInputSuggest<TFile> {
   constructor(app: App, private input: HTMLInputElement, private onPick: (file: TFile) => void) {
@@ -50,7 +60,7 @@ export class NoteSuggest extends AbstractInputSuggest<TFile> {
     const q = query.toLowerCase();
     return this.app.vault
       .getMarkdownFiles()
-      .filter((f) => f.path.toLowerCase().includes(q))
+      .filter((f) => canHoldTasks(this.app, f) && f.path.toLowerCase().includes(q))
       .slice(0, 50);
   }
 
@@ -73,7 +83,7 @@ export class NotePickerModal extends FuzzySuggestModal<TFile> {
   }
 
   getItems(): TFile[] {
-    return this.app.vault.getMarkdownFiles();
+    return this.app.vault.getMarkdownFiles().filter((f) => canHoldTasks(this.app, f));
   }
 
   getItemText(file: TFile): string {

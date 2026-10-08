@@ -40,7 +40,14 @@ import {
 import { taskDisplayText } from "./core/tasks";
 import { isClosed, NoteSummary } from "./core/types";
 import { addTagToNote, addTaskLine, createNote, openFile, toggleTask, togglePin } from "./actions";
-import { NotebookModal, NotePickerModal, PickerModal, TagModal, TaskModal } from "./modals";
+import {
+  canHoldTasks,
+  NotebookModal,
+  NotePickerModal,
+  PickerModal,
+  TagModal,
+  TaskModal,
+} from "./modals";
 import {
   attachmentFolderSetting,
   Bookmark,
@@ -583,9 +590,9 @@ export class SidebarView extends ItemView {
   /** The default task note; the first time (or if it's gone), ask and remember. */
   private taskNote(): Promise<TFile | null> {
     const current = this.app.vault.getAbstractFileByPath(this.plugin.settings.defaultTaskNote);
-    // Only a Markdown note: appending a task line to a canvas, base or PDF
-    // would corrupt it.
-    if (current instanceof TFile && current.extension === "md") return Promise.resolve(current);
+    // Only a plain Markdown note: appending to a canvas, base or PDF would
+    // corrupt it, and in a Kanban board the task would be hidden.
+    if (current instanceof TFile && canHoldTasks(this.app, current)) return Promise.resolve(current);
     return new Promise((resolve) => {
       new NotePickerModal(this.app, "Choose the note new tasks are added to", (file) => {
         this.plugin.settings.defaultTaskNote = file.path;

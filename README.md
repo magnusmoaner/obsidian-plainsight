@@ -42,7 +42,7 @@ It replaces File explorer with two columns: places on the left, and the selected
 - **Templates:** the core Templates folder. Clicking a template creates a new note from it.
 - **Folders** and **Tags:** collapsible trees with counts. Folders that Obsidian uses for attachments are hidden.
 
-**Note cards** show the title, the first useful line of text, task progress (`3/6`), the date, tags and a thumbnail. Canvases and Kanban boards appear with their own icons and counts. Right-click a card to pin or unpin it, or to get Obsidian's usual file menu (rename, move, delete).
+**Note cards** show the title, the first useful line of text, task progress (`3/6`), the date, tags and a thumbnail. Canvases and Kanban boards appear with their own icons and counts; a board's archived cards aren't counted. Right-click a card to pin or unpin it, or to get Obsidian's usual file menu (rename, move, delete).
 
 **Creating things:** the **Note** button, the round **New folder** and **New task** buttons, and the `+` that appears when you hover Tasks, Folders or Tags. New tasks open the Tasks plugin's own dialog and are added to a note you choose once, which you can change later in settings. New tags are added to the note you have open. The **⋯** menu has search, expand/collapse all, bookmark cleanup and settings.
 
@@ -63,7 +63,7 @@ Turn off the core **File explorer** (Settings → Core plugins) to use the sideb
 | Enable WYSIWYG editing | On | Hides syntax and enables the editor shortcuts |
 | Take over rendering (Source mode) | Off | Turns Live Preview off so Plainsight is the only renderer |
 | Notes sidebar | On | Shows the two-column sidebar |
-| Default note for new tasks | (asked the first time) | Where the sidebar's "New task" adds tasks |
+| Default note for new tasks | (asked the first time) | Where the sidebar's "New task" adds tasks (any note except a Kanban board) |
 | Show Kanban cards in Tasks | Off | Kanban cards are checkbox lines too; off keeps them out of Tasks |
 
 ## Installation

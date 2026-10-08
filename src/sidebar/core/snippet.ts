@@ -1,6 +1,15 @@
 const FRONTMATTER = /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/;
 const FENCE = /^\s*(```|~~~)/;
 
+// A Dataview key: optional ** / __ wrapping around word characters, spaces,
+// hyphens or emoji.
+const DV_KEY = String.raw`(?:\*\*|__)?[\p{L}\p{N}\p{Extended_Pictographic}_][\p{L}\p{N}\p{Extended_Pictographic}_ -]*?(?:\*\*|__)?`;
+// A field value may contain links, whose brackets must not end the field.
+const DV_VALUE = String.raw`((?:\[\[[^\]]*\]\]|\[[^\]]*\]\([^)]*\)|[^\[\]()])*?)`;
+const DV_LINE_FIELD = new RegExp(String.raw`^${DV_KEY}::\s+`, "u");
+const DV_INLINE_SQUARE = new RegExp(String.raw`\[${DV_KEY}::\s+${DV_VALUE}\]`, "gu");
+const DV_INLINE_ROUND = new RegExp(String.raw`\(${DV_KEY}::\s+${DV_VALUE}\)`, "gu");
+
 /**
  * The note's first useful text, for a card. Lines are cleaned of Markdown
  * and joined until `max` characters, then truncated with an ellipsis.
@@ -37,8 +46,12 @@ function cleanLine(raw: string): string {
     .replace(/^(>\s*)+/, "") // quote / callout prefix
     .replace(/^\[![^\]]+\][+-]?\s*/, "") // callout token, keep its title
     .replace(/^([-*+]|\d+[.)])\s+(\[.\]\s+)?/, "") // list and task markers
-    .replace(/^[\p{L}\p{N}_][\p{L}\p{N}_ -]*::\s*/u, "") // Dataview line field "key:: value" → value
-    .replace(/[[(][\p{L}\p{N}_][\p{L}\p{N}_ -]*::\s*([^\])]*)[\])]/gu, "$1") // inline [key:: v] / (key:: v)
+    // Dataview fields keep their value. Dataview requires a space after
+    // "::", which is what tells a field from code like std::vector or
+    // [fe80::1]; keys may be wrapped in ** or __ and may hold emoji.
+    .replace(DV_LINE_FIELD, "")
+    .replace(DV_INLINE_SQUARE, "$1")
+    .replace(DV_INLINE_ROUND, "$1")
     .replace(/!\[\[[^\]]*\]\]/g, "") // embeds
     .replace(/!\[[^\]]*\]\([^)]*\)/g, "") // images
     .replace(/\[\[[^\]|]*\|([^\]]*)\]\]/g, "$1") // aliased wikilink → alias

@@ -68,12 +68,20 @@ const FENCE = /^\s*(```|~~~)/;
  * list items under them are cards. Stops at the plugin's trailing
  * "%% kanban:settings" block.
  */
-export function parseBoard(text: string): { columns: string[]; cards: number } {
+export function parseBoard(text: string): { columns: string[]; cards: number; end: number } {
   const columns: string[] = [];
   let cards = 0;
   let inFence = false;
-  for (const line of text.split(/\r?\n/)) {
-    if (/^%%\s*kanban:settings/.test(line)) break;
+  const lines = text.split(/\r?\n/);
+  let end = lines.length;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // The plugin puts archived cards under a `***` rule ("## Archive"), then
+    // its settings block. Neither is part of the visible board.
+    if (/^%%\s*kanban:settings/.test(line) || (!inFence && /^\*{3,}\s*$/.test(line))) {
+      end = i;
+      break;
+    }
     if (FENCE.test(line)) {
       inFence = !inFence;
       continue;
@@ -83,7 +91,7 @@ export function parseBoard(text: string): { columns: string[]; cards: number } {
     if (heading) columns.push(heading[1]);
     else if (columns.length && /^[-*+]\s+/.test(line)) cards++;
   }
-  return { columns, cards };
+  return { columns, cards, end };
 }
 
 export function summarize(facts: FileFacts, text: string): NoteSummary {
@@ -104,7 +112,9 @@ export function summarize(facts: FileFacts, text: string): NoteSummary {
     ctime: facts.ctime,
     // A board's raw text is lane headings and card lines; its columns read better.
     snippet: board ? board.columns.join(" · ") : extractSnippet(text),
-    tasks: parseTasks(text),
+    // A board's archived cards are done and hidden in the plugin; keep them
+    // off the Tasks page too.
+    tasks: board ? parseTasks(text).filter((t) => t.line < board.end) : parseTasks(text),
     thumbnail: firstImage(text),
     searchText: `${facts.basename} ${tags.join(" ")} ${text.slice(0, SEARCH_CAP)}`.toLowerCase(),
     extracted,

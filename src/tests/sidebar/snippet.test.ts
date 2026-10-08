@@ -52,6 +52,32 @@ describe("extractSnippet", () => {
     );
   });
 
+  test("code with :: is not a Dataview field", () => {
+    expect(extractSnippet("std::vector is great")).toBe("std::vector is great");
+    expect(extractSnippet("Example (see std::move) here")).toBe("Example (see std::move) here");
+    expect(extractSnippet("Server at [fe80::1] is up")).toBe("Server at [fe80::1] is up");
+    expect(extractSnippet("I like (things like Foo::Bar and more) right")).toBe(
+      "I like (things like Foo::Bar and more) right"
+    );
+  });
+
+  test("a field whose value is a link keeps the link text", () => {
+    expect(extractSnippet("Meet (who:: [[Page|Alias]]) now")).toBe("Meet Alias now");
+    expect(extractSnippet("See [src:: [site](https://x.dk)] here")).toBe("See site here");
+  });
+
+  test("bold and emoji keys are fields too", () => {
+    expect(extractSnippet("**Status**:: done")).toBe("done");
+    expect(extractSnippet("🎯:: goal")).toBe("goal");
+  });
+
+  test("a long line of unclosed openers stays fast", () => {
+    const line = "(a:: ".repeat(2000);
+    const start = Date.now();
+    extractSnippet(line);
+    expect(Date.now() - start).toBeLessThan(200);
+  });
+
   test("a plain colon is not a Dataview field", () => {
     expect(extractSnippet("Note: remember this")).toBe("Note: remember this");
   });

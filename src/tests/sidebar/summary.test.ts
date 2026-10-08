@@ -123,7 +123,7 @@ const BOARD = [
 
 describe("Kanban boards", () => {
   test("parseBoard counts columns and cards, ignoring the settings block", () => {
-    expect(parseBoard(BOARD)).toEqual({ columns: ["Todo", "Done"], cards: 3 });
+    expect(parseBoard(BOARD)).toMatchObject({ columns: ["Todo", "Done"], cards: 3 });
   });
 
   test("a note with kanban-plugin frontmatter is a board", () => {
@@ -165,5 +165,34 @@ describe("summarizeCanvas", () => {
   test("an unreadable canvas is still listed, empty", () => {
     const s = summarizeCanvas(facts({ basename: "Broken" }), "{not json");
     expect(s).toMatchObject({ kind: "canvas", title: "Broken", items: 0, snippet: "" });
+  });
+});
+
+describe("Kanban archive", () => {
+  const archived = [
+    "---",
+    "kanban-plugin: board",
+    "---",
+    "## Todo",
+    "- [ ] Live card",
+    "",
+    "***",
+    "",
+    "## Archive",
+    "",
+    "- [x] Old card 1",
+    "- [x] Old card 2",
+    "",
+    "%% kanban:settings",
+    "%%",
+  ].join("\n");
+
+  test("the archive is not a column and its cards aren't counted", () => {
+    expect(parseBoard(archived)).toMatchObject({ columns: ["Todo"], cards: 1 });
+  });
+
+  test("archived cards are not tasks", () => {
+    const s = summarize(facts({ frontmatter: { "kanban-plugin": "board" } }), archived);
+    expect(s.tasks.map((t) => t.text)).toEqual(["Live card"]);
   });
 });
