@@ -44,7 +44,7 @@ import {
   formatSize,
 } from "./core/attachments";
 import { taskDisplayText } from "./core/tasks";
-import { isClosed, NoteSummary } from "./core/types";
+import { isClosed, NoteSummary, renamedPath } from "./core/types";
 import { addTagToNote, addTaskLine, createNote, openFile, toggleTask, togglePin } from "./actions";
 import {
   canHoldTasks,
@@ -161,6 +161,7 @@ export class SidebarView extends ItemView {
     for (const name of ["create", "delete", "rename", "modify"] as const) {
       this.registerEvent(this.app.vault.on(name as "create", onFile));
     }
+    this.registerEvent(this.app.vault.on("rename", (file, oldPath) => this.followRename(oldPath, file.path)));
     this.render();
   }
 
@@ -178,6 +179,34 @@ export class SidebarView extends ItemView {
       this.renderTimer = null;
       this.render();
     }, 150);
+  }
+
+  /**
+   * Keep view state attached to what was renamed — here or in File
+   * explorer: the selected folder, fold state of a renamed folder and its
+   * subfolders, the task note filter, and the default task note. Otherwise
+   * a rename would drop the user back to Notes and unfold everything.
+   */
+  private followRename(from: string, to: string): void {
+    if (this.place.kind === "notebook") {
+      this.place = { kind: "notebook", folder: renamedPath(this.place.folder, from, to) };
+    }
+    if (this.taskNoteFilter) this.taskNoteFilter = renamedPath(this.taskNoteFilter, from, to);
+    const settings = this.plugin.settings;
+    let changed = false;
+    settings.sidebarCollapsed = settings.sidebarCollapsed.map((key) => {
+      if (!key.startsWith("notebook:")) return key;
+      const next = `notebook:${renamedPath(key.slice("notebook:".length), from, to)}`;
+      changed = changed || next !== key;
+      return next;
+    });
+    if (settings.defaultTaskNote) {
+      const next = renamedPath(settings.defaultTaskNote, from, to);
+      changed = changed || next !== settings.defaultTaskNote;
+      settings.defaultTaskNote = next;
+    }
+    if (changed) void this.plugin.saveData(settings);
+    this.queueRender();
   }
 
   /** Re-render everything, e.g. after a setting changed what's shown. */

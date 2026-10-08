@@ -68,3 +68,12 @@ export function isClosed(task: TaskItem): boolean {
 export function inFolder(folder: string, root: string): boolean {
   return root === "" || folder === root || folder.startsWith(`${root}/`);
 }
+
+/**
+ * `path` after `from` was renamed to `to`: unchanged unless it is `from` or
+ * lies beneath it (a renamed folder carries its descendants along).
+ */
+export function renamedPath(path: string, from: string, to: string): string {
+  if (path === from) return to;
+  return path.startsWith(`${from}/`) ? `${to}${path.slice(from.length)}` : path;
+}

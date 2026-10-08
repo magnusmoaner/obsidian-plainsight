@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { NoteIndex } from "../../sidebar/core/note-index";
+import { renamedPath } from "../../sidebar/core/types";
 import { note } from "./fixtures";
 
 describe("NoteIndex", () => {
@@ -38,5 +39,16 @@ describe("NoteIndex", () => {
     unsubscribe();
     index.set(note("b.md"));
     expect(fn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("renamedPath", () => {
+  test("the renamed item itself and everything beneath it move", () => {
+    expect(renamedPath("Projects", "Projects", "Work")).toBe("Work");
+    expect(renamedPath("Projects/Clients/A", "Projects", "Work")).toBe("Work/Clients/A");
+  });
+  test("siblings that merely share a prefix don't", () => {
+    expect(renamedPath("Projects 2026", "Projects", "Work")).toBe("Projects 2026");
+    expect(renamedPath("Other/Projects", "Projects", "Work")).toBe("Other/Projects");
   });
 });

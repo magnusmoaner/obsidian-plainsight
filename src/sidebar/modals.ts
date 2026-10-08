@@ -290,7 +290,8 @@ export class RenameModal extends Modal {
       const problem = folderNameError(name);
       if (problem) return void error.setText(problem);
       const parent = this.file.parent && !this.file.parent.isRoot() ? `${this.file.parent.path}/` : "";
-      const ext = this.file instanceof TFile ? `.${this.file.extension}` : "";
+      // An extensionless file (LICENSE) must not gain a trailing dot.
+      const ext = this.file instanceof TFile && this.file.extension ? `.${this.file.extension}` : "";
       const path = normalizePath(`${parent}${name}${ext}`);
       if (path === this.file.path) return void this.close();
       if (this.app.vault.getAbstractFileByPath(path)) return void error.setText("Something with that name already exists here.");

@@ -180,6 +180,9 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
+  /* Lets the filter chips respond to this column's width, not the window's. */
+  container-type: inline-size;
+  container-name: ps-list;
   /* Same grey as the nav column: the sidebar reads as one surface. */
   background: var(--background-secondary);
 }
@@ -450,29 +453,40 @@
 .ps-search {
   margin: 0 14px 8px;
 }
+/*
+ * Filter chips: one row that scrolls sideways when it doesn't fit (no
+ * wrapping onto a second line), compact chips, and counts dropped when the
+ * column is narrow.
+ */
 .ps-filters {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-wrap: nowrap;
+  gap: 5px;
   padding: 0 14px 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ps-filters::-webkit-scrollbar {
+  display: none;
 }
 .ps-filters:empty {
   display: none;
 }
 .ps-filter {
-  padding: 3px 10px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  padding: 2px 9px;
   border-radius: 999px;
   border: 1px solid var(--background-modifier-border);
   cursor: pointer;
 }
-/* The note chip shrinks and truncates its title, but its ✕ always shows;
-   when the row is too narrow it wraps onto its own line. */
+/* The note chip truncates its title at a fixed maximum width, so its ✕
+   always shows; the chip row scrolls sideways when it doesn't fit. */
 .ps-filter-note {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  min-width: 0;
-  max-width: 100%;
+  max-width: 180px;
 }
 .ps-filter-caret,
 .ps-filter-clear {
@@ -699,4 +713,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@container ps-list (max-width: 340px) {
+  .ps-filter-count {
+    display: none;
+  }
+  .ps-filter {
+    padding: 2px 8px;
+  }
+  .ps-filter-note {
+    max-width: 130px;
+  }
 }
