@@ -5,6 +5,8 @@ import {
   notesFor,
   tagRows,
   taskProgress,
+  filterTaskRows,
+  notesOfTaskRows,
   taskRows,
   visibleRows,
 } from "../../sidebar/core/queries";
@@ -208,5 +210,36 @@ describe("visibleRows", () => {
 
   test("a collapsed row inside a collapsed parent stays hidden", () => {
     expect(shown(["A", "A/B"])).toEqual(["A+", "E"]);
+  });
+});
+
+describe("filterTaskRows", () => {
+  const t = (line: number, text: string) => ({ line, status: " ", text, due: null });
+  const rows = [
+    { note: note("Home.md"), task: t(0, "Buy milk 📅 2026-10-09") },
+    { note: note("Home.md"), task: t(1, "Call plumber") },
+    { note: note("Work/Plan.md"), task: t(0, "Send budget") },
+  ];
+  const texts = (r: { task: { text: string } }[]) => r.map((x) => x.task.text.split(" ")[0]);
+
+  test("search matches task text, every word, case-insensitively", () => {
+    expect(texts(filterTaskRows(rows, "MILK buy", null))).toEqual(["Buy"]);
+  });
+
+  test("search also matches the note's title", () => {
+    expect(texts(filterTaskRows(rows, "plan", null))).toEqual(["Send"]);
+  });
+
+  test("filters to one note, combined with search", () => {
+    expect(texts(filterTaskRows(rows, "", "Home.md"))).toEqual(["Buy", "Call"]);
+    expect(texts(filterTaskRows(rows, "call", "Home.md"))).toEqual(["Call"]);
+    expect(filterTaskRows(rows, "budget", "Home.md")).toEqual([]);
+  });
+
+  test("notesOfTaskRows counts rows per note, most first", () => {
+    expect(notesOfTaskRows(rows).map((e) => [e.note.path, e.count])).toEqual([
+      ["Home.md", 2],
+      ["Work/Plan.md", 1],
+    ]);
   });
 });

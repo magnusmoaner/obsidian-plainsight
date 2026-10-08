@@ -242,3 +242,30 @@ export function visibleRows(rows: TreeRow[], collapsed: ReadonlySet<string>): Vi
   });
   return out;
 }
+
+/**
+ * Narrow task rows by search text (every word must appear in the task text
+ * or its note's title) and, optionally, to one note.
+ */
+export function filterTaskRows(rows: TaskRow[], search: string, notePath: string | null): TaskRow[] {
+  const terms = search.toLowerCase().split(/\s+/).filter(Boolean);
+  return rows.filter(({ note, task }) => {
+    if (notePath !== null && note.path !== notePath) return false;
+    if (!terms.length) return true;
+    const text = `${task.text} ${note.title}`.toLowerCase();
+    return terms.every((term) => text.includes(term));
+  });
+}
+
+/** The notes behind a set of task rows, with how many rows each has, most first. */
+export function notesOfTaskRows(rows: TaskRow[]): Array<{ note: NoteSummary; count: number }> {
+  const counts = new Map<string, { note: NoteSummary; count: number }>();
+  for (const { note } of rows) {
+    const entry = counts.get(note.path);
+    if (entry) entry.count++;
+    else counts.set(note.path, { note, count: 1 });
+  }
+  return [...counts.values()].sort(
+    (a, b) => b.count - a.count || a.note.title.localeCompare(b.note.title, undefined, { numeric: true })
+  );
+}

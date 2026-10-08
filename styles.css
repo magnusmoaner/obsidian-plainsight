@@ -464,6 +464,40 @@
   border: 1px solid var(--background-modifier-border);
   cursor: pointer;
 }
+.ps-filter-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 60%;
+  margin-left: auto;
+}
+.ps-filter-note > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ps-filter-caret,
+.ps-filter-clear {
+  display: inline-flex;
+}
+.ps-filter-caret svg,
+.ps-filter-clear svg {
+  width: 14px;
+  height: 14px;
+}
+.ps-filter-clear {
+  border-radius: 50%;
+}
+.ps-filter-clear:hover {
+  background: var(--background-modifier-hover);
+}
+.ps-task-note {
+  cursor: pointer;
+}
+.ps-task-note:hover {
+  color: var(--text-normal);
+  text-decoration: underline;
+}
 .ps-filter.is-active {
   background: var(--background-modifier-active-hover);
   font-weight: 600;

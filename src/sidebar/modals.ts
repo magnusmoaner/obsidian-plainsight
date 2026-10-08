@@ -230,3 +230,29 @@ export class TaskModal extends Modal {
     this.contentEl.empty();
   }
 }
+
+/** Generic type-ahead picker over any list (e.g. "notes with tasks"). */
+export class PickerModal<T> extends FuzzySuggestModal<T> {
+  constructor(
+    app: App,
+    placeholder: string,
+    private items: T[],
+    private text: (item: T) => string,
+    private onPick: (item: T) => void
+  ) {
+    super(app);
+    this.setPlaceholder(placeholder);
+  }
+
+  getItems(): T[] {
+    return this.items;
+  }
+
+  getItemText(item: T): string {
+    return this.text(item);
+  }
+
+  onChooseItem(item: T): void {
+    this.onPick(item);
+  }
+}

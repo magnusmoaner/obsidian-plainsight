@@ -13,8 +13,10 @@ import {
 import type WysiwygPlugin from "../main";
 import { cardDate, localISODate } from "./core/format";
 import {
+  filterTaskRows,
   folderRows,
   groupNotes,
+  notesOfTaskRows,
   notesFor,
   Place,
   QueryOptions,
@@ -35,7 +37,7 @@ import {
 import { taskDisplayText } from "./core/tasks";
 import { isClosed, NoteSummary } from "./core/types";
 import { addTagToNote, addTaskLine, createNote, openFile, toggleTask, togglePin } from "./actions";
-import { NotebookModal, NotePickerModal, TagModal, TaskModal } from "./modals";
+import { NotebookModal, NotePickerModal, PickerModal, TagModal, TaskModal } from "./modals";
 import {
   attachmentFolderSetting,
   Bookmark,
@@ -72,6 +74,8 @@ export class SidebarView extends ItemView {
   private sort: SortKey = "modified";
   private search = "";
   private taskFilter: TaskFilter = "open";
+  /** Tasks page: only this note's tasks, or all notes when null. */
+  private taskNoteFilter: string | null = null;
   /** Mobile shows one column at a time. */
   private mobilePane: "nav" | "list" = "nav";
 
@@ -173,6 +177,7 @@ export class SidebarView extends ItemView {
 
   private setPlace(place: Place): void {
     this.place = place;
+    this.taskNoteFilter = null;
     this.mobilePane = "list";
     this.resetScroll();
     this.render();
@@ -908,6 +913,41 @@ export class SidebarView extends ItemView {
     });
   }
 
+  private filterTasksTo(path: string | null): void {
+    this.taskNoteFilter = path;
+    this.resetScroll();
+    this.renderList();
+  }
+
+  /** "All notes ▾" (pick one) or "Note title ✕" (clear) beside the status tabs. */
+  private noteFilterChip(rows: Parameters<typeof notesOfTaskRows>[0]): void {
+    const chip = this.filtersEl.createDiv("ps-filter ps-filter-note");
+    const current = this.taskNoteFilter && rows.find((r) => r.note.path === this.taskNoteFilter)?.note;
+    if (current) {
+      chip.addClass("is-active");
+      chip.createSpan({ text: current.title });
+      const clear = chip.createSpan({ cls: "ps-filter-clear", attr: { "aria-label": "All notes" } });
+      setIcon(clear, "x");
+      clear.addEventListener("click", (evt) => {
+        evt.stopPropagation();
+        this.filterTasksTo(null);
+      });
+    } else {
+      chip.createSpan({ text: "All notes" });
+      setIcon(chip.createSpan("ps-filter-caret"), "chevron-down");
+    }
+    chip.addEventListener("click", () => {
+      const entries = notesOfTaskRows(rows);
+      new PickerModal(
+        this.app,
+        "Show tasks from note…",
+        entries,
+        (e) => `${e.note.title} (${e.count})`,
+        (e) => this.filterTasksTo(e.note.path)
+      ).open();
+    });
+  }
+
   /** Cheap highlight update when a note is opened elsewhere. */
   private markActive(): void {
     const active = this.app.workspace.getActiveFile()?.path;
@@ -920,12 +960,13 @@ export class SidebarView extends ItemView {
 
   private renderTasks(): void {
     const today = localISODate();
-    const rows = taskRows(
-      this.partition().notes,
-      this.taskFilter,
-      today,
-      templateOptions(this.app).folder
-    );
+    const all = taskRows(this.partition().notes, this.taskFilter, today, templateOptions(this.app).folder);
+    // A note filter for a note that no longer has matching tasks would show
+    // an empty list with no visible cause; drop it.
+    if (this.taskNoteFilter && !all.some((r) => r.note.path === this.taskNoteFilter)) {
+      this.taskNoteFilter = null;
+    }
+    const rows = filterTaskRows(all, this.search, this.taskNoteFilter);
     this.renderHeader("Tasks", rows.length);
 
     const filters: Array<[TaskFilter, string]> = [
@@ -943,8 +984,10 @@ export class SidebarView extends ItemView {
       });
     }
 
+    this.noteFilterChip(all);
+
     if (!rows.length) {
-      this.bodyEl.createDiv({ cls: "ps-empty", text: "No tasks" });
+      this.bodyEl.createDiv({ cls: "ps-empty", text: this.search ? "No matches" : "No tasks" });
       return;
     }
     this.renderIncrementally(rows.length, (i) => {
@@ -963,7 +1006,15 @@ export class SidebarView extends ItemView {
       const body = row.createDiv("ps-task-body");
       body.createDiv({ cls: "ps-task-text", text: taskDisplayText(task.text) || task.text });
       const meta = body.createDiv("ps-task-meta");
-      meta.createSpan({ text: note.title });
+      const noteLink = meta.createSpan({
+        cls: "ps-task-note",
+        text: note.title,
+        attr: { "aria-label": `Show only tasks in ${note.title}` },
+      });
+      noteLink.addEventListener("click", (evt) => {
+        evt.stopPropagation();
+        this.filterTasksTo(note.path);
+      });
       if (task.due) {
         const due = meta.createSpan({ cls: "ps-task-due", text: task.due });
         due.toggleClass("is-overdue", !isClosed(task) && task.due < today);
