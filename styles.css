@@ -180,7 +180,8 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  background: var(--background-primary);
+  /* Same grey as the nav column: the sidebar reads as one surface. */
+  background: var(--background-secondary);
 }
 
 /* Nav */
