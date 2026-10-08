@@ -185,12 +185,22 @@
 }
 
 /* Nav */
-/* Action row: the Note pill grows, the round icon buttons keep their size. */
+/*
+ * Action row: the Note pill grows, the round icon buttons keep their size.
+ * Sticky at the top of the scrolling nav column. The negative margins cancel
+ * .ps-nav's padding so the row's background spans the full width and covers
+ * items scrolling underneath; top matches the padding so it pins flush.
+ */
 .ps-nav-actions {
+  position: sticky;
+  top: -10px;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 0 4px 12px;
+  margin: -10px -6px 0;
+  padding: 10px 10px 12px;
+  background: var(--background-secondary);
 }
 .ps-round-button {
   flex: 0 0 auto;
