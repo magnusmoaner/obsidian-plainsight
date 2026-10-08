@@ -415,6 +415,7 @@
 
 /* List header */
 .ps-list-header {
+  flex: 0 0 auto;
   padding: 14px 14px 6px;
 }
 .ps-header-row {
@@ -451,6 +452,7 @@
 }
 /* Wraps Obsidian's SearchComponent, which brings its own pill styling. */
 .ps-search {
+  flex: 0 0 auto;
   margin: 0 14px 8px;
 }
 /*
@@ -459,11 +461,16 @@
  * column is narrow.
  */
 .ps-filters {
+  /* A scroll container in a flex column gets min-height 0 and is squashed
+     flat by the list below it; it must not shrink. */
+  flex: 0 0 auto;
   display: flex;
   flex-wrap: nowrap;
+  align-items: center;
   gap: 5px;
   padding: 0 14px 6px;
   overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: none;
 }
 .ps-filters::-webkit-scrollbar {
