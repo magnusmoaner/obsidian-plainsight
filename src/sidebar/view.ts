@@ -418,13 +418,19 @@ export class SidebarView extends ItemView {
   }
 
   private toggleCollapsed(key: string): void {
+    this.setCollapsed(key, !this.isCollapsed(key));
+    this.renderNav();
+  }
+
+  /** Record a fold state without re-rendering (callers render once after). */
+  private setCollapsed(key: string, collapsed: boolean): void {
     const list = this.plugin.settings.sidebarCollapsed;
     const at = list.indexOf(key);
-    if (at === -1) list.push(key);
-    else list.splice(at, 1);
+    if (collapsed && at === -1) list.push(key);
+    else if (!collapsed && at !== -1) list.splice(at, 1);
+    else return;
     // saveData, not saveSettings: no need to reconfigure every editor.
     void this.plugin.saveData(this.plugin.settings);
-    this.renderNav();
   }
 
   private navRow(
@@ -474,7 +480,16 @@ export class SidebarView extends ItemView {
     for (const row of visibleRows(rows, collapsed)) {
       const place = toPlace(row);
       const el = this.navRow(parent, row.name, null, row.depth + 1, row.count, this.isActive(place));
-      el.addEventListener("click", () => this.setPlace(place));
+      const key = `${keyPrefix}:${row.path}`;
+      el.addEventListener("click", () => {
+        if (!row.hasChildren) return this.setPlace(place);
+        // A parent is a place and a group: the first click selects it (and
+        // opens it if folded); clicking it again while selected folds or
+        // unfolds it, like a section heading.
+        if (this.isActive(place)) return this.toggleCollapsed(key);
+        if (row.collapsed) this.setCollapsed(key, false);
+        this.setPlace(place);
+      });
       if (!row.hasChildren) continue;
       // Replace the empty icon slot with one that shows a chevron on hover.
       el.addClass("is-foldable");
@@ -482,7 +497,7 @@ export class SidebarView extends ItemView {
       el.querySelector(".ps-nav-icon")!.replaceWith(slot);
       slot.addEventListener("click", (evt) => {
         evt.stopPropagation();
-        this.toggleCollapsed(`${keyPrefix}:${row.path}`);
+        this.toggleCollapsed(key);
       });
     }
   }
