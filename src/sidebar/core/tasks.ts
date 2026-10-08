@@ -10,12 +10,18 @@ const TASKS_FIELD = /[📅⏳🛫✅➕❌🔁⏫🔼🔽⏬🔺🆔⛔]/u;
 export function parseTasks(text: string): TaskItem[] {
   const tasks: TaskItem[] = [];
   let inFence = false;
+  let section: string | null = null;
   text.split(/\r?\n/).forEach((line, index) => {
     if (FENCE.test(line)) {
       inFence = !inFence;
       return;
     }
     if (inFence) return;
+    const heading = /^#{1,6}\s+(.+?)\s*#*\s*$/.exec(line);
+    if (heading) {
+      section = heading[1];
+      return;
+    }
     const match = TASK_LINE.exec(line);
     if (!match) return;
     tasks.push({
@@ -23,6 +29,7 @@ export function parseTasks(text: string): TaskItem[] {
       status: match[2],
       text: match[4].trim(),
       due: DUE.exec(match[4])?.[1] ?? null,
+      section,
     });
   });
   return tasks;

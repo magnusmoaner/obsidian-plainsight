@@ -16,6 +16,8 @@ export interface WysiwygSettings {
   defaultTaskNote: string;
   /** List Kanban board cards on the Tasks page (they're `- [ ]` lines too). */
   boardCardsInTasks: boolean;
+  /** How the Tasks page groups rows. */
+  taskGroupBy: "due" | "folder" | "note" | "board" | "none";
 }
 
 export const DEFAULT_SETTINGS: WysiwygSettings = {
@@ -26,6 +28,7 @@ export const DEFAULT_SETTINGS: WysiwygSettings = {
   sidebarCollapsed: [],
   defaultTaskNote: "",
   boardCardsInTasks: false,
+  taskGroupBy: "due",
 };
 
 export class WysiwygSettingTab extends PluginSettingTab {

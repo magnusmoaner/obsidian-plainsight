@@ -10,9 +10,9 @@ describe("parseTasks", () => {
   test("finds tasks with line numbers and statuses", () => {
     const text = "intro\n- [ ] open\n- [x] done\n* [/] doing";
     expect(parseTasks(text)).toEqual([
-      { line: 1, status: " ", text: "open", due: null },
-      { line: 2, status: "x", text: "done", due: null },
-      { line: 3, status: "/", text: "doing", due: null },
+      { line: 1, status: " ", text: "open", due: null, section: null },
+      { line: 2, status: "x", text: "done", due: null, section: null },
+      { line: 3, status: "/", text: "doing", due: null, section: null },
     ]);
   });
 
@@ -31,6 +31,11 @@ describe("parseTasks", () => {
 
   test("ignores tasks inside fenced code and plain list items", () => {
     expect(parseTasks("```\n- [ ] not real\n```\n- plain item")).toEqual([]);
+  });
+
+  test("records the nearest heading above each task", () => {
+    const text = "- [ ] loose\n## Todo\n- [ ] a\n### Sub ##\n- [ ] b";
+    expect(parseTasks(text).map((t) => t.section)).toEqual([null, "Todo", "Sub"]);
   });
 
   test("tolerates CRLF line endings", () => {

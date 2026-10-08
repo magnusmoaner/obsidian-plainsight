@@ -16,6 +16,9 @@ import {
   filterTaskRows,
   folderRows,
   groupNotes,
+  groupTaskRows,
+  TaskGrouping,
+  TaskRow,
   notesOfTaskRows,
   notesFor,
   Place,
@@ -745,7 +748,12 @@ export class SidebarView extends ItemView {
     setIcon(add, "file-plus-2");
     add.addEventListener("click", () => void createNote(this.app, this.currentFolder()));
 
-    if (this.place.kind === "tasks") return;
+    if (this.place.kind === "tasks") {
+      const group = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "Group by" } });
+      setIcon(group, "group");
+      group.addEventListener("click", (evt) => this.groupMenu(evt));
+      return;
+    }
     const sort = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "Sort" } });
     setIcon(sort, "arrow-up-down");
     sort.addEventListener("click", (evt) => {
@@ -939,6 +947,32 @@ export class SidebarView extends ItemView {
     });
   }
 
+  private groupMenu(evt: MouseEvent): void {
+    const menu = new Menu();
+    const options: Array<[TaskGrouping, string, string]> = [
+      ["due", "Due date", "calendar"],
+      ["folder", "Folder", "folder"],
+      ["note", "Note", "file-text"],
+      ["board", "Kanban board", "kanban"],
+      ["none", "No grouping", "list"],
+    ];
+    for (const [key, label, icon] of options) {
+      menu.addItem((item) =>
+        item
+          .setTitle(label)
+          .setIcon(icon)
+          .setChecked(this.plugin.settings.taskGroupBy === key)
+          .onClick(() => {
+            this.plugin.settings.taskGroupBy = key;
+            void this.plugin.saveData(this.plugin.settings);
+            this.resetScroll();
+            this.renderList();
+          })
+      );
+    }
+    menu.showAtMouseEvent(evt);
+  }
+
   private filterTasksTo(path: string | null): void {
     this.taskNoteFilter = path;
     this.resetScroll();
@@ -986,12 +1020,14 @@ export class SidebarView extends ItemView {
 
   private renderTasks(): void {
     const today = localISODate();
+    const grouping = this.plugin.settings.taskGroupBy;
     const all = taskRows(
       this.partition().notes,
       this.taskFilter,
       today,
       templateOptions(this.app).folder,
-      this.plugin.settings.boardCardsInTasks
+      // Grouping by board is an explicit ask for board cards.
+      this.plugin.settings.boardCardsInTasks || grouping === "board"
     );
     // A note filter for a note that no longer has matching tasks would show
     // an empty list with no visible cause; drop it.
@@ -999,7 +1035,9 @@ export class SidebarView extends ItemView {
       this.taskNoteFilter = null;
     }
     const rows = filterTaskRows(all, this.search, this.taskNoteFilter);
-    this.renderHeader("Tasks", rows.length);
+    // Count what's shown: board grouping drops tasks from ordinary notes.
+    const groups = groupTaskRows(rows, grouping, today);
+    this.renderHeader("Tasks", groups.reduce((n, g) => n + g.rows.length, 0));
 
     const filters: Array<[TaskFilter, string]> = [
       ["open", "Open"],
@@ -1018,12 +1056,27 @@ export class SidebarView extends ItemView {
 
     this.noteFilterChip(all);
 
-    if (!rows.length) {
-      this.bodyEl.createDiv({ cls: "ps-empty", text: this.search ? "No matches" : "No tasks" });
+    if (!groups.length) {
+      const empty = this.search
+        ? "No matches"
+        : grouping === "board"
+          ? "No Kanban cards"
+          : "No tasks";
+      this.bodyEl.createDiv({ cls: "ps-empty", text: empty });
       return;
     }
-    this.renderIncrementally(rows.length, (i) => {
-      const { note, task } = rows[i];
+    const items: Array<{ label: string } | TaskRow> = [];
+    for (const group of groups) {
+      if (group.label) items.push({ label: `${group.label} · ${group.rows.length}` });
+      items.push(...group.rows);
+    }
+    this.renderIncrementally(items.length, (i) => {
+      const item = items[i];
+      if ("label" in item) {
+        this.bodyEl.createDiv({ cls: "ps-group-label", text: item.label });
+        return;
+      }
+      const { note, task } = item;
       const row = this.bodyEl.createDiv("ps-task");
       const box = row.createEl("input", { type: "checkbox", cls: "task-list-item-checkbox" });
       box.checked = isClosed(task);

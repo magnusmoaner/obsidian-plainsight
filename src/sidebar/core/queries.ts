@@ -272,3 +272,61 @@ export function notesOfTaskRows(rows: TaskRow[]): Array<{ note: NoteSummary; cou
     (a, b) => b.count - a.count || a.note.title.localeCompare(b.note.title, undefined, { numeric: true })
   );
 }
+
+export type TaskGrouping = "due" | "folder" | "note" | "board" | "none";
+
+export interface TaskGroup {
+  label: string;
+  rows: TaskRow[];
+}
+
+/** YYYY-MM-DD `days` after `iso`, in calendar terms (no time zones involved). */
+export function addDays(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d + days));
+  return date.toISOString().slice(0, 10);
+}
+
+const DUE_ORDER = ["Overdue", "Today", "Tomorrow", "Next 7 days", "Later", "No due date"];
+
+function dueLabel(due: string | null, today: string): string {
+  if (!due) return "No due date";
+  if (due < today) return "Overdue";
+  if (due === today) return "Today";
+  if (due === addDays(today, 1)) return "Tomorrow";
+  if (due <= addDays(today, 7)) return "Next 7 days";
+  return "Later";
+}
+
+/**
+ * Group already-sorted task rows, keeping row order within each group.
+ * - due: fixed buckets from Overdue to No due date
+ * - folder: by the note's folder, alphabetically ("" = vault root)
+ * - note: one group per note, in first-appearance order
+ * - board: "Board › List" for Kanban cards, in board order; rows from
+ *   ordinary notes are dropped (the caller asked for boards)
+ * - none: a single unlabelled group
+ */
+export function groupTaskRows(rows: TaskRow[], by: TaskGrouping, today: string): TaskGroup[] {
+  if (by === "none") return rows.length ? [{ label: "", rows }] : [];
+  const groups = new Map<string, TaskRow[]>();
+  const add = (label: string, row: TaskRow) => {
+    const list = groups.get(label);
+    if (list) list.push(row);
+    else groups.set(label, [row]);
+  };
+  for (const row of rows) {
+    if (by === "due") add(dueLabel(row.task.due, today), row);
+    else if (by === "folder") add(row.note.folder || "Vault root", row);
+    else if (by === "note") add(row.note.title, row);
+    else if (row.note.kind === "board") {
+      add(row.task.section ? `${row.note.title} › ${row.task.section}` : row.note.title, row);
+    }
+  }
+  const out = [...groups].map(([label, list]) => ({ label, rows: list }));
+  if (by === "due") out.sort((a, b) => DUE_ORDER.indexOf(a.label) - DUE_ORDER.indexOf(b.label));
+  if (by === "folder") {
+    out.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: "base" }));
+  }
+  return out;
+}

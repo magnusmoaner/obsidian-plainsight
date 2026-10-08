@@ -5,7 +5,9 @@ import {
   notesFor,
   tagRows,
   taskProgress,
+  addDays,
   filterTaskRows,
+  groupTaskRows,
   notesOfTaskRows,
   taskRows,
   visibleRows,
@@ -144,6 +146,7 @@ describe("taskRows", () => {
     status,
     text: `task ${line}`,
     due,
+    section: null,
   });
   const list = [
     note("a.md", { mtime: 1, tasks: [t(0, " ", "2026-10-20"), t(1, "x"), t(2, " ")] }),
@@ -220,7 +223,7 @@ describe("visibleRows", () => {
 });
 
 describe("filterTaskRows", () => {
-  const t = (line: number, text: string) => ({ line, status: " ", text, due: null });
+  const t = (line: number, text: string) => ({ line, status: " ", text, due: null, section: null });
   const rows = [
     { note: note("Home.md"), task: t(0, "Buy milk 📅 2026-10-09") },
     { note: note("Home.md"), task: t(1, "Call plumber") },
@@ -247,5 +250,63 @@ describe("filterTaskRows", () => {
       ["Home.md", 2],
       ["Work/Plan.md", 1],
     ]);
+  });
+});
+
+describe("groupTaskRows", () => {
+  const today = "2026-10-08";
+  const row = (path: string, due: string | null, section: string | null = null, kind: "note" | "board" = "note") => ({
+    note: note(path, { kind }),
+    task: { line: 0, status: " ", text: path, due, section },
+  });
+  const labels = (groups: { label: string; rows: unknown[] }[]) => groups.map((g) => `${g.label}:${g.rows.length}`);
+
+  test("addDays crosses month and year ends", () => {
+    expect(addDays("2026-10-31", 1)).toBe("2026-11-01");
+    expect(addDays("2026-12-31", 1)).toBe("2027-01-01");
+  });
+
+  test("due buckets in a fixed order, regardless of row order", () => {
+    const rows = [
+      row("a.md", null),
+      row("b.md", "2026-10-30"),
+      row("c.md", "2026-10-12"),
+      row("d.md", "2026-10-09"),
+      row("e.md", "2026-10-08"),
+      row("f.md", "2026-10-01"),
+    ];
+    expect(labels(groupTaskRows(rows, "due", today))).toEqual([
+      "Overdue:1",
+      "Today:1",
+      "Tomorrow:1",
+      "Next 7 days:1",
+      "Later:1",
+      "No due date:1",
+    ]);
+  });
+
+  test("folder groups alphabetically, root labelled", () => {
+    const rows = [row("Work/x.md", null), row("y.md", null), row("Home/z.md", null)];
+    expect(labels(groupTaskRows(rows, "folder", today))).toEqual(["Home:1", "Vault root:1", "Work:1"]);
+  });
+
+  test("note groups keep first-appearance order", () => {
+    const rows = [row("B.md", null), row("A.md", null), row("B.md", null)];
+    expect(labels(groupTaskRows(rows, "note", today))).toEqual(["B:2", "A:1"]);
+  });
+
+  test("board groups by board and list, dropping ordinary notes", () => {
+    const rows = [
+      row("Proj.md", null, "Todo", "board"),
+      row("Proj.md", null, "Doing", "board"),
+      row("Proj.md", null, "Todo", "board"),
+      row("Note.md", null, "Todo"),
+    ];
+    expect(labels(groupTaskRows(rows, "board", today))).toEqual(["Proj › Todo:2", "Proj › Doing:1"]);
+  });
+
+  test("none is one unlabelled group, or nothing", () => {
+    expect(labels(groupTaskRows([row("a.md", null)], "none", today))).toEqual([":1"]);
+    expect(groupTaskRows([], "none", today)).toEqual([]);
   });
 });

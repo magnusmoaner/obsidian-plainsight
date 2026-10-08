@@ -8,6 +8,8 @@ export interface TaskItem {
   text: string;
   /** YYYY-MM-DD from the Tasks plugin's 📅 field, if present. */
   due: string | null;
+  /** Text of the nearest heading above the task (a Kanban board's list). */
+  section: string | null;
 }
 
 /**
