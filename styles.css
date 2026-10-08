@@ -493,7 +493,11 @@
 .ps-card:hover {
   background: var(--background-modifier-hover);
 }
-.ps-card.is-active {
+/* The selected note lifts off the grey as a white card (the editor's own
+   background, so dark themes get their dark equivalent). */
+.ps-card.is-active,
+.ps-card.is-active:hover {
+  background: var(--background-primary);
   outline: 2px solid var(--interactive-accent);
   outline-offset: -2px;
 }
