@@ -120,6 +120,27 @@ export function openGlobalSearch(app: App, query: string): boolean {
   return true;
 }
 
+type Commands = {
+  commands?: Record<string, unknown>;
+  executeCommandById?(id: string): boolean;
+};
+
+/** Whether a command (core or plugin) is registered right now. */
+export function hasCommand(app: App, id: string): boolean {
+  const commands = (app as unknown as { commands?: Commands }).commands;
+  return !!commands?.commands?.[id] && typeof commands.executeCommandById === "function";
+}
+
+/**
+ * Run a command by id, as the command palette would. Returns false if it
+ * isn't registered or declined to run (e.g. needs an open note).
+ */
+export function runCommand(app: App, id: string): boolean {
+  const commands = (app as unknown as { commands?: Commands }).commands;
+  if (!hasCommand(app, id)) return false;
+  return commands!.executeCommandById!(id) !== false;
+}
+
 export function openSettingsTab(app: App, tabId: string): void {
   const setting = (app as unknown as { setting?: { open(): void; openTabById(id: string): void } })
     .setting;

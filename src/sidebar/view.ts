@@ -45,7 +45,15 @@ import {
 } from "./core/attachments";
 import { taskDisplayText } from "./core/tasks";
 import { isClosed, NoteSummary, renamedPath } from "./core/types";
-import { addTagToNote, addTaskLine, createNote, openFile, toggleTask, togglePin } from "./actions";
+import {
+  addTagToNote,
+  addTaskLine,
+  createCanvas,
+  createNote,
+  openFile,
+  toggleTask,
+  togglePin,
+} from "./actions";
 import {
   canHoldTasks,
   NotebookModal,
@@ -62,13 +70,25 @@ import {
   onBookmarksChanged,
   openGlobalSearch,
   openSettingsTab,
+  hasCommand,
   readBookmarks,
   removeBookmark,
+  runCommand,
   tasksCreateModal,
   templateOptions,
 } from "./internals";
 
 export const SIDEBAR_VIEW = "plainsight-sidebar";
+
+// Commands the More menu runs, as registered by Obsidian or the plugins.
+// Items whose command isn't registered (plugin off or missing) are hidden.
+const KANBAN_NEW = "obsidian-kanban:create-new-kanban-board";
+const IMPORTER = "obsidian-importer:open-modal";
+const INSERT_TEMPLATE = "templates:insert-template";
+const NAV_COMMANDS: Array<[string, string, string]> = [
+  ["switcher:open", "Quick switcher", "file-search"],
+  ["graph:open", "Open graph view", "git-fork"],
+];
 /** Cards rendered per scroll step; the rest load as the end comes into view. */
 const BATCH = 100;
 
@@ -414,7 +434,32 @@ export class SidebarView extends ItemView {
 
   private moreMenu(evt: MouseEvent, tags: string[]): void {
     const menu = new Menu();
+    const folder = this.currentFolder();
+
+    // Create
     menu.addItem((i) => i.setTitle("New tag…").setIcon("tag").onClick(() => this.newTag(tags)));
+    menu.addItem((i) =>
+      i
+        .setTitle("New canvas")
+        .setIcon("layout-dashboard")
+        .onClick(() => void createCanvas(this.app, folder))
+    );
+    if (hasCommand(this.app, KANBAN_NEW)) {
+      menu.addItem((i) =>
+        i.setTitle("New Kanban board").setIcon("kanban").onClick(() => runCommand(this.app, KANBAN_NEW))
+      );
+    }
+    if (hasCommand(this.app, INSERT_TEMPLATE)) {
+      menu.addItem((i) =>
+        i
+          .setTitle("Insert template")
+          .setIcon("layout-template")
+          .onClick(() => this.inNote(() => runCommand(this.app, INSERT_TEMPLATE)))
+      );
+    }
+
+    // Navigate
+    menu.addSeparator();
     menu.addItem((i) =>
       i
         .setTitle("Search all notes")
@@ -423,6 +468,14 @@ export class SidebarView extends ItemView {
           if (!openGlobalSearch(this.app, "")) new Notice("The core Search plugin is turned off.");
         })
     );
+    for (const [id, title, icon] of NAV_COMMANDS) {
+      if (!hasCommand(this.app, id)) continue;
+      menu.addItem((i) => i.setTitle(title).setIcon(icon).onClick(() => runCommand(this.app, id)));
+    }
+    if (hasCommand(this.app, IMPORTER)) {
+      menu.addItem((i) => i.setTitle("Import…").setIcon("import").onClick(() => runCommand(this.app, IMPORTER)));
+    }
+
     menu.addSeparator();
     menu.addItem((i) => i.setTitle("Expand all").setIcon("chevrons-up-down").onClick(() => this.setAllCollapsed(false)));
     menu.addItem((i) => i.setTitle("Collapse all").setIcon("chevrons-down-up").onClick(() => this.setAllCollapsed(true)));
@@ -440,6 +493,21 @@ export class SidebarView extends ItemView {
         .onClick(() => openSettingsTab(this.app, this.plugin.manifest.id))
     );
     menu.showAtMouseEvent(evt);
+  }
+
+  /**
+   * Run an editor command against the note the user was last in. Clicking
+   * the sidebar makes it the active leaf, and editor commands such as
+   * Insert template act on the active note — so focus that note first.
+   */
+  private inNote(run: () => boolean): void {
+    const leaf = this.app.workspace.getMostRecentLeaf();
+    if (!leaf || leaf.view.getViewType() !== "markdown") {
+      new Notice("Open a note first.");
+      return;
+    }
+    this.app.workspace.setActiveLeaf(leaf, { focus: true });
+    if (!run()) new Notice("Couldn't run that here. Put the cursor in a note and try again.");
   }
 
   /** Fold or unfold every section and nested folder/tag at once. */

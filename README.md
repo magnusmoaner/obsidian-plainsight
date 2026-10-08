@@ -44,7 +44,7 @@ It replaces File explorer with two columns: places on the left, and the selected
 
 **Note cards** show the title, the first useful line of text, task progress (`3/6`), the date, tags and a thumbnail. Canvases and Kanban boards appear with their own icons and counts; a board's archived cards aren't counted. Right-click a card to open it in a new tab or to the right, pin or unpin it, rename or delete it, plus the items other plugins add (such as Move file to…). Right-click a folder for New note, New folder, Rename and Delete.
 
-**Creating things:** the **Note** button, the round **New folder** and **New task** buttons, and the `+` that appears when you hover Tasks, Folders or Tags. New tasks open the Tasks plugin's own dialog and are added to a note you choose once, which you can change later in settings. New tags are added to the note you have open. The **⋯** menu has search, expand/collapse all, bookmark cleanup and settings.
+**Creating things:** the **Note** button, the round **New folder** and **New task** buttons, and the `+` that appears when you hover Tasks, Folders or Tags. New tasks open the Tasks plugin's own dialog and are added to a note you choose once, which you can change later in settings. New tags are added to the note you have open. The **⋯** menu creates tags, canvases and Kanban boards, inserts a template into the open note, opens search, the quick switcher, the graph view and the Importer, and has expand/collapse all, bookmark cleanup and settings. Items for plugins you don't have (Kanban, Importer) are hidden.
 
 Turn off the core **File explorer** (Settings → Core plugins) to use the sidebar in its place.
 

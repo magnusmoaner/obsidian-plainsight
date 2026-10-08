@@ -84,12 +84,20 @@ export async function addTagToNote(app: App, file: TFile, tag: string): Promise<
   return !refused;
 }
 
-function availablePath(app: App, folder: string, base: string): string {
+function availablePath(app: App, folder: string, base: string, ext = "md"): string {
   for (let n = 0; ; n++) {
     const name = n ? `${base} ${n}` : base;
-    const path = normalizePath(folder ? `${folder}/${name}.md` : `${name}.md`);
+    const path = normalizePath(folder ? `${folder}/${name}.${ext}` : `${name}.${ext}`);
     if (!app.vault.getAbstractFileByPath(path)) return path;
   }
+}
+
+/** Create an empty canvas in `folder` (null = Obsidian's default location) and open it. */
+export async function createCanvas(app: App, folder: string | null): Promise<void> {
+  const parent = folder ?? app.fileManager.getNewFileParent("").path;
+  const path = availablePath(app, parent === "/" ? "" : parent, "Untitled", "canvas");
+  const file = await app.vault.create(path, JSON.stringify({ nodes: [], edges: [] }));
+  await openFile(app, file, false);
 }
 
 /** Create a note in `folder` (null = Obsidian's default location) and open it. */
