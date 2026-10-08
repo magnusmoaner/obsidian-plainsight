@@ -2,6 +2,7 @@ import { TaskItem } from "./types";
 
 const TASK_LINE = /^(\s*(?:[-*+]|\d+[.)])\s+\[)(.)(\]\s?)(.*)$/;
 const DUE = /📅\s*(\d{4}-\d{2}-\d{2})/u;
+const DONE = /✅\s*(\d{4}-\d{2}-\d{2})/u;
 const FENCE = /^\s*(```|~~~)/;
 // Tasks-plugin field markers. They always follow the description, so the
 // text before the first one is the human-readable task.
@@ -17,7 +18,9 @@ export function parseTasks(text: string): TaskItem[] {
       return;
     }
     if (inFence) return;
-    const heading = /^#{1,6}\s+(.+?)\s*#*\s*$/.exec(line);
+    // CommonMark: trailing #s close the heading only after whitespace, so
+    // "## C#" is "C#" while "## Todo ##" is "Todo".
+    const heading = /^#{1,6}\s+(.+?)(?:\s+#+)?\s*$/.exec(line);
     if (heading) {
       section = heading[1];
       return;
@@ -30,6 +33,7 @@ export function parseTasks(text: string): TaskItem[] {
       text: match[4].trim(),
       due: DUE.exec(match[4])?.[1] ?? null,
       section,
+      done: DONE.exec(match[4])?.[1] ?? null,
     });
   });
   return tasks;

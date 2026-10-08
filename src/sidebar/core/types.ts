@@ -10,6 +10,8 @@ export interface TaskItem {
   due: string | null;
   /** Text of the nearest heading above the task (a Kanban board's list). */
   section: string | null;
+  /** YYYY-MM-DD from the Tasks plugin's ✅ (completed) field, if present. */
+  done: string | null;
 }
 
 /**

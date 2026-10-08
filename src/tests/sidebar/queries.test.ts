@@ -147,6 +147,7 @@ describe("taskRows", () => {
     text: `task ${line}`,
     due,
     section: null,
+    done: null,
   });
   const list = [
     note("a.md", { mtime: 1, tasks: [t(0, " ", "2026-10-20"), t(1, "x"), t(2, " ")] }),
@@ -223,7 +224,7 @@ describe("visibleRows", () => {
 });
 
 describe("filterTaskRows", () => {
-  const t = (line: number, text: string) => ({ line, status: " ", text, due: null, section: null });
+  const t = (line: number, text: string) => ({ line, status: " ", text, due: null, section: null, done: null });
   const rows = [
     { note: note("Home.md"), task: t(0, "Buy milk 📅 2026-10-09") },
     { note: note("Home.md"), task: t(1, "Call plumber") },
@@ -255,9 +256,15 @@ describe("filterTaskRows", () => {
 
 describe("groupTaskRows", () => {
   const today = "2026-10-08";
-  const row = (path: string, due: string | null, section: string | null = null, kind: "note" | "board" = "note") => ({
-    note: note(path, { kind }),
-    task: { line: 0, status: " ", text: path, due, section },
+  const row = (
+    path: string,
+    due: string | null,
+    section: string | null = null,
+    kind: "note" | "board" = "note",
+    extra: { status?: string; done?: string | null; columns?: string[] } = {}
+  ) => ({
+    note: note(path, { kind, columns: extra.columns ?? [] }),
+    task: { line: 0, status: extra.status ?? " ", text: path, due, section, done: extra.done ?? null },
   });
   const labels = (groups: { label: string; rows: unknown[] }[]) => groups.map((g) => `${g.label}:${g.rows.length}`);
 
@@ -287,7 +294,7 @@ describe("groupTaskRows", () => {
 
   test("folder groups alphabetically, root labelled", () => {
     const rows = [row("Work/x.md", null), row("y.md", null), row("Home/z.md", null)];
-    expect(labels(groupTaskRows(rows, "folder", today))).toEqual(["Home:1", "Vault root:1", "Work:1"]);
+    expect(labels(groupTaskRows(rows, "folder", today))).toEqual(["Vault root:1", "Home:1", "Work:1"]);
   });
 
   test("note groups keep first-appearance order", () => {
@@ -295,14 +302,40 @@ describe("groupTaskRows", () => {
     expect(labels(groupTaskRows(rows, "note", today))).toEqual(["B:2", "A:1"]);
   });
 
-  test("board groups by board and list, dropping ordinary notes", () => {
+  test("board groups by board and list in the board's own order, dropping ordinary notes", () => {
+    const cols = { columns: ["Todo", "Doing", "Done"] };
     const rows = [
-      row("Proj.md", null, "Todo", "board"),
-      row("Proj.md", null, "Doing", "board"),
-      row("Proj.md", null, "Todo", "board"),
+      row("Proj.md", "2026-10-08", "Doing", "board", cols),
+      row("Proj.md", null, "Todo", "board", cols),
+      row("Proj.md", null, "Todo", "board", cols),
       row("Note.md", null, "Todo"),
     ];
     expect(labels(groupTaskRows(rows, "board", today))).toEqual(["Proj › Todo:2", "Proj › Doing:1"]);
+  });
+
+  test("boards come alphabetically, whatever the due-date order of their cards", () => {
+    const rows = [
+      row("B.md", "2026-10-08", "X", "board", { columns: ["X"] }),
+      row("A.md", null, "Todo", "board", { columns: ["Todo"] }),
+    ];
+    expect(labels(groupTaskRows(rows, "board", today))).toEqual(["A › Todo:1", "B › X:1"]);
+  });
+
+  test("same-named notes in different folders stay separate, labelled by folder", () => {
+    const rows = [row("Work/Roadmap.md", null), row("Home/Roadmap.md", null), row("Work/Roadmap.md", null)];
+    expect(labels(groupTaskRows(rows, "note", today))).toEqual(["Roadmap (Work):2", "Roadmap (Home):1"]);
+  });
+
+  test("completed tasks group by completion date, never as Overdue", () => {
+    const done = (d: string | null) => row("x.md", "2026-09-01", null, "note", { status: "x", done: d });
+    const rows = [done("2026-10-08"), done("2026-10-07"), done("2026-10-03"), done("2026-08-01"), done(null)];
+    expect(labels(groupTaskRows(rows, "due", today))).toEqual([
+      "Done today:1",
+      "Done yesterday:1",
+      "Done in the last 7 days:1",
+      "Done earlier:1",
+      "No completion date:1",
+    ]);
   });
 
   test("none is one unlabelled group, or nothing", () => {

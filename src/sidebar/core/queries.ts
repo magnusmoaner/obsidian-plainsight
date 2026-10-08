@@ -288,6 +288,7 @@ export function addDays(iso: string, days: number): string {
 }
 
 const DUE_ORDER = ["Overdue", "Today", "Tomorrow", "Next 7 days", "Later", "No due date"];
+const DONE_ORDER = ["Done today", "Done yesterday", "Done in the last 7 days", "Done earlier", "No completion date"];
 
 function dueLabel(due: string | null, today: string): string {
   if (!due) return "No due date";
@@ -298,35 +299,83 @@ function dueLabel(due: string | null, today: string): string {
   return "Later";
 }
 
+/** Finished work groups by when it was finished; "Overdue" would be wrong. */
+function doneLabel(done: string | null, today: string): string {
+  if (!done) return "No completion date";
+  if (done === today) return "Done today";
+  if (done === addDays(today, -1)) return "Done yesterday";
+  if (done >= addDays(today, -7)) return "Done in the last 7 days";
+  return "Done earlier";
+}
+
+interface Bucket {
+  label: string;
+  /** Sort keys, compared in order. */
+  order: Array<number | string>;
+  rows: TaskRow[];
+}
+
+const byKeys = (a: Bucket, b: Bucket): number => {
+  for (let i = 0; i < Math.max(a.order.length, b.order.length); i++) {
+    const x = a.order[i];
+    const y = b.order[i];
+    if (x === y) continue;
+    if (typeof x === "number" && typeof y === "number") return x - y;
+    return String(x).localeCompare(String(y), undefined, { numeric: true, sensitivity: "base" });
+  }
+  return 0;
+};
+
 /**
  * Group already-sorted task rows, keeping row order within each group.
- * - due: fixed buckets from Overdue to No due date
- * - folder: by the note's folder, alphabetically ("" = vault root)
+ * Groups are keyed by identity (note path, board + list), never by label,
+ * so two notes with the same name stay separate; their labels then carry
+ * the folder.
+ * - due: Overdue … No due date for open tasks; completed tasks group by
+ *   their ✅ date instead (Done today … Done earlier)
+ * - folder: alphabetical ("Vault root" for the top level)
  * - note: one group per note, in first-appearance order
- * - board: "Board › List" for Kanban cards, in board order; rows from
- *   ordinary notes are dropped (the caller asked for boards)
+ * - board: "Board › List" for Kanban cards, boards alphabetically and lists
+ *   in the board's own order; rows from ordinary notes are dropped
  * - none: a single unlabelled group
  */
 export function groupTaskRows(rows: TaskRow[], by: TaskGrouping, today: string): TaskGroup[] {
   if (by === "none") return rows.length ? [{ label: "", rows }] : [];
-  const groups = new Map<string, TaskRow[]>();
-  const add = (label: string, row: TaskRow) => {
-    const list = groups.get(label);
-    if (list) list.push(row);
-    else groups.set(label, [row]);
+  const buckets = new Map<string, Bucket>();
+  const add = (key: string, label: string, order: Bucket["order"], row: TaskRow) => {
+    const bucket = buckets.get(key);
+    if (bucket) bucket.rows.push(row);
+    else buckets.set(key, { label, order, rows: [row] });
   };
+  let seen = 0;
   for (const row of rows) {
-    if (by === "due") add(dueLabel(row.task.due, today), row);
-    else if (by === "folder") add(row.note.folder || "Vault root", row);
-    else if (by === "note") add(row.note.title, row);
-    else if (row.note.kind === "board") {
-      add(row.task.section ? `${row.note.title} › ${row.task.section}` : row.note.title, row);
+    const { note, task } = row;
+    if (by === "due") {
+      const closed = isClosed(task);
+      const label = closed ? doneLabel(task.done, today) : dueLabel(task.due, today);
+      // Open buckets before done buckets (only one kind shows per tab anyway).
+      const order = closed ? DUE_ORDER.length + DONE_ORDER.indexOf(label) : DUE_ORDER.indexOf(label);
+      add(label, label, [order], row);
+    } else if (by === "folder") {
+      const label = note.folder || "Vault root";
+      add(note.folder, label, [note.folder === "" ? 0 : 1, label], row);
+    } else if (by === "note") {
+      add(note.path, note.title, [seen++], row);
+    } else if (note.kind === "board") {
+      const lane = task.section ? note.columns.indexOf(task.section) : -1;
+      const label = task.section ? `${note.title} › ${task.section}` : note.title;
+      add(`${note.path}\u0000${task.section ?? ""}`, label, [note.title, note.path, lane === -1 ? 1e9 : lane], row);
     }
   }
-  const out = [...groups].map(([label, list]) => ({ label, rows: list }));
-  if (by === "due") out.sort((a, b) => DUE_ORDER.indexOf(a.label) - DUE_ORDER.indexOf(b.label));
-  if (by === "folder") {
-    out.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: "base" }));
-  }
-  return out;
+  const out = [...buckets.values()].sort(byKeys);
+  // Same label for different notes (Work/Roadmap, Home/Roadmap): add the folder.
+  const counts = new Map<string, number>();
+  for (const b of out) counts.set(b.label, (counts.get(b.label) ?? 0) + 1);
+  return out.map((b) => {
+    const folder = b.rows[0].note.folder;
+    const clash = (by === "note" || by === "board") && (counts.get(b.label) ?? 0) > 1;
+    return { label: clash ? `${b.label} (${folder || "Vault root"})` : b.label, rows: b.rows };
+  });
 }
+
+export const TASK_GROUPINGS: TaskGrouping[] = ["due", "folder", "note", "board", "none"];

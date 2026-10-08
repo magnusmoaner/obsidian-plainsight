@@ -17,6 +17,7 @@ import {
   folderRows,
   groupNotes,
   groupTaskRows,
+  TASK_GROUPINGS,
   TaskGrouping,
   TaskRow,
   notesOfTaskRows,
@@ -1027,7 +1028,9 @@ export class SidebarView extends ItemView {
 
   private renderTasks(): void {
     const today = localISODate();
-    const grouping = this.plugin.settings.taskGroupBy;
+    // A stale or hand-edited setting falls back to the default.
+    const stored = this.plugin.settings.taskGroupBy;
+    const grouping: TaskGrouping = TASK_GROUPINGS.includes(stored) ? stored : "due";
     const all = taskRows(
       this.partition().notes,
       this.taskFilter,
@@ -1064,11 +1067,15 @@ export class SidebarView extends ItemView {
     this.noteFilterChip(all);
 
     if (!groups.length) {
+      // Board grouping drops tasks from ordinary notes; say so rather than
+      // leave an empty list with no visible cause.
       const empty = this.search
         ? "No matches"
-        : grouping === "board"
-          ? "No Kanban cards"
-          : "No tasks";
+        : grouping === "board" && rows.length
+          ? "These tasks aren't on a Kanban board. Change Group by to see them."
+          : grouping === "board"
+            ? "No Kanban cards"
+            : "No tasks";
       this.bodyEl.createDiv({ cls: "ps-empty", text: empty });
       return;
     }

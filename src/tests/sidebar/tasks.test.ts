@@ -10,9 +10,9 @@ describe("parseTasks", () => {
   test("finds tasks with line numbers and statuses", () => {
     const text = "intro\n- [ ] open\n- [x] done\n* [/] doing";
     expect(parseTasks(text)).toEqual([
-      { line: 1, status: " ", text: "open", due: null, section: null },
-      { line: 2, status: "x", text: "done", due: null, section: null },
-      { line: 3, status: "/", text: "doing", due: null, section: null },
+      { line: 1, status: " ", text: "open", due: null, section: null, done: null },
+      { line: 2, status: "x", text: "done", due: null, section: null, done: null },
+      { line: 3, status: "/", text: "doing", due: null, section: null, done: null },
     ]);
   });
 
@@ -31,6 +31,17 @@ describe("parseTasks", () => {
 
   test("ignores tasks inside fenced code and plain list items", () => {
     expect(parseTasks("```\n- [ ] not real\n```\n- plain item")).toEqual([]);
+  });
+
+  test("a trailing # with no space before it is heading text (C#)", () => {
+    expect(parseTasks("## C#\n- [ ] a\n## Todo ##\n- [ ] b").map((t) => t.section)).toEqual([
+      "C#",
+      "Todo",
+    ]);
+  });
+
+  test("reads the Tasks plugin completion date", () => {
+    expect(parseTasks("- [x] Paid ✅ 2026-10-07")[0].done).toBe("2026-10-07");
   });
 
   test("records the nearest heading above each task", () => {
