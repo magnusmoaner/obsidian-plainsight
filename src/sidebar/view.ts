@@ -360,7 +360,7 @@ export class SidebarView extends ItemView {
 
     const notebooks = folderRows(this.plugin.indexer.folders(), notes, templates, isAttachmentFolder);
     if (this.navHeading(nav, "Folders", "folder", "section:notebooks", () => this.newNotebook(isAttachmentFolder))) {
-      this.treeSection(nav, notebooks, "notebook", (row) => ({ kind: "notebook", folder: row.path }));
+      this.treeSection(nav, notebooks, "notebook", (row) => ({ kind: "notebook", folder: row.path }), "folder");
     }
 
     const tags = tagRows(notes);
@@ -532,7 +532,9 @@ export class SidebarView extends ItemView {
     parent: HTMLElement,
     rows: TreeRow[],
     keyPrefix: string,
-    toPlace: (row: TreeRow) => Place
+    toPlace: (row: TreeRow) => Place,
+    /** Shown on every row; on parents it gives way to the fold chevron on hover. */
+    icon: string | null = null
   ): void {
     const collapsed = new Set(
       this.plugin.settings.sidebarCollapsed
@@ -541,7 +543,7 @@ export class SidebarView extends ItemView {
     );
     for (const row of visibleRows(rows, collapsed)) {
       const place = toPlace(row);
-      const el = this.navRow(parent, row.name, null, row.depth + 1, row.count, this.isActive(place));
+      const el = this.navRow(parent, row.name, icon, row.depth + 1, row.count, this.isActive(place));
       const key = `${keyPrefix}:${row.path}`;
       if (place.kind === "notebook") {
         el.addEventListener("contextmenu", (evt) => {
@@ -559,9 +561,9 @@ export class SidebarView extends ItemView {
         this.setPlace(place);
       });
       if (!row.hasChildren) continue;
-      // Replace the empty icon slot with one that shows a chevron on hover.
+      // Swap the icon slot for one that shows the chevron on hover.
       el.addClass("is-foldable");
-      const slot = this.foldSlot(el, null, row.collapsed);
+      const slot = this.foldSlot(el, icon, row.collapsed);
       el.querySelector(".ps-nav-icon")!.replaceWith(slot);
       slot.addEventListener("click", (evt) => {
         evt.stopPropagation();
