@@ -6,6 +6,7 @@ import {
   Platform,
   SearchComponent,
   setIcon,
+  TAbstractFile,
   TFile,
   TFolder,
   WorkspaceLeaf,
@@ -44,6 +45,7 @@ import { addTagToNote, addTaskLine, createNote, openFile, toggleTask, togglePin 
 import {
   canHoldTasks,
   NotebookModal,
+  RenameModal,
   NotePickerModal,
   PickerModal,
   TagModal,
@@ -508,6 +510,12 @@ export class SidebarView extends ItemView {
       const place = toPlace(row);
       const el = this.navRow(parent, row.name, null, row.depth + 1, row.count, this.isActive(place));
       const key = `${keyPrefix}:${row.path}`;
+      if (place.kind === "notebook") {
+        el.addEventListener("contextmenu", (evt) => {
+          const folder = this.app.vault.getAbstractFileByPath(place.folder);
+          if (folder instanceof TFolder) this.fileMenu(evt, folder);
+        });
+      }
       el.addEventListener("click", () => {
         if (!row.hasChildren) return this.setPlace(place);
         // A parent is a place and a group: the first click selects it (and
@@ -604,13 +612,13 @@ export class SidebarView extends ItemView {
     });
   }
 
-  private newNotebook(isAttachmentFolder: (folder: string) => boolean): void {
+  private newNotebook(isAttachmentFolder: (folder: string) => boolean, parentFolder?: string): void {
     const templates = templateOptions(this.app).folder;
     const folders = this.plugin.indexer
       .folders()
       .filter((f) => !isAttachmentFolder(f) && !(templates && (f === templates || f.startsWith(`${templates}/`))))
       .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true }));
-    const parent = this.place.kind === "notebook" ? this.place.folder : "";
+    const parent = parentFolder ?? (this.place.kind === "notebook" ? this.place.folder : "");
     new NotebookModal(this.app, folders, parent, (path) => {
       void this.app.vault.createFolder(path).then(
         () => this.setPlace({ kind: "notebook", folder: path }),
@@ -854,30 +862,90 @@ export class SidebarView extends ItemView {
   private cardMenu(evt: MouseEvent, note: NoteSummary): void {
     const file = this.app.vault.getAbstractFileByPath(note.path);
     if (!(file instanceof TFile)) return;
+    this.fileMenu(evt, file, (menu) => {
+      // Pinning writes a frontmatter line: fine for notes and boards
+      // (Markdown), never for a canvas, whose JSON it would corrupt.
+      if (note.kind !== "canvas") {
+        menu.addItem((item) =>
+          item
+            .setTitle(note.pinned ? "Unpin note" : "Pin note")
+            .setIcon(note.pinned ? "pin-off" : "pin")
+            .onClick(() => void togglePin(this.app, file))
+        );
+      }
+      if (this.place.kind === "templates") {
+        menu.addItem((item) =>
+          item
+            .setTitle("Edit template")
+            .setIcon("pencil")
+            .onClick(() => void openFile(this.app, file, false))
+        );
+      }
+    });
+  }
+
+  /**
+   * The right-click menu for a file or folder, modelled on File explorer's.
+   * Obsidian's views add Rename, Delete, New note etc. themselves and only
+   * then trigger "file-menu" for other plugins' items — triggering the event
+   * alone yields none of them. So the core items are added here, using the
+   * public APIs (renameFile via RenameModal; promptForDeletion, which shows
+   * Obsidian's own confirmation and honours its trash setting), and the
+   * event follows for plugin items (Move to…, Bookmark…, Merge…). The source
+   * is File explorer's, as this sidebar stands in for it and some plugins
+   * only add their folder items for that source.
+   */
+  private fileMenu(evt: MouseEvent, file: TAbstractFile, extra?: (menu: Menu) => void): void {
     evt.preventDefault();
+    evt.stopPropagation();
     const menu = new Menu();
-    // Pinning writes a frontmatter line: fine for notes and boards (Markdown),
-    // never for a canvas, whose JSON it would corrupt.
-    if (note.kind !== "canvas") {
-      menu.addItem((item) =>
-        item
-          .setTitle(note.pinned ? "Unpin note" : "Pin note")
-          .setIcon(note.pinned ? "pin-off" : "pin")
-          .onClick(() => void togglePin(this.app, file))
+    if (file instanceof TFolder) {
+      menu.addItem((i) =>
+        i
+          .setTitle("New note")
+          .setIcon("file-plus-2")
+          .onClick(() => void createNote(this.app, file.path))
+      );
+      menu.addItem((i) =>
+        i
+          .setTitle("New folder")
+          .setIcon("folder-plus")
+          .onClick(() => this.newNotebook(this.partition().isAttachmentFolder, file.path))
+      );
+    } else if (file instanceof TFile) {
+      menu.addItem((i) =>
+        i
+          .setTitle("Open in new tab")
+          .setIcon("file-plus")
+          .onClick(() => void openFile(this.app, file, "tab"))
+      );
+      menu.addItem((i) =>
+        i
+          .setTitle("Open to the right")
+          .setIcon("separator-vertical")
+          .onClick(() => void openFile(this.app, file, "split"))
       );
     }
-    if (this.place.kind === "templates") {
-      menu.addItem((item) =>
-        item
-          .setTitle("Edit template")
-          .setIcon("pencil")
-          .onClick(() => void openFile(this.app, file, false))
-      );
+    if (extra) {
+      menu.addSeparator();
+      extra(menu);
     }
     menu.addSeparator();
-    // Obsidian's own file menu: rename, move to folder (= change notebook),
-    // delete, and other plugins' items.
-    this.app.workspace.trigger("file-menu", menu, file, "plainsight-sidebar");
+    menu.addItem((i) =>
+      i
+        .setTitle("Rename…")
+        .setIcon("pencil-line")
+        .onClick(() => new RenameModal(this.app, file).open())
+    );
+    menu.addItem((i) =>
+      i
+        .setTitle("Delete")
+        .setIcon("trash-2")
+        .setWarning(true)
+        .onClick(() => void this.app.fileManager.promptForDeletion(file))
+    );
+    menu.addSeparator();
+    this.app.workspace.trigger("file-menu", menu, file, "file-explorer-context-menu", null);
     menu.showAtMouseEvent(evt);
   }
 
@@ -935,24 +1003,21 @@ export class SidebarView extends ItemView {
     }
 
     card.addEventListener("click", (evt) => void openFile(this.app, tfile, Keymap.isModEvent(evt)));
-    card.addEventListener("contextmenu", (evt) => {
-      evt.preventDefault();
-      const menu = new Menu();
-      for (const companion of companions) {
-        menu.addItem((item) =>
-          item
-            .setTitle(companions.length > 1 ? `Open extracted text: ${companion.title}` : "Open extracted text")
-            .setIcon("text")
-            .onClick(() => {
-              const note = this.app.vault.getAbstractFileByPath(companion.path);
-              if (note instanceof TFile) void openFile(this.app, note, false);
-            })
-        );
-      }
-      if (companions.length) menu.addSeparator();
-      this.app.workspace.trigger("file-menu", menu, tfile, "plainsight-sidebar");
-      menu.showAtMouseEvent(evt);
-    });
+    card.addEventListener("contextmenu", (evt) =>
+      this.fileMenu(evt, tfile, (menu) => {
+        for (const companion of companions) {
+          menu.addItem((item) =>
+            item
+              .setTitle(companions.length > 1 ? `Open extracted text: ${companion.title}` : "Open extracted text")
+              .setIcon("text")
+              .onClick(() => {
+                const note = this.app.vault.getAbstractFileByPath(companion.path);
+                if (note instanceof TFile) void openFile(this.app, note, false);
+              })
+          );
+        }
+      })
+    );
   }
 
   private groupMenu(evt: MouseEvent): void {

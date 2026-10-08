@@ -4,7 +4,9 @@ import {
   FuzzySuggestModal,
   Modal,
   normalizePath,
+  Notice,
   Setting,
+  TAbstractFile,
   TFile,
 } from "obsidian";
 import { folderNameError, normalizeTag } from "./core/edits";
@@ -264,5 +266,55 @@ export class PickerModal<T> extends FuzzySuggestModal<T> {
 
   onChooseItem(item: T): void {
     this.onPick(item);
+  }
+}
+
+/**
+ * Rename a note, canvas, attachment or folder. Obsidian has no public rename
+ * dialog, so this is a small one around the public fileManager.renameFile,
+ * which also updates links to the file. The extension is kept.
+ */
+export class RenameModal extends Modal {
+  private name: string;
+
+  constructor(app: App, private file: TAbstractFile) {
+    super(app);
+    this.name = file instanceof TFile ? file.basename : file.name;
+  }
+
+  onOpen(): void {
+    this.titleEl.setText(this.file instanceof TFile ? "Rename" : "Rename folder");
+    const error = createDiv({ cls: "ps-modal-error" });
+    const submit = () => {
+      const name = this.name.trim();
+      const problem = folderNameError(name);
+      if (problem) return void error.setText(problem);
+      const parent = this.file.parent && !this.file.parent.isRoot() ? `${this.file.parent.path}/` : "";
+      const ext = this.file instanceof TFile ? `.${this.file.extension}` : "";
+      const path = normalizePath(`${parent}${name}${ext}`);
+      if (path === this.file.path) return void this.close();
+      if (this.app.vault.getAbstractFileByPath(path)) return void error.setText("Something with that name already exists here.");
+      this.close();
+      this.app.fileManager
+        .renameFile(this.file, path)
+        .catch((err: Error) => new Notice(`Couldn't rename: ${err.message}`));
+    };
+    new Setting(this.contentEl).setName("Name").addText((t) => {
+      t.setValue(this.name).onChange((v) => {
+        this.name = v;
+        error.setText("");
+      });
+      submitOnEnter(t.inputEl, submit);
+      window.setTimeout(() => {
+        t.inputEl.focus();
+        t.inputEl.select();
+      }, 0);
+    });
+    this.contentEl.appendChild(error);
+    addButtons(this, "Rename", submit);
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
   }
 }

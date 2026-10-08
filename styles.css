@@ -452,6 +452,7 @@
 }
 .ps-filters {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 0 14px 6px;
 }
@@ -464,12 +465,18 @@
   border: 1px solid var(--background-modifier-border);
   cursor: pointer;
 }
+/* The note chip shrinks and truncates its title, but its ✕ always shows;
+   when the row is too narrow it wraps onto its own line. */
 .ps-filter-note {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  max-width: 60%;
-  margin-left: auto;
+  min-width: 0;
+  max-width: 100%;
+}
+.ps-filter-caret,
+.ps-filter-clear {
+  flex: 0 0 auto;
 }
 .ps-filter-note > span:first-child {
   overflow: hidden;
