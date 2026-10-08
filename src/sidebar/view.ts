@@ -1214,8 +1214,21 @@ export class SidebarView extends ItemView {
       ["overdue", "Overdue"],
       ["done", "Done"],
     ];
+    // Each tab counts what it would show under the current search and note
+    // filter (the note filter only narrows if that note has tasks there).
+    const notes = this.partition().notes;
+    const templates = templateOptions(this.app).folder;
+    const withBoards = this.plugin.settings.boardCardsInTasks || grouping === "board";
+    const countFor = (filter: TaskFilter): number => {
+      const rowsFor = taskRows(notes, filter, today, templates, withBoards);
+      const note = this.taskNoteFilter && rowsFor.some((r) => r.note.path === this.taskNoteFilter) ? this.taskNoteFilter : null;
+      const visible = filterTaskRows(rowsFor, this.search, note);
+      return grouping === "board" ? visible.filter((r) => r.note.kind === "board").length : visible.length;
+    };
     for (const [key, label] of filters) {
-      const tab = this.filtersEl.createDiv({ cls: "ps-filter", text: label });
+      const tab = this.filtersEl.createDiv({ cls: "ps-filter" });
+      tab.createSpan({ text: label });
+      tab.createSpan({ cls: "ps-filter-count", text: String(countFor(key)) });
       tab.toggleClass("is-active", this.taskFilter === key);
       tab.addEventListener("click", () => {
         this.taskFilter = key;
