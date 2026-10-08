@@ -37,6 +37,8 @@ function cleanLine(raw: string): string {
     .replace(/^(>\s*)+/, "") // quote / callout prefix
     .replace(/^\[![^\]]+\][+-]?\s*/, "") // callout token, keep its title
     .replace(/^([-*+]|\d+[.)])\s+(\[.\]\s+)?/, "") // list and task markers
+    .replace(/^[\p{L}\p{N}_][\p{L}\p{N}_ -]*::\s*/u, "") // Dataview line field "key:: value" → value
+    .replace(/[[(][\p{L}\p{N}_][\p{L}\p{N}_ -]*::\s*([^\])]*)[\])]/gu, "$1") // inline [key:: v] / (key:: v)
     .replace(/!\[\[[^\]]*\]\]/g, "") // embeds
     .replace(/!\[[^\]]*\]\([^)]*\)/g, "") // images
     .replace(/\[\[[^\]|]*\|([^\]]*)\]\]/g, "$1") // aliased wikilink → alias

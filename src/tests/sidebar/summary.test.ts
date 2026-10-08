@@ -1,5 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { FileFacts, fileLinks, firstImage, summarize } from "../../sidebar/core/summary";
+import {
+  FileFacts,
+  fileLinks,
+  firstImage,
+  parseBoard,
+  summarize,
+  summarizeCanvas,
+} from "../../sidebar/core/summary";
 
 const facts = (over: Partial<FileFacts> = {}): FileFacts => ({
   path: "Inbox/Note.md",
@@ -90,5 +97,73 @@ describe("extracted-text companions", () => {
     const s = summarize(facts(), "See [[Brev.pdf]]");
     expect(s.extracted).toBe(false);
     expect(s.sourceLinks).toEqual([]);
+  });
+});
+
+const BOARD = [
+  "---",
+  "kanban-plugin: board",
+  "---",
+  "",
+  "## Todo",
+  "",
+  "- [ ] Write intro",
+  "- [ ] Book venue",
+  "",
+  "## Done",
+  "",
+  "- [x] Pick date",
+  "",
+  "%% kanban:settings",
+  "```",
+  '{"kanban-plugin":"board"}',
+  "```",
+  "%%",
+].join("\n");
+
+describe("Kanban boards", () => {
+  test("parseBoard counts columns and cards, ignoring the settings block", () => {
+    expect(parseBoard(BOARD)).toEqual({ columns: ["Todo", "Done"], cards: 3 });
+  });
+
+  test("a note with kanban-plugin frontmatter is a board", () => {
+    const s = summarize(facts({ frontmatter: { "kanban-plugin": "board" } }), BOARD);
+    expect(s.kind).toBe("board");
+    expect(s.columns).toEqual(["Todo", "Done"]);
+    expect(s.items).toBe(3);
+    expect(s.snippet).toBe("Todo · Done");
+  });
+
+  test("an ordinary note is a note", () => {
+    expect(summarize(facts(), "## Todo\n- a").kind).toBe("note");
+  });
+});
+
+describe("summarizeCanvas", () => {
+  const json = JSON.stringify({
+    nodes: [
+      { id: "1", type: "text", text: "# Plan\nFirst idea" },
+      { id: "2", type: "file", file: "pic.png" },
+      { id: "3", type: "text", text: "Second **idea**" },
+    ],
+    edges: [],
+  });
+
+  test("text boxes become the snippet and search text", () => {
+    const s = summarizeCanvas(facts({ path: "Board.canvas", basename: "Board" }), json);
+    expect(s.kind).toBe("canvas");
+    expect(s.items).toBe(3);
+    expect(s.snippet).toBe("First idea Second idea");
+    expect(s.searchText).toContain("second **idea**");
+  });
+
+  test("never has tasks, even if a box holds a checkbox", () => {
+    const withTask = JSON.stringify({ nodes: [{ type: "text", text: "- [ ] not a real task" }] });
+    expect(summarizeCanvas(facts(), withTask).tasks).toEqual([]);
+  });
+
+  test("an unreadable canvas is still listed, empty", () => {
+    const s = summarizeCanvas(facts({ basename: "Broken" }), "{not json");
+    expect(s).toMatchObject({ kind: "canvas", title: "Broken", items: 0, snippet: "" });
   });
 });

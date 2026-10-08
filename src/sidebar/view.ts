@@ -163,6 +163,11 @@ export class SidebarView extends ItemView {
     }, 150);
   }
 
+  /** Re-render everything, e.g. after a setting changed what's shown. */
+  refresh(): void {
+    this.render();
+  }
+
   private render(): void {
     // A renamed or deleted notebook would otherwise leave an empty list whose
     // "New note" targets a folder that no longer exists.
@@ -292,7 +297,13 @@ export class SidebarView extends ItemView {
     }
 
     const noteCount = notesFor(notes, { kind: "notes" }, unfiltered).length;
-    const openTasks = taskRows(notes, "open", localISODate(), templates).length;
+    const openTasks = taskRows(
+      notes,
+      "open",
+      localISODate(),
+      templates,
+      this.plugin.settings.boardCardsInTasks
+    ).length;
     const templateCount = templates
       ? notesFor(notes, { kind: "templates" }, unfiltered).length
       : null;
@@ -783,12 +794,22 @@ export class SidebarView extends ItemView {
     const text = card.createDiv("ps-card-text");
 
     const title = text.createDiv("ps-card-title");
+    if (note.kind !== "note") {
+      setIcon(title.createSpan("ps-card-kind"), note.kind === "board" ? "kanban" : "layout-dashboard");
+    }
     title.createSpan({ text: note.title });
     if (note.pinned) setIcon(title.createSpan("ps-card-pin"), "pin");
     if (note.snippet) text.createDiv({ cls: "ps-card-snippet", text: note.snippet });
 
     const { closed, total } = taskProgress(note);
-    if (total) {
+    if (note.kind !== "note") {
+      // Boards: card count (their checkboxes are cards, not progress);
+      // canvases: how many boxes they hold.
+      const label = note.kind === "board" ? "card" : "box";
+      const chip = text.createDiv("ps-card-tasks ps-card-items");
+      setIcon(chip.createSpan(), note.kind === "board" ? "square-stack" : "shapes");
+      chip.createSpan({ text: `${note.items} ${label}${note.items === 1 ? "" : label === "box" ? "es" : "s"}` });
+    } else if (total) {
       const chip = text.createDiv("ps-card-tasks");
       setIcon(chip.createSpan(), "check-circle-2");
       chip.createSpan({ text: `${closed}/${total}` });
@@ -807,7 +828,8 @@ export class SidebarView extends ItemView {
     card.addEventListener("click", (evt) => {
       const file = this.app.vault.getAbstractFileByPath(note.path);
       if (!(file instanceof TFile)) return;
-      if (this.place.kind === "templates") void createNote(this.app, null, file);
+      // Only Markdown can seed a new note; a canvas "template" just opens.
+      if (this.place.kind === "templates" && file.extension === "md") void createNote(this.app, null, file);
       else void openFile(this.app, file, Keymap.isModEvent(evt));
     });
     card.addEventListener("contextmenu", (evt) => this.cardMenu(evt, note));
@@ -818,12 +840,16 @@ export class SidebarView extends ItemView {
     if (!(file instanceof TFile)) return;
     evt.preventDefault();
     const menu = new Menu();
-    menu.addItem((item) =>
-      item
-        .setTitle(note.pinned ? "Unpin note" : "Pin note")
-        .setIcon(note.pinned ? "pin-off" : "pin")
-        .onClick(() => void togglePin(this.app, file))
-    );
+    // Pinning writes a frontmatter line: fine for notes and boards (Markdown),
+    // never for a canvas, whose JSON it would corrupt.
+    if (note.kind !== "canvas") {
+      menu.addItem((item) =>
+        item
+          .setTitle(note.pinned ? "Unpin note" : "Pin note")
+          .setIcon(note.pinned ? "pin-off" : "pin")
+          .onClick(() => void togglePin(this.app, file))
+      );
+    }
     if (this.place.kind === "templates") {
       menu.addItem((item) =>
         item
@@ -960,7 +986,13 @@ export class SidebarView extends ItemView {
 
   private renderTasks(): void {
     const today = localISODate();
-    const all = taskRows(this.partition().notes, this.taskFilter, today, templateOptions(this.app).folder);
+    const all = taskRows(
+      this.partition().notes,
+      this.taskFilter,
+      today,
+      templateOptions(this.app).folder,
+      this.plugin.settings.boardCardsInTasks
+    );
     // A note filter for a note that no longer has matching tasks would show
     // an empty list with no visible cause; drop it.
     if (this.taskNoteFilter && !all.some((r) => r.note.path === this.taskNoteFilter)) {

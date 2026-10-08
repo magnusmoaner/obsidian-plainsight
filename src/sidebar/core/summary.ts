@@ -61,23 +61,91 @@ export function normalizeTags(tags: string[]): string[] {
   return [...seen.values()];
 }
 
+const FENCE = /^\s*(```|~~~)/;
+
+/**
+ * Columns and cards of a Kanban-plugin board: "## " headings are columns,
+ * list items under them are cards. Stops at the plugin's trailing
+ * "%% kanban:settings" block.
+ */
+export function parseBoard(text: string): { columns: string[]; cards: number } {
+  const columns: string[] = [];
+  let cards = 0;
+  let inFence = false;
+  for (const line of text.split(/\r?\n/)) {
+    if (/^%%\s*kanban:settings/.test(line)) break;
+    if (FENCE.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    const heading = /^##\s+(.+?)\s*$/.exec(line);
+    if (heading) columns.push(heading[1]);
+    else if (columns.length && /^[-*+]\s+/.test(line)) cards++;
+  }
+  return { columns, cards };
+}
+
 export function summarize(facts: FileFacts, text: string): NoteSummary {
   const tags = normalizeTags(facts.tags);
   const pinned = facts.frontmatter?.pinned;
   const extracted = facts.frontmatter?.type === "extracted-text";
+  const board = facts.frontmatter?.["kanban-plugin"] !== undefined ? parseBoard(text) : null;
   return {
     path: facts.path,
+    kind: board ? "board" : "note",
+    columns: board?.columns ?? [],
+    items: board?.cards ?? 0,
     title: facts.basename,
     folder: facts.folder,
     tags,
     pinned: pinned === true || pinned === "true",
     mtime: facts.mtime,
     ctime: facts.ctime,
-    snippet: extractSnippet(text),
+    // A board's raw text is lane headings and card lines; its columns read better.
+    snippet: board ? board.columns.join(" · ") : extractSnippet(text),
     tasks: parseTasks(text),
     thumbnail: firstImage(text),
     searchText: `${facts.basename} ${tags.join(" ")} ${text.slice(0, SEARCH_CAP)}`.toLowerCase(),
     extracted,
     sourceLinks: extracted ? fileLinks(text) : [],
+  };
+}
+
+/**
+ * A canvas (JSON) as a sidebar item: its text boxes are its content. Tasks
+ * stay empty on purpose — toggling one would rewrite a line of the JSON.
+ */
+export function summarizeCanvas(facts: FileFacts, json: string): NoteSummary {
+  let texts: string[] = [];
+  let nodes = 0;
+  try {
+    const data = JSON.parse(json) as { nodes?: Array<{ type?: string; text?: unknown }> };
+    const list = Array.isArray(data.nodes) ? data.nodes : [];
+    nodes = list.length;
+    texts = list
+      .filter((n) => n.type === "text" && typeof n.text === "string")
+      .map((n) => n.text as string);
+  } catch {
+    // Unreadable or mid-write canvas: still list it, just without content.
+  }
+  const body = texts.join("\n\n");
+  return {
+    path: facts.path,
+    kind: "canvas",
+    columns: [],
+    items: nodes,
+    title: facts.basename,
+    folder: facts.folder,
+    tags: [],
+    pinned: false,
+    mtime: facts.mtime,
+    ctime: facts.ctime,
+    snippet: extractSnippet(body),
+    tasks: [],
+    thumbnail: firstImage(body),
+    searchText: `${facts.basename} ${body.slice(0, SEARCH_CAP)}`.toLowerCase(),
+    extracted: false,
+    sourceLinks: [],
   };
 }

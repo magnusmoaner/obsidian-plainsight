@@ -200,6 +200,13 @@ export default class WysiwygPlugin extends Plugin {
     this.applySidebarSetting();
   }
 
+  /** Re-render open sidebars after a setting that changes what they show. */
+  refreshSidebar(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(SIDEBAR_VIEW)) {
+      if (leaf.view instanceof SidebarView) leaf.view.refresh();
+    }
+  }
+
   /** Remove bookmarks whose note or folder no longer exists. */
   removeDeadBookmarks(): void {
     const dead = (readBookmarks(this.app) ?? []).filter(

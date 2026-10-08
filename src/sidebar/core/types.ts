@@ -10,9 +10,22 @@ export interface TaskItem {
   due: string | null;
 }
 
+/**
+ * What a sidebar item is. Boards (Kanban plugin) are Markdown notes with a
+ * `kanban-plugin` property; canvases are JSON. Only plain notes take the
+ * sidebar's text edits (pin, tags, task toggles): writing a frontmatter
+ * line or a task line into a canvas's JSON would corrupt it.
+ */
+export type NoteKind = "note" | "board" | "canvas";
+
 /** Everything the sidebar needs to know about one note. */
 export interface NoteSummary {
   path: string;
+  kind: NoteKind;
+  /** Boards: column (lane) names. Empty for other kinds. */
+  columns: string[];
+  /** Boards: number of cards; canvases: number of nodes. 0 otherwise. */
+  items: number;
   title: string;
   /** Parent folder path; "" for the vault root. */
   folder: string;

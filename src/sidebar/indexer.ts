@@ -1,7 +1,10 @@
 import { App, EventRef, getAllTags, TAbstractFile, TFile, TFolder } from "obsidian";
 import { NoteIndex } from "./core/note-index";
-import { summarize } from "./core/summary";
+import { FileFacts, summarize, summarizeCanvas } from "./core/summary";
 import { NoteSummary } from "./core/types";
+
+/** Files the index holds: notes (incl. Kanban boards) and canvases. */
+const indexed = (file: TFile) => file.extension === "md" || file.extension === "canvas";
 
 /** Keeps a NoteIndex in step with the vault. */
 export class Indexer {
@@ -19,7 +22,7 @@ export class Indexer {
   async build(): Promise<void> {
     for (let attempt = 0; attempt < 3; attempt++) {
       this.dirty = false;
-      const files = this.app.vault.getMarkdownFiles();
+      const files = this.app.vault.getFiles().filter(indexed);
       const summaries = await Promise.all(files.map((f) => this.summarizeFile(f).catch(() => null)));
       this.index.replaceAll(summaries.filter((s): s is NoteSummary => s !== null));
       if (!this.dirty) return;
@@ -42,6 +45,12 @@ export class Indexer {
       })
     );
     register(vault.on("create", (file) => void this.upsert(file)));
+    // Canvases get no metadataCache "changed" event; follow their edits here.
+    register(
+      vault.on("modify", (file) => {
+        if (file instanceof TFile && file.extension === "canvas") void this.upsert(file);
+      })
+    );
     register(
       vault.on("delete", (file) => {
         if (file instanceof TFile) this.index.delete(file.path);
@@ -55,8 +64,8 @@ export class Indexer {
           void this.upsert(file);
         } else if (file instanceof TFolder) {
           this.index.deleteUnder(oldPath);
-          for (const f of this.app.vault.getMarkdownFiles()) {
-            if (f.path.startsWith(`${file.path}/`)) void this.upsert(f);
+          for (const f of this.app.vault.getFiles()) {
+            if (indexed(f) && f.path.startsWith(`${file.path}/`)) void this.upsert(f);
           }
         }
       })
@@ -72,7 +81,7 @@ export class Indexer {
   }
 
   private async upsert(file: TAbstractFile): Promise<void> {
-    if (!(file instanceof TFile) || file.extension !== "md") return;
+    if (!(file instanceof TFile) || !indexed(file)) return;
     try {
       this.index.set(await this.summarizeFile(file));
     } catch {
@@ -87,17 +96,15 @@ export class Indexer {
   private fromText(file: TFile, text: string): NoteSummary {
     const cache = this.app.metadataCache.getFileCache(file);
     const parent = file.parent;
-    return summarize(
-      {
-        path: file.path,
-        basename: file.basename,
-        folder: !parent || parent.isRoot() ? "" : parent.path,
-        mtime: file.stat.mtime,
-        ctime: file.stat.ctime,
-        tags: cache ? getAllTags(cache) ?? [] : [],
-        frontmatter: cache?.frontmatter,
-      },
-      text
-    );
+    const facts: FileFacts = {
+      path: file.path,
+      basename: file.basename,
+      folder: !parent || parent.isRoot() ? "" : parent.path,
+      mtime: file.stat.mtime,
+      ctime: file.stat.ctime,
+      tags: cache ? getAllTags(cache) ?? [] : [],
+      frontmatter: cache?.frontmatter,
+    };
+    return file.extension === "canvas" ? summarizeCanvas(facts, text) : summarize(facts, text);
   }
 }

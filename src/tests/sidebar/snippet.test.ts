@@ -46,6 +46,16 @@ describe("extractSnippet", () => {
     expect(extractSnippet(text)).toBe("After.");
   });
 
+  test("strips Dataview fields, keeping their values", () => {
+    expect(extractSnippet("status:: active\nDue [due:: 2026-10-09] and (owner:: Magnus)")).toBe(
+      "active Due 2026-10-09 and Magnus"
+    );
+  });
+
+  test("a plain colon is not a Dataview field", () => {
+    expect(extractSnippet("Note: remember this")).toBe("Note: remember this");
+  });
+
   test("empty and syntax-only notes give an empty snippet", () => {
     expect(extractSnippet("")).toBe("");
     expect(extractSnippet("---\na: 1\n---\n# Only a heading")).toBe("");

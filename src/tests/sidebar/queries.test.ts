@@ -164,6 +164,12 @@ describe("taskRows", () => {
     expect(keys(taskRows(list, "done", "2026-10-07"))).toEqual(["b.md:1", "a.md:1"]);
   });
 
+  test("Kanban board cards are left out unless asked for", () => {
+    const board = note("Board.md", { kind: "board", tasks: [t(0, " ")] });
+    expect(keys(taskRows([...list, board], "open", "2026-10-07"))).not.toContain("Board.md:0");
+    expect(keys(taskRows([...list, board], "open", "2026-10-07", null, true))).toContain("Board.md:0");
+  });
+
   test("tasks inside the templates folder are excluded", () => {
     const withTemplate = [...list, note("Templates/t.md", { tasks: [t(0, " ")] })];
     expect(keys(taskRows(withTemplate, "open", "2026-10-07", "Templates"))).toEqual([

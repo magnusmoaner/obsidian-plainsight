@@ -14,6 +14,8 @@ export interface WysiwygSettings {
   sidebarCollapsed: string[];
   /** Note that the sidebar's "+" on Tasks appends new tasks to; "" = ask. */
   defaultTaskNote: string;
+  /** List Kanban board cards on the Tasks page (they're `- [ ]` lines too). */
+  boardCardsInTasks: boolean;
 }
 
 export const DEFAULT_SETTINGS: WysiwygSettings = {
@@ -23,6 +25,7 @@ export const DEFAULT_SETTINGS: WysiwygSettings = {
   sidebarNavWidth: 200,
   sidebarCollapsed: [],
   defaultTaskNote: "",
+  boardCardsInTasks: false,
 };
 
 export class WysiwygSettingTab extends PluginSettingTab {
@@ -89,5 +92,16 @@ export class WysiwygSettingTab extends PluginSettingTab {
           await this.plugin.saveData(this.plugin.settings);
         });
       });
+
+    new Setting(this.containerEl)
+      .setName("Show Kanban cards in Tasks")
+      .setDesc("Kanban boards store cards as checkbox lines. Off: the Tasks page lists only real tasks.")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.boardCardsInTasks).onChange(async (value) => {
+          this.plugin.settings.boardCardsInTasks = value;
+          await this.plugin.saveData(this.plugin.settings);
+          this.plugin.refreshSidebar();
+        })
+      );
   }
 }

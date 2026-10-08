@@ -558,6 +558,18 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.ps-card-kind {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+.ps-card-kind svg {
+  width: 15px;
+  height: 15px;
+}
+.ps-card-items {
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+}
 .ps-card-pin {
   display: inline-flex;
   color: var(--color-orange);

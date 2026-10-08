@@ -194,10 +194,13 @@ export function taskRows(
   notes: NoteSummary[],
   filter: TaskFilter,
   today: string,
-  templatesFolder: string | null = null
+  templatesFolder: string | null = null,
+  /** Kanban cards are `- [ ]` lines too, but they're board items, not to-dos. */
+  includeBoardCards = false
 ): TaskRow[] {
   const rows = notes
     .filter((note) => templatesFolder === null || !inFolder(note.folder, templatesFolder))
+    .filter((note) => includeBoardCards || note.kind !== "board")
     .flatMap((note) => note.tasks.map((task) => ({ note, task })));
   const keep = rows.filter(({ task }) => {
     if (filter === "done") return isClosed(task);
