@@ -12,7 +12,7 @@ import {
   WorkspaceLeaf,
 } from "obsidian";
 import type WysiwygPlugin from "../main";
-import { cardDate, localISODate } from "./core/format";
+import { cardDate, dueDateLabel, localISODate } from "./core/format";
 import {
   filterTaskRows,
   folderRows,
@@ -1288,7 +1288,11 @@ export class SidebarView extends ItemView {
         this.filterTasksTo(note.path);
       });
       if (task.due) {
-        const due = meta.createSpan({ cls: "ps-task-due", text: task.due });
+        const due = meta.createSpan({
+          cls: "ps-task-due",
+          text: dueDateLabel(task.due, today),
+          attr: { "aria-label": `Due ${task.due}` },
+        });
         due.toggleClass("is-overdue", !isClosed(task) && task.due < today);
       }
 

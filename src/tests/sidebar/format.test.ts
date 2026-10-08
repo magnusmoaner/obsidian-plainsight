@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { applyTemplate, cardDate, localISODate } from "../../sidebar/core/format";
+import { applyTemplate, cardDate, dueDateLabel, localISODate } from "../../sidebar/core/format";
 
 describe("cardDate", () => {
   const now = new Date(2026, 9, 7, 12, 0).getTime();
@@ -30,5 +30,24 @@ describe("applyTemplate", () => {
   });
   test("leaves unknown placeholders alone", () => {
     expect(applyTemplate("{{other}}", "x", fmt, "D", "T")).toBe("{{other}}");
+  });
+});
+
+describe("dueDateLabel", () => {
+  const today = "2026-10-08";
+  test("near dates are relative", () => {
+    expect(dueDateLabel("2026-10-08", today)).toBe("Today");
+    expect(dueDateLabel("2026-10-09", today)).toBe("Tomorrow");
+    expect(dueDateLabel("2026-10-07", today)).toBe("Yesterday");
+    expect(dueDateLabel("2026-10-11", today)).toBe("in 3 days");
+    expect(dueDateLabel("2026-10-05", today)).toBe("3 days ago");
+  });
+  test("a week or more away shows the date, with the year if it differs", () => {
+    expect(dueDateLabel("2026-10-15", today)).toBe("Oct 15");
+    expect(dueDateLabel("2026-01-27", today)).toBe("Jan 27");
+    expect(dueDateLabel("2027-01-27", today)).toBe("Jan 27, 2027");
+  });
+  test("counts calendar days across month and year ends", () => {
+    expect(dueDateLabel("2027-01-01", "2026-12-31")).toBe("Tomorrow");
   });
 });

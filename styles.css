@@ -519,8 +519,17 @@
 .ps-filter-clear:hover {
   background: var(--background-modifier-hover);
 }
+/* The note name gives way (one line, "…") so the due date never wraps. */
 .ps-task-note {
   cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ps-task-due {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 .ps-task-note:hover {
   color: var(--text-normal);
@@ -672,10 +681,13 @@
   background: var(--background-modifier-hover);
 }
 .ps-task-body {
+  flex: 1 1 auto;
   min-width: 0;
 }
 .ps-task-meta {
   margin-top: 3px;
+  min-width: 0;
+  align-items: baseline;
   display: flex;
   gap: 8px;
   color: var(--text-faint);
