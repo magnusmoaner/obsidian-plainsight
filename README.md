@@ -1,172 +1,100 @@
 # Plainsight
 
-An Obsidian plugin for a calm, document-like note experience. Markdown renders without its syntax while you edit, and ordinary Markdown files remain the source of truth. A two-column notes sidebar (notebooks, tags, tasks, note cards) is planned.
+An Obsidian plugin for a calm, document-like note experience: Markdown that reads like a page instead of syntax, and a two-column notes sidebar that shows what's in a note before you open it.
 
-> **Status:** In development. Shipped: inline marks (bold, italic, code), headings, and callouts. Next: wikilinks, frontmatter, lists, and the sidebar. See `docs/plans/`.
+Your files stay ordinary Markdown. Plainsight hides syntax and adds browsing on top; it never converts your notes into another format.
 
-## Goal
+> **Status:** early and in active development. Not yet in the Community Plugins directory, and only tested on desktop (macOS).
 
-Build an Obsidian community plugin that makes Markdown feel like a rich-text document without replacing Obsidian's native editor or introducing a proprietary document format.
+## The editor
 
-The intended experience is closer to Typora than to a separate Canvas-style editor:
+Formatting renders as you type, and the syntax never comes back: there's no "reveal the markup when the cursor gets close". Typing Markdown still works, because a construct converts the moment it's complete.
 
-* Markdown remains the canonical file format.
-* Obsidian's native Markdown editor, file handling, undo/redo, links, embeds, and workspace integration remain available.
-* Formatting syntax is visually minimized or hidden when it is not being edited.
-* Syntax becomes visible around the cursor or active selection.
-* Rendered elements remain editable and produce valid Markdown transactions.
+- **Bold, italic and inline code.** Delimiters stay hidden, and the caret moves past them like rich text. Backspace at the edge of a formatted span removes the formatting instead of exposing a `**`.
+- **Headings.** `# ` disappears once you type the space, and each level is styled. Backspace at the start of a heading turns it back into a paragraph.
+- **Callouts.** `> [!type]` blocks render as boxes while you edit them. A `···` button changes the callout type.
 
-## Initial scope
+Anything Plainsight doesn't render yet (lists, links, tables and more) stays visible as plain Markdown and fully editable.
 
-Start with a narrow vertical slice rather than attempting all of Markdown at once:
+### Live Preview vs Source mode
 
-1. Headings
-2. Strong and emphasis marks
-3. Inline code
-4. Links and wikilinks
-5. Blockquotes
-6. Unordered and ordered lists
-7. Task checkboxes
-8. Paragraph and line-break behavior
+Obsidian's Live Preview draws some blocks, such as callouts, itself, and turns them back into Markdown when you click in. To make Plainsight the only renderer, turn on **Take over rendering (Source mode)**. Your previous editor mode is restored when you turn it off. The trade-off is that in Source mode anything Plainsight doesn't render yet shows as Markdown.
 
-Defer initially:
+### Shortcuts
 
-* Tables
-* Callouts
-* Footnotes
-* Mermaid and other code-block renderers
-* Dataview syntax
-* Complex embeds and transclusions
-* Full rich-text paste handling
-* Mobile-specific interaction polish
+| Keys | Action |
+| --- | --- |
+| `Cmd/Ctrl + B` / `I` / `` ` `` | Toggle bold / italic / inline code |
+| `Cmd/Ctrl + Opt/Alt + 1…6` | Set heading level (pressing the current level again returns it to a paragraph) |
+| `Cmd/Ctrl + Opt/Alt + 0` | Set paragraph |
 
-## Technical direction
+Heading shortcuts use `Opt/Alt` because Obsidian already binds `Cmd + 1…8` to switching tabs.
 
-Use Obsidian's public CodeMirror 6 integration:
+## The notes sidebar
 
-```ts
-this.registerEditorExtension(extension);
+It replaces File explorer with two columns: places on the left, and the selected place's contents on the right.
+
+**Places**
+- **Bookmarks:** Obsidian's own bookmarks. Bookmarks to deleted notes are shown crossed out; click one to remove it.
+- **Notes:** every note, with pinned notes first, then grouped by month.
+- **Tasks:** tasks from all your notes. Filter by Open, Overdue or Done, or by a single note. Group by due date, folder, note or Kanban board (as "Board › List"). Ticking a task goes through the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) plugin when it's installed, so done dates and recurring tasks behave exactly as they do inside a note.
+- **Attachments:** PDFs, images and other files, with thumbnails. If a file has extracted-text notes (frontmatter `type: extracted-text` with a link to the file), they're listed with the file, their text is searchable from it, and they're kept out of your note lists.
+- **Templates:** the core Templates folder. Clicking a template creates a new note from it.
+- **Folders** and **Tags:** collapsible trees with counts. Folders that Obsidian uses for attachments are hidden.
+
+**Note cards** show the title, the first useful line of text, task progress (`3/6`), the date, tags and a thumbnail. Canvases and Kanban boards appear with their own icons and counts. Right-click a card to pin or unpin it, or to get Obsidian's usual file menu (rename, move, delete).
+
+**Creating things:** the **Note** button, the round **New folder** and **New task** buttons, and the `+` that appears when you hover Tasks, Folders or Tags. New tasks open the Tasks plugin's own dialog and are added to a note you choose once, which you can change later in settings. New tags are added to the note you have open. The **⋯** menu has search, expand/collapse all, bookmark cleanup and settings.
+
+Turn off the core **File explorer** (Settings → Core plugins) to use the sidebar in its place.
+
+## How Plainsight treats your notes
+
+- **Markdown stays the source of truth.** No database and no separate copy. Everything shown comes from your files.
+- **Edits are as small as possible.** Pinning edits one property line. Adding a tag edits only the `tags` property, keeping its existing formatting. Ticking a task changes one line, and only if that line is still the task that was shown. Nothing is ever re-saved through a YAML serializer that could drop comments or reformat the file.
+- **If an edit can't be made safely, nothing is written.** For example, adding a tag to a `tags` property written in a format Plainsight doesn't recognise. You get a message explaining why instead.
+- **Canvases are never written to.** They're JSON, and Plainsight's edits are line-based.
+- **Other plugins keep working.** Plainsight never intercepts other plugins' edits, so formatting inserted by tools such as Better Edit or Editing Toolbar renders normally.
+
+## Settings
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| Enable WYSIWYG editing | On | Hides syntax and enables the editor shortcuts |
+| Take over rendering (Source mode) | Off | Turns Live Preview off so Plainsight is the only renderer |
+| Notes sidebar | On | Shows the two-column sidebar |
+| Default note for new tasks | (asked the first time) | Where the sidebar's "New task" adds tasks |
+| Show Kanban cards in Tasks | Off | Kanban cards are checkbox lines too; off keeps them out of Tasks |
+
+## Installation
+
+Plainsight isn't in the Community Plugins directory yet. To install it manually:
+
+1. Build it (see below), or take `main.js`, `manifest.json` and `styles.css` from a release.
+2. Copy those three files to `<your vault>/.obsidian/plugins/plainsight/`.
+3. In Obsidian, go to Settings → Community plugins, reload, and enable **Plainsight**.
+
+## Development
+
+```bash
+npm install
+npm test          # vitest
+npm run build     # type-check, then a production bundle (main.js)
+npm run deploy    # build and copy into a vault
 ```
 
-Likely building blocks:
+`npm run deploy` copies to a default vault path. Set `OBSIDIAN_PLUGIN_DIR` to deploy to your own vault's `.obsidian/plugins/plainsight` folder instead. Reload Obsidian (`Cmd/Ctrl + R`) to pick up changes.
 
-* `@codemirror/language` for Markdown syntax-tree inspection.
-* `@codemirror/state` for state fields and transactions.
-* `@codemirror/view` for decorations, widgets, event handling, and view plugins.
-* Obsidian's `Editor` API for operations that do not require direct CM6 access.
-* Obsidian's `registerEditorExtension()` for plugin lifecycle management.
+**Layout**
+- `src/editor/`: the CodeMirror 6 extension. Plainsight runs its own incremental Lezer Markdown parse and builds the decorations, hidden delimiters and edit behaviour from that syntax tree.
+- `src/sidebar/core/`: pure TypeScript (no `obsidian` import), tested in Node. This covers note summaries, the index, queries, task parsing and grouping, and the safe text edits.
+- `src/sidebar/`: the Obsidian side. The view, the indexer that follows vault events, the dialogs, the write actions, and `internals.ts`, which isolates every undocumented Obsidian API in one place.
+- `docs/plans/`: design documents and implementation plans, dated.
 
-The first implementation should be a native editor extension, not a separate `ItemView` or `FileView`.
+## Roadmap
 
-## Proposed architecture
+Next for the editor are wikilinks, frontmatter/properties, lists and task checkboxes, tables, embeds and highlights. For the sidebar, Spaces are planned (folders grouped into named spaces).
 
-```text
-Obsidian plugin
-    ├── settings and feature flags
-    ├── editor extension registration
-    ├── Markdown syntax-tree inspection
-    ├── decoration/state management
-    ├── cursor and selection awareness
-    ├── rendered inline/block widgets
-    └── safe Markdown transactions
-```
+## License
 
-### Rendering model
-
-The underlying CodeMirror document remains Markdown. Decorations and widgets change its presentation without changing the stored file.
-
-```text
-Markdown source
-    ↓
-CodeMirror Markdown syntax tree
-    ↓
-WYSIWYG decorations/widgets
-    ↓
-User interaction
-    ↓
-CodeMirror transaction
-    ↓
-Markdown source
-```
-
-The extension must avoid mutating the document during ordinary rendering. Document changes should happen only through explicit user actions or editor transactions.
-
-## Design principles
-
-* **Markdown is the source of truth.** Never create a second proprietary document model unless a specific feature requires temporary state.
-* **Progressive disclosure.** Hide syntax only when it is safe; reveal it when the cursor or selection enters the construct.
-* **Native first.** Prefer public Obsidian and CodeMirror APIs over DOM patching or internal Obsidian classes.
-* **Failure should be boring.** Unsupported or ambiguous syntax must remain visible and editable as normal Markdown.
-* **No destructive parsing.** Preserve text that the plugin does not understand.
-* **Small vertical slices.** Every feature should include rendering, cursor behavior, editing behavior, and regression tests.
-* **Performance matters.** Decorations must be viewport-aware where appropriate and must not reparse the entire document on every keystroke without measurement.
-
-## Suggested first milestones
-
-### Milestone 1: Plugin shell
-
-* Create a standard TypeScript Obsidian plugin.
-* Register one CM6 extension.
-* Add a setting to enable/disable the experimental WYSIWYG behavior.
-* Add a debug command that reports the active Markdown syntax tree/document state.
-
-### Milestone 2: Inline marks
-
-* Render strong and emphasis text without visible delimiters when the cursor is outside the range.
-* Reveal delimiters when the cursor enters the range.
-* Preserve correct cursor positions and selection behavior.
-* Add tests for nested and adjacent marks.
-
-### Milestone 3: Block syntax
-
-* Render headings, blockquotes, lists, and task checkboxes.
-* Handle cursor transitions across block boundaries.
-* Ensure keyboard editing remains predictable.
-
-### Milestone 4: Links and embeds
-
-* Render standard Markdown links and wikilinks.
-* Preserve link destinations and aliases.
-* Keep unsupported embed forms visible until their behavior is explicitly designed.
-
-## Development notes
-
-This repository is intended to be developed with Claude Code. Before implementing a feature, inspect the current project state and create a small implementation plan. Use test-driven development for parsing, range calculations, and transaction behavior. Verify builds and tests before claiming a feature is complete.
-
-Recommended future files:
-
-```text
-manifest.json
-package.json
-tsconfig.json
-esbuild.config.mjs
-src/
-    main.ts
-    settings.ts
-    editor/
-        extension.ts
-        decorations.ts
-        cursor-awareness.ts
-        transactions.ts
-        syntax.ts
-    tests/
-```
-
-## Useful references
-
-* [Obsidian plugin documentation](https://docs.obsidian.md/Plugins/Getting+started/Build+a+plugin)
-* [Obsidian editor extensions](https://docs.obsidian.md/Plugins/Editor/Editor+extensions)
-* [`registerEditorExtension()`](https://docs.obsidian.md/Reference/TypeScript+API/Plugin/registerEditorExtension)
-* [Obsidian decorations](https://docs.obsidian.md/Plugins/Editor/Decorations)
-* [Obsidian state management](https://docs.obsidian.md/Plugins/Editor/State+management)
-* [Obsidian communication with editor extensions](https://docs.obsidian.md/Plugins/Editor/Communicating+with+editor+extensions)
-* [CodeMirror 6 documentation](https://codemirror.net/docs/)
-
-## Open questions
-
-* Should WYSIWYG mode be enabled globally, per vault, per note, or per editor pane?
-* Should syntax be revealed on cursor entry, selection, keyboard navigation, or all three?
-* How should live preview rendering interact with Obsidian's own Markdown decorations?
-* Which constructs should use decorations, and which require replacement widgets?
-* What is the minimum acceptable behavior on mobile?
-* How should plugin-owned widgets behave when the document is changed externally?
+[MIT](LICENSE)
