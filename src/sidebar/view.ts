@@ -830,6 +830,9 @@ export class SidebarView extends ItemView {
     add.addEventListener("click", () => void createNote(this.app, this.currentFolder()));
 
     if (this.place.kind === "tasks") {
+      const task = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "New task" } });
+      setIcon(task, "list-checks");
+      task.addEventListener("click", () => void this.newTask());
       const group = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "Group by" } });
       setIcon(group, "group");
       group.addEventListener("click", (evt) => this.groupMenu(evt));
