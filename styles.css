@@ -184,11 +184,39 @@
 }
 
 /* Nav */
+/* Action row: the Note pill grows, the round icon buttons keep their size. */
+.ps-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 4px 12px;
+}
+.ps-round-button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.ps-round-button svg {
+  width: 18px;
+  height: 18px;
+}
+.ps-round-button:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
 .ps-new-note {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 4px 12px;
   padding: 8px 14px;
   border-radius: 999px;
   background: var(--interactive-accent);
@@ -592,4 +620,10 @@
 .ps-card-fileicon svg {
   width: 28px;
   height: 28px;
+}
+/* At narrow nav widths the pill shrinks; its label truncates, never wraps. */
+.ps-new-note > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

@@ -141,17 +141,7 @@ export default class WysiwygPlugin extends Plugin {
     this.addCommand({
       id: "remove-dead-bookmarks",
       name: "Remove bookmarks to deleted notes",
-      callback: () => {
-        const dead = (readBookmarks(this.app) ?? []).filter(
-          (b) => b.kind !== "search" && !this.app.vault.getAbstractFileByPath(b.target)
-        );
-        const removed = dead.filter((b) => removeBookmark(this.app, b)).length;
-        new Notice(
-          dead.length === 0
-            ? "No bookmarks point to deleted notes."
-            : `Removed ${removed} of ${dead.length} bookmark${dead.length === 1 ? "" : "s"} to deleted notes.`
-        );
-      },
+      callback: () => this.removeDeadBookmarks(),
     });
     this.addCommand({
       id: "open-sidebar",
@@ -208,6 +198,19 @@ export default class WysiwygPlugin extends Plugin {
     this.refreshExtensions();
     this.applyRenderingMode();
     this.applySidebarSetting();
+  }
+
+  /** Remove bookmarks whose note or folder no longer exists. */
+  removeDeadBookmarks(): void {
+    const dead = (readBookmarks(this.app) ?? []).filter(
+      (b) => b.kind !== "search" && !this.app.vault.getAbstractFileByPath(b.target)
+    );
+    const removed = dead.filter((b) => removeBookmark(this.app, b)).length;
+    new Notice(
+      dead.length === 0
+        ? "No bookmarks point to deleted notes."
+        : `Removed ${removed} of ${dead.length} bookmark${dead.length === 1 ? "" : "s"} to deleted notes.`
+    );
   }
 
   async openSidebar(): Promise<void> {

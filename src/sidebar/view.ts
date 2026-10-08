@@ -269,10 +269,17 @@ export class SidebarView extends ItemView {
     const templates = templateOptions(this.app).folder;
     const unfiltered = this.queryOptions("");
 
-    const newNote = nav.createDiv("ps-new-note");
+    // Evernote-style action row: the Note pill, then round icon buttons.
+    const actions = nav.createDiv("ps-nav-actions");
+    const newNote = actions.createDiv("ps-new-note");
     setIcon(newNote.createSpan("ps-nav-icon"), "file-plus-2");
     newNote.createSpan({ text: "Note" });
     newNote.addEventListener("click", () => void createNote(this.app, this.currentFolder()));
+    this.roundButton(actions, "folder-plus", "New folder", () => this.newNotebook(isAttachmentFolder));
+    this.roundButton(actions, "list-checks", "New task", () => void this.newTask());
+    this.roundButton(actions, "more-horizontal", "More", (evt) =>
+      this.moreMenu(evt, tagRows(notes).map((t) => t.path))
+    );
 
     const bookmarks = readBookmarks(this.app);
     if (bookmarks && bookmarks.length && this.navHeading(nav, "Bookmarks", "bookmark", "section:bookmarks")) {
@@ -330,6 +337,71 @@ export class SidebarView extends ItemView {
     chevron.toggleClass("is-collapsed", collapsed);
     setIcon(chevron, "chevron-down");
     return slot;
+  }
+
+  private roundButton(
+    parent: HTMLElement,
+    icon: string,
+    label: string,
+    onClick: (evt: MouseEvent) => void
+  ): void {
+    const button = parent.createDiv({ cls: "ps-round-button", attr: { "aria-label": label } });
+    setIcon(button, icon);
+    button.addEventListener("click", onClick);
+  }
+
+  private moreMenu(evt: MouseEvent, tags: string[]): void {
+    const menu = new Menu();
+    menu.addItem((i) => i.setTitle("New tag…").setIcon("tag").onClick(() => this.newTag(tags)));
+    menu.addItem((i) =>
+      i
+        .setTitle("Search all notes")
+        .setIcon("search")
+        .onClick(() => {
+          if (!openGlobalSearch(this.app, "")) new Notice("The core Search plugin is turned off.");
+        })
+    );
+    menu.addSeparator();
+    menu.addItem((i) => i.setTitle("Expand all").setIcon("chevrons-up-down").onClick(() => this.setAllCollapsed(false)));
+    menu.addItem((i) => i.setTitle("Collapse all").setIcon("chevrons-down-up").onClick(() => this.setAllCollapsed(true)));
+    menu.addSeparator();
+    menu.addItem((i) =>
+      i
+        .setTitle("Remove bookmarks to deleted notes")
+        .setIcon("bookmark-minus")
+        .onClick(() => this.plugin.removeDeadBookmarks())
+    );
+    menu.addItem((i) =>
+      i
+        .setTitle("Plainsight settings")
+        .setIcon("settings")
+        .onClick(() => openSettingsTab(this.app, this.plugin.manifest.id))
+    );
+    menu.showAtMouseEvent(evt);
+  }
+
+  /** Fold or unfold every section and nested folder/tag at once. */
+  private setAllCollapsed(collapsed: boolean): void {
+    const settings = this.plugin.settings;
+    if (collapsed) {
+      const { notes, isAttachmentFolder } = this.partition();
+      const templates = templateOptions(this.app).folder;
+      const parents = (rows: TreeRow[], prefix: string) =>
+        visibleRows(rows, new Set())
+          .filter((r) => r.hasChildren)
+          .map((r) => `${prefix}:${r.path}`);
+      settings.sidebarCollapsed = [
+        "section:bookmarks",
+        "section:notebooks",
+        "section:tags",
+        ...parents(folderRows(this.plugin.indexer.folders(), notes, templates, isAttachmentFolder), "notebook"),
+        ...parents(tagRows(notes), "tag"),
+      ];
+    } else {
+      settings.sidebarCollapsed = [];
+    }
+    void this.plugin.saveData(settings);
+    this.renderNav();
   }
 
   private addButton(row: HTMLElement, label: string, onAdd: (evt: MouseEvent) => void): void {
