@@ -125,6 +125,9 @@ export class SidebarView extends ItemView {
   /** Items rendered so far; re-renders restore at least this many so the
    * saved scroll position still has content to land on. */
   private renderedCount = 0;
+  /** Rendered task rows by "path\0line", for O(1) highlight changes. */
+  private taskRowEls = new Map<string, HTMLElement>();
+  private activeTaskEl: HTMLElement | null = null;
   private unsubscribe: (() => void) | null = null;
   private unsubscribeBookmarks: (() => void) | null = null;
   private watchedBookmarks: unknown = null;
@@ -777,6 +780,8 @@ export class SidebarView extends ItemView {
 
   private renderList(): void {
     this.disconnectObservers();
+    this.taskRowEls.clear();
+    this.activeTaskEl = null;
     const scroll = this.bodyEl.scrollTop;
     this.headerEl.empty();
     this.filtersEl.empty();
@@ -1249,6 +1254,25 @@ export class SidebarView extends ItemView {
     });
   }
 
+  /**
+   * Move the highlight to the task under the cursor (or clear it). One map
+   * lookup; only the old and new rows change, and it scrolls only when the
+   * highlighted row changed. A row in a batch not rendered yet is left
+   * alone rather than forcing the whole list to render.
+   */
+  markActiveTask(): void {
+    if (this.place.kind !== "tasks") return;
+    const active = this.plugin.activeTask;
+    const el = active ? this.taskRowEls.get(`${active.path}\u0000${active.line}`) ?? null : null;
+    if (el === this.activeTaskEl) return;
+    this.activeTaskEl?.removeClass("is-active");
+    this.activeTaskEl = el;
+    if (el) {
+      el.addClass("is-active");
+      el.scrollIntoView({ block: "nearest" });
+    }
+  }
+
   /** Cheap highlight update when a note is opened elsewhere. */
   private markActive(): void {
     const active = this.app.workspace.getActiveFile()?.path;
@@ -1338,6 +1362,13 @@ export class SidebarView extends ItemView {
       }
       const { note, task } = item;
       const row = this.bodyEl.createDiv("ps-task");
+      const key = `${note.path}\u0000${task.line}`;
+      this.taskRowEls.set(key, row);
+      const active = this.plugin.activeTask;
+      if (active && active.path === note.path && active.line === task.line) {
+        row.addClass("is-active");
+        this.activeTaskEl = row;
+      }
       const box = row.createEl("input", { type: "checkbox", cls: "task-list-item-checkbox" });
       box.checked = isClosed(task);
       box.addEventListener("click", (evt) => evt.stopPropagation());
