@@ -19,6 +19,7 @@ import {
 import { wysiwyg } from "./editor/extension";
 import { treeOf } from "./editor/parser";
 import { NoteIndex } from "./sidebar/core/note-index";
+import { cursorTracker } from "./sidebar/cursor";
 import { Indexer } from "./sidebar/indexer";
 import { SIDEBAR_VIEW, SidebarView } from "./sidebar/view";
 import { readBookmarks, removeBookmark } from "./sidebar/internals";
@@ -42,6 +43,8 @@ export default class WysiwygPlugin extends Plugin {
   private savedLivePreview: boolean | null = null;
   readonly index = new NoteIndex();
   indexer!: Indexer;
+  /** Where the cursor last was in a note, for highlighting its task. */
+  lastCursor: { path: string; line: number } | null = null;
   /** The sidebar setting as last acted on; null until loaded. */
   private sidebarApplied: boolean | null = null;
 
@@ -200,6 +203,15 @@ export default class WysiwygPlugin extends Plugin {
     this.applySidebarSetting();
   }
 
+  private onCursor(path: string, line: number): void {
+    const last = this.lastCursor;
+    if (last && last.path === path && last.line === line) return;
+    this.lastCursor = { path, line };
+    for (const leaf of this.app.workspace.getLeavesOfType(SIDEBAR_VIEW)) {
+      if (leaf.view instanceof SidebarView) leaf.view.markActiveTask();
+    }
+  }
+
   /** Re-render open sidebars after a setting that changes what they show. */
   refreshSidebar(): void {
     for (const leaf of this.app.workspace.getLeavesOfType(SIDEBAR_VIEW)) {
@@ -274,6 +286,11 @@ export default class WysiwygPlugin extends Plugin {
     // Mutate the registered array in place; updateOptions() makes all open
     // editors reconfigure with the new contents.
     this.extensions.length = 0;
+    // Independent of WYSIWYG editing: the Tasks list highlights the task
+    // under the cursor whenever the sidebar is on.
+    if (this.settings.sidebar) {
+      this.extensions.push(cursorTracker((path, line) => this.onCursor(path, line)));
+    }
     if (this.settings.enabled) {
       this.extensions.push(
         wysiwyg(),
