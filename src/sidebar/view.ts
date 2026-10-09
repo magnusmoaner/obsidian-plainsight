@@ -1,6 +1,7 @@
 import {
   ItemView,
   Keymap,
+  MarkdownView,
   Menu,
   Notice,
   Platform,
@@ -43,7 +44,7 @@ import {
   attachmentsFor,
   formatSize,
 } from "./core/attachments";
-import { taskDisplayText } from "./core/tasks";
+import { taskDisplayText, taskTextColumn } from "./core/tasks";
 import { isClosed, NoteSummary, renamedPath } from "./core/types";
 import {
   addTagToNote,
@@ -1273,6 +1274,24 @@ export class SidebarView extends ItemView {
     }
   }
 
+  /**
+   * Open a task's note with the caret on the task's first letter, not at
+   * the start of the line before "- [ ]". Obsidian's line state puts it at
+   * column 0, so the column is set once the note is open.
+   */
+  private async openTask(path: string, line: number, evt: MouseEvent): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) return;
+    const leaf = await openFile(this.app, file, Keymap.isModEvent(evt), line);
+    const view = leaf.view;
+    if (!(view instanceof MarkdownView)) return;
+    const editor = view.editor;
+    if (line >= editor.lineCount()) return;
+    const ch = taskTextColumn(editor.getLine(line));
+    editor.setCursor({ line, ch });
+    editor.focus();
+  }
+
   /** Cheap highlight update when a note is opened elsewhere. */
   private markActive(): void {
     const active = this.app.workspace.getActiveFile()?.path;
@@ -1400,10 +1419,7 @@ export class SidebarView extends ItemView {
         due.toggleClass("is-overdue", !isClosed(task) && task.due < today);
       }
 
-      row.addEventListener("click", (evt) => {
-        const file = this.app.vault.getAbstractFileByPath(note.path);
-        if (file instanceof TFile) void openFile(this.app, file, Keymap.isModEvent(evt), task.line);
-      });
+      row.addEventListener("click", (evt) => void this.openTask(note.path, task.line, evt));
     });
   }
 }

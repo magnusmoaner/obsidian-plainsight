@@ -61,3 +61,13 @@ export function toggleTaskLine(line: string): string | null {
   const next = match[2] === "x" || match[2] === "X" ? " " : "x";
   return `${match[1]}${next}${match[3]}${match[4]}${cr}`;
 }
+
+/**
+ * Column of the first character of a task's text — past indentation, list
+ * marker and checkbox — so the caret lands on the task, not before "- [ ]".
+ * 0 for a line that isn't a task.
+ */
+export function taskTextColumn(line: string): number {
+  const match = /^(\s*(?:[-*+]|\d+[.)])\s+\[.\]\s*)/.exec(line);
+  return match ? match[1].length : 0;
+}

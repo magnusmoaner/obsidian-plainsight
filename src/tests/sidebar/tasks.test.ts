@@ -3,6 +3,7 @@ import {
   matchTaskLine,
   parseTasks,
   taskDisplayText,
+  taskTextColumn,
   toggleTaskLine,
 } from "../../sidebar/core/tasks";
 
@@ -102,5 +103,17 @@ describe("matchTaskLine", () => {
   test("null for headings and plain list items", () => {
     expect(matchTaskLine("## Notes")).toBeNull();
     expect(matchTaskLine("- item")).toBeNull();
+  });
+});
+
+describe("taskTextColumn", () => {
+  test("lands on the first letter of the task", () => {
+    expect(taskTextColumn("- [ ] Buy milk")).toBe(6);
+    expect(taskTextColumn("    * [x] Done 📅 2026-10-09")).toBe(10);
+    expect(taskTextColumn("12. [/] Doing")).toBe(8);
+  });
+  test("0 for anything that isn't a task", () => {
+    expect(taskTextColumn("## Heading")).toBe(0);
+    expect(taskTextColumn("- plain item")).toBe(0);
   });
 });
