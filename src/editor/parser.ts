@@ -4,10 +4,11 @@ import { ChangedRange, Tree, TreeFragment } from "@lezer/common";
 // esbuild external provided by Obsidian at runtime, so it adds no bundle cost.
 import { DocInput } from "@codemirror/language";
 import { GFM, parser as baseParser } from "@lezer/markdown";
+import { WikiLinks } from "./wikilinks";
 
 // Obsidian's own markdown parser has undocumented node names, so we run our
 // own @lezer/markdown parse and never depend on Obsidian editor internals.
-const parser = baseParser.configure([GFM]);
+const parser = baseParser.configure([GFM, WikiLinks]);
 
 interface ParseState {
   tree: Tree;
