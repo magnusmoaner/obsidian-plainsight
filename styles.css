@@ -759,3 +759,27 @@
     max-width: 130px;
   }
 }
+
+/* ---------- Links ---------- */
+.cm-wys-link {
+  color: var(--link-color);
+  text-decoration: underline;
+  text-decoration-color: var(--link-color);
+  text-underline-offset: 2px;
+  cursor: text;
+}
+.cm-wys-link.is-external {
+  color: var(--link-external-color, var(--link-color));
+  text-decoration-color: var(--link-external-color, var(--link-color));
+}
+/* A link to a note that doesn't exist (yet). */
+.cm-wys-link.is-unresolved {
+  text-decoration-style: dashed;
+  opacity: 0.8;
+}
+/* Imported evernote:/// links can't open in Obsidian. */
+.cm-wys-link.is-evernote {
+  color: var(--text-muted);
+  text-decoration-color: var(--text-faint);
+  text-decoration-style: dotted;
+}

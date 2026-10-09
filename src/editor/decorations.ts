@@ -1,6 +1,8 @@
 import { EditorState, Range as RangeValue, RangeSet } from "@codemirror/state";
-import { Decoration, DecorationSet } from "@codemirror/view";
+import { Decoration, DecorationSet, WidgetType } from "@codemirror/view";
 import { CalloutIconWidget } from "./callout";
+import { linkResolver } from "./link-facets";
+import { LinkInfo, linksIn } from "./links";
 import {
   InlineMarkType,
   TextSpan,
@@ -27,6 +29,46 @@ const headingLine = [1, 2, 3, 4, 5, 6].map((level) =>
 // throughout, top/bottom and radii on the end lines). This only ever renders
 // while Obsidian has handed the source lines back, so it never competes with
 // Obsidian's own cm-embed-block rendering of the same callout.
+/** Shows a link whose visible text is derived from its target. */
+class LinkTextWidget extends WidgetType {
+  constructor(readonly text: string, readonly cls: string, readonly title: string) {
+    super();
+  }
+
+  eq(other: LinkTextWidget): boolean {
+    return other.text === this.text && other.cls === this.cls && other.title === this.title;
+  }
+
+  toDOM(): HTMLElement {
+    const el = document.createElement("span");
+    el.className = this.cls;
+    el.textContent = this.text;
+    if (this.title) el.title = this.title;
+    return el;
+  }
+
+  // Let CodeMirror handle clicks (caret placement, Cmd+click open).
+  ignoreEvent(): boolean {
+    return false;
+  }
+}
+
+function linkClass(state: EditorState, link: LinkInfo): string {
+  const classes = ["cm-wys-link"];
+  if (link.external) classes.push("is-external");
+  if (link.evernote) classes.push("is-evernote");
+  if (!link.external && !link.evernote) {
+    const resolves = state.facet(linkResolver);
+    if (resolves && !resolves(state, link.target)) classes.push("is-unresolved");
+  }
+  return classes.join(" ");
+}
+
+function linkTitle(link: LinkInfo): string {
+  if (link.evernote) return "Evernote link (not in vault)";
+  return link.target;
+}
+
 function calloutLine(type: string, first: boolean, last: boolean): Decoration {
   return Decoration.line({
     class: [
@@ -74,6 +116,23 @@ export function buildDecorations(
           state.doc.line(n).from
         )
       );
+    }
+  }
+  for (const link of linksIn(state, from, to)) {
+    const cls = linkClass(state, link);
+    const title = linkTitle(link);
+    if (link.text) {
+      // Text the user wrote stays editable; only the syntax around it hides.
+      if (link.text.to > link.text.from) {
+        all.push(Decoration.mark({ class: cls, attributes: { title } }).range(link.text.from, link.text.to));
+      }
+      delims.push(...link.hidden);
+    } else {
+      // Derived text (target name, shortened URL): a widget, atomic.
+      all.push(
+        Decoration.replace({ widget: new LinkTextWidget(link.display, cls, title) }).range(link.from, link.to)
+      );
+      atomicOnly.push({ from: link.from, to: link.to });
     }
   }
   for (const heading of headingsIn(state, from, to)) {

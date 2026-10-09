@@ -1,4 +1,4 @@
-import { Extension, RangeSet } from "@codemirror/state";
+import { Extension, Prec, RangeSet } from "@codemirror/state";
 import {
   Decoration,
   DecorationSet,
@@ -9,6 +9,8 @@ import {
 import { BuiltDecorations, buildDecorations } from "./decorations";
 import { markdownTree } from "./parser";
 import { wysiwygKeymap } from "./edit-semantics";
+import { linkOpener } from "./link-facets";
+import { enclosingLink } from "./links";
 
 class WysiwygView {
   decorations: DecorationSet = Decoration.none;
@@ -58,8 +60,29 @@ const decorationPlugin = ViewPlugin.fromClass(WysiwygView, {
     ),
 });
 
+/**
+ * Cmd/Ctrl+click opens a link (Cmd+Opt opens it to the right); a plain
+ * click just places the caret, so link text can be edited. Highest
+ * precedence so Obsidian's own source-mode link handling doesn't also fire.
+ */
+const linkClicks = Prec.highest(
+  EditorView.domEventHandlers({
+    mousedown(event, view) {
+      if (!(event.metaKey || event.ctrlKey) || event.button !== 0) return false;
+      const open = view.state.facet(linkOpener);
+      const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+      if (!open || pos === null) return false;
+      const link = enclosingLink(view.state, pos);
+      if (!link) return false;
+      event.preventDefault();
+      open(view, link, event.altKey);
+      return true;
+    },
+  })
+);
+
 export function wysiwyg(): Extension {
   // Returned as a flat array: CM6 deduplicates the StateField/keymap when the
   // host app also adds markdownTree explicitly.
-  return [markdownTree, decorationPlugin, wysiwygKeymap];
+  return [markdownTree, decorationPlugin, wysiwygKeymap, linkClicks];
 }

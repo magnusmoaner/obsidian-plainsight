@@ -187,3 +187,34 @@ describe("buildDecorations on callouts", () => {
     expect(ranges(decorations)).toContainEqual([16, 21, "cm-wys-strong"]);
   });
 });
+
+describe("buildDecorations on links", () => {
+  test("markdown link: syntax hidden, text styled", () => {
+    const s = mkState("see [text](https://x.dk) end");
+    const { hidden, decorations } = buildDecorations(s, 0, s.doc.length);
+    expect(ranges(hidden)).toEqual([
+      [4, 5, "replace"],
+      [9, 24, "replace"],
+    ]);
+    expect(ranges(decorations)).toContainEqual([5, 9, "cm-wys-link is-external"]);
+  });
+
+  test("unaliased wikilink: one atomic widget over the whole link", () => {
+    const s = mkState("a [[Note]] b");
+    const { hidden } = buildDecorations(s, 0, s.doc.length);
+    expect(ranges(hidden)).toEqual([[2, 10, "replace"]]);
+  });
+
+  test("bold inside link text still renders", () => {
+    const s = mkState("[**b**](u)");
+    const { decorations } = buildDecorations(s, 0, s.doc.length);
+    expect(ranges(decorations)).toContainEqual([1, 6, "cm-wys-strong"]);
+  });
+
+  test("[foo] without a URL is left alone", () => {
+    const s = mkState("[foo] bar");
+    const { hidden, decorations } = buildDecorations(s, 0, s.doc.length);
+    expect(ranges(hidden)).toEqual([]);
+    expect(ranges(decorations)).toEqual([]);
+  });
+});

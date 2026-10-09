@@ -13,8 +13,9 @@ Formatting renders as you type, and the syntax never comes back: there's no "rev
 - **Bold, italic and inline code.** Delimiters stay hidden, and the caret moves past them like rich text. Backspace at the edge of a formatted span removes the formatting instead of exposing a `**`.
 - **Headings.** `# ` disappears once you type the space, and each level is styled. Backspace at the start of a heading turns it back into a paragraph.
 - **Callouts.** `> [!type]` blocks render as boxes while you edit them. A `···` button changes the callout type.
+- **Links.** Only the link text shows: `[text](url)` shows *text*, `[[Note|alias]]` shows *alias*, `[[Note#Section]]` shows *Note › Section*, and bare URLs show shortened (`github.com/…/repo`). Text you wrote (link text, aliases) stays editable in place; text derived from the target moves as one unit. A plain click places the cursor; **Cmd/Ctrl+click opens** the link (add Opt/Alt to open it to the right). Links to notes that don't exist get a dashed underline, and imported `evernote:///` links are muted.
 
-Anything Plainsight doesn't render yet (lists, links, tables and more) stays visible as plain Markdown and fully editable.
+Anything Plainsight doesn't render yet (lists, tables, embeds and more) stays visible as plain Markdown and fully editable.
 
 ### Live Preview vs Source mode
 
@@ -93,7 +94,7 @@ npm run deploy    # build and copy into a vault
 
 ## Roadmap
 
-Next for the editor are wikilinks, frontmatter/properties, lists and task checkboxes, tables, embeds and highlights. For the sidebar, Spaces are planned (folders grouped into named spaces).
+In progress for the editor: link editing (a link toolbar, an Edit dialog and Cmd+K) and embeds (images, file chips, note previews). After that: frontmatter/properties, lists and task checkboxes, tables and highlights. For the sidebar, Spaces are planned (folders grouped into named spaces).
 
 ## License
 

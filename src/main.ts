@@ -2,6 +2,7 @@ import { Extension, Prec } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import {
   Editor,
+  editorInfoField,
   MarkdownPostProcessorContext,
   Menu,
   Notice,
@@ -9,6 +10,8 @@ import {
   WorkspaceLeaf,
 } from "obsidian";
 import { CALLOUT_TYPES, calloutMenu } from "./editor/callout";
+import { linkOpener, linkResolver } from "./editor/link-facets";
+import type { LinkInfo } from "./editor/links";
 import { enclosingCallout } from "./editor/syntax";
 import {
   setHeading,
@@ -229,6 +232,36 @@ export default class WysiwygPlugin extends Plugin {
     if (this.cursorTimer !== null) window.clearTimeout(this.cursorTimer);
   }
 
+  /** Vault part of a link target: no "#subpath", URL-decoded for markdown links. */
+  private linkPath(target: string): string {
+    const path = target.split("#")[0];
+    try {
+      return decodeURI(path);
+    } catch {
+      return path;
+    }
+  }
+
+  private resolvesLink(sourcePath: string, target: string): boolean {
+    const path = this.linkPath(target);
+    if (!path) return true; // [[#Heading]] — a heading in this note
+    return this.app.metadataCache.getFirstLinkpathDest(path, sourcePath) !== null;
+  }
+
+  private openLink(sourcePath: string, link: LinkInfo, split: boolean): void {
+    if (link.evernote) {
+      new Notice("This Evernote link points to a note outside this vault.");
+      return;
+    }
+    if (link.external) {
+      window.open(link.target, "_blank");
+      return;
+    }
+    // A vault link (wiki or relative markdown); an unresolved one creates the note.
+    const sub = link.target.includes("#") ? link.target.slice(link.target.indexOf("#")) : "";
+    void this.app.workspace.openLinkText(`${this.linkPath(link.target)}${sub}`, sourcePath, split ? "split" : false);
+  }
+
   /** Re-render open sidebars after a setting that changes what they show. */
   refreshSidebar(): void {
     for (const leaf of this.app.workspace.getLeavesOfType(SIDEBAR_VIEW)) {
@@ -313,6 +346,10 @@ export default class WysiwygPlugin extends Plugin {
       this.extensions.push(
         wysiwyg(),
         calloutMenu.of(openCalloutMenu),
+        linkResolver.of((state, target) => this.resolvesLink(state.field(editorInfoField, false)?.file?.path ?? "", target)),
+        linkOpener.of((view, link, split) =>
+          this.openLink(view.state.field(editorInfoField, false)?.file?.path ?? "", link, split)
+        ),
         // Bound as a key, not just a palette command: the palette blurs the
         // editor, and the blurred state is exactly what we must not measure.
         Prec.high(
