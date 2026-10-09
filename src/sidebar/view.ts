@@ -1249,24 +1249,6 @@ export class SidebarView extends ItemView {
     });
   }
 
-  /**
-   * Highlight the task under the cursor in a note, like the open note's
-   * card: called as the cursor moves. Scrolls only as far as needed, and
-   * only when that row is already rendered (a far-off row in an unloaded
-   * batch is left alone rather than forcing the whole list to render).
-   */
-  markActiveTask(): void {
-    if (this.place.kind !== "tasks") return;
-    const cursor = this.plugin.lastCursor;
-    let active: HTMLElement | null = null;
-    this.bodyEl.querySelectorAll<HTMLElement>(".ps-task").forEach((el) => {
-      const on = !!cursor && el.dataset.path === cursor.path && el.dataset.line === String(cursor.line);
-      el.toggleClass("is-active", on);
-      if (on) active = el;
-    });
-    (active as HTMLElement | null)?.scrollIntoView({ block: "nearest" });
-  }
-
   /** Cheap highlight update when a note is opened elsewhere. */
   private markActive(): void {
     const active = this.app.workspace.getActiveFile()?.path;
@@ -1355,12 +1337,7 @@ export class SidebarView extends ItemView {
         return;
       }
       const { note, task } = item;
-      const row = this.bodyEl.createDiv({
-        cls: "ps-task",
-        attr: { "data-path": note.path, "data-line": String(task.line) },
-      });
-      const cursor = this.plugin.lastCursor;
-      row.toggleClass("is-active", !!cursor && cursor.path === note.path && cursor.line === task.line);
+      const row = this.bodyEl.createDiv("ps-task");
       const box = row.createEl("input", { type: "checkbox", cls: "task-list-item-checkbox" });
       box.checked = isClosed(task);
       box.addEventListener("click", (evt) => evt.stopPropagation());
