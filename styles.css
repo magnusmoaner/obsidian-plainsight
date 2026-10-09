@@ -167,10 +167,17 @@
   padding: 10px 6px;
   background: var(--background-secondary);
 }
+/* A 5px grab area that shows only a 1px line until hovered. */
 .ps-divider {
-  flex: 0 0 4px;
+  flex: 0 0 5px;
   cursor: col-resize;
-  background: var(--background-modifier-border);
+  background: linear-gradient(
+    to right,
+    transparent 2px,
+    var(--background-modifier-border) 2px,
+    var(--background-modifier-border) 3px,
+    transparent 3px
+  );
 }
 .ps-divider:hover {
   background: var(--interactive-accent);
