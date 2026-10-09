@@ -32,8 +32,12 @@ import {
   WysiwygSettingTab,
 } from "./settings";
 
-/** URL schemes a Cmd+click may open outside Obsidian (or, for obsidian:, inside it). */
-const SAFE_LINK_SCHEMES = new Set(["http:", "https:", "mailto:", "obsidian:"]);
+/**
+ * URL schemes a Cmd+click may hand to the system. Not obsidian:// — plugins
+ * register their own obsidian:// actions, so an allowlisted scheme would
+ * still let a crafted link in a note trigger arbitrary plugin behaviour.
+ */
+const SAFE_LINK_SCHEMES = new Set(["http:", "https:", "mailto:"]);
 
 /** vault.getConfig/setConfig are undocumented but long-stable, the same
  * category as the `editor.cm` handle this plugin already relies on. */
