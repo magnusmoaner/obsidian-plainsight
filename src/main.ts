@@ -32,6 +32,9 @@ import {
   WysiwygSettingTab,
 } from "./settings";
 
+/** URL schemes a Cmd+click may open outside Obsidian (or, for obsidian:, inside it). */
+const SAFE_LINK_SCHEMES = new Set(["http:", "https:", "mailto:", "obsidian:"]);
+
 /** vault.getConfig/setConfig are undocumented but long-stable, the same
  * category as the `editor.cm` handle this plugin already relies on. */
 type ConfigVault = {
@@ -254,7 +257,21 @@ export default class WysiwygPlugin extends Plugin {
       return;
     }
     if (link.external) {
-      window.open(link.target, "_blank");
+      // Only open schemes that are safe to hand to the system: imported
+      // notes can contain javascript:, file: or app-specific URLs, and a
+      // Cmd+click must never run or launch something unexpected.
+      let url: URL;
+      try {
+        url = new URL(link.target);
+      } catch {
+        new Notice("That link isn't a valid URL.");
+        return;
+      }
+      if (!SAFE_LINK_SCHEMES.has(url.protocol)) {
+        new Notice(`Not opening a ${url.protocol} link from a note.`);
+        return;
+      }
+      window.open(url.href, "_blank", "noopener");
       return;
     }
     // A vault link (wiki or relative markdown); an unresolved one creates the note.
