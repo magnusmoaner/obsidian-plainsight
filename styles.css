@@ -835,8 +835,14 @@
   width: 28px;
   height: 28px;
 }
-.ps-back:active {
-  background: var(--background-modifier-hover);
+/* Transparent in every state: Obsidian's button styling and a hover that
+   sticks after a tap on touch screens would otherwise grey it. */
+.ps-sidebar .ps-back,
+.ps-sidebar .ps-back:hover,
+.ps-sidebar .ps-back:active,
+.ps-sidebar .ps-back:focus {
+  background: transparent;
+  box-shadow: none;
 }
 .ps-sidebar.is-mobile .ps-header-row {
   align-items: center;
