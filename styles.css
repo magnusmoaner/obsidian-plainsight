@@ -841,3 +841,13 @@
 .ps-sidebar.is-mobile .ps-header-row {
   align-items: center;
 }
+
+/* A bookmark's group name, in the count's place; long names truncate. */
+.ps-nav-group {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

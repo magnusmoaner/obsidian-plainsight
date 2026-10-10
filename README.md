@@ -36,7 +36,7 @@ Heading shortcuts use `Opt/Alt` because Obsidian already binds `Cmd + 1…8` to 
 It replaces File explorer with two columns: places on the left, and the selected place's contents on the right.
 
 **Places**
-- **Bookmarks:** Obsidian's own bookmarks. Bookmarks to deleted notes are shown crossed out; click one to remove it.
+- **Bookmarks:** Obsidian's own bookmarks, each showing its bookmark group (if any) on the right. Bookmarks to deleted notes are shown crossed out; click one to remove it.
 - **Notes:** every note, with pinned notes first. Group by month, folder or type, or not at all; when a place holds more than plain notes, chips filter to Notes, Boards or Canvases.
 - **Tasks:** tasks from all your notes. Filter by Open, Overdue or Done, or by a single note. Group by due date (completed tasks by the date they were done), folder, note, or Kanban board (as "Board › List", in the board's own list order). The task under your cursor in a note is highlighted in the list, like the open note's card. Ticking a task goes through the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) plugin when it's installed, so done dates and recurring tasks behave exactly as they do inside a note.
 - **Attachments:** PDFs, images and other files, with thumbnails. If a file has extracted-text notes (frontmatter `type: extracted-text` with a link to the file), they're listed with the file, their text is searchable from it, and they're kept out of your note lists.

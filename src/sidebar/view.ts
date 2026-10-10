@@ -654,6 +654,8 @@ export class SidebarView extends ItemView {
     // Obsidian keeps a bookmark after its note is deleted; show it, but say so.
     const missing = bookmark.kind !== "search" && !target;
     const row = this.navRow(parent, bookmark.title, icon, 1, null, false);
+    // The bookmark's group, where folders show their count.
+    if (bookmark.group) row.createSpan({ cls: "ps-nav-count ps-nav-group", text: bookmark.group });
     row.toggleClass("is-missing", missing);
     if (missing) row.setAttribute("aria-label", `Deleted: ${bookmark.target}. Click to remove the bookmark.`);
     const menu = (evt: MouseEvent) => {

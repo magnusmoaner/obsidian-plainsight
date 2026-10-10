@@ -15,6 +15,8 @@ export interface Bookmark {
   subpath: string;
   /** The plugin's own item object; removeBookmark needs this exact reference. */
   raw: unknown;
+  /** The bookmark group(s) it sits in, e.g. "Work › Clients"; null at top level. */
+  group: string | null;
 }
 
 type Loose = Record<string, unknown> | null | undefined;
@@ -33,21 +35,22 @@ export function readBookmarks(app: App): Bookmark[] | null {
   const items = internalPlugin(app, "bookmarks")?.items;
   if (!Array.isArray(items)) return null;
   const out: Bookmark[] = [];
-  const walk = (list: unknown[]) => {
+  const walk = (list: unknown[], groups: string[]) => {
+    const group = groups.length ? groups.join(" › ") : null;
     for (const raw of list) {
       const item = raw as Record<string, unknown>;
       const title = typeof item.title === "string" && item.title ? item.title : null;
       const subpath = typeof item.subpath === "string" ? item.subpath : "";
-      if (item.type === "group" && Array.isArray(item.items)) walk(item.items);
+      if (item.type === "group" && Array.isArray(item.items)) walk(item.items, [...groups, title ?? "Group"]);
       else if (item.type === "file" && typeof item.path === "string")
-        out.push({ kind: "file", target: item.path, subpath, title: title ?? lastSegment(item.path), raw });
+        out.push({ kind: "file", target: item.path, subpath, title: title ?? lastSegment(item.path), raw, group });
       else if (item.type === "folder" && typeof item.path === "string")
-        out.push({ kind: "folder", target: item.path, subpath: "", title: title ?? lastSegment(item.path), raw });
+        out.push({ kind: "folder", target: item.path, subpath: "", title: title ?? lastSegment(item.path), raw, group });
       else if (item.type === "search" && typeof item.query === "string")
-        out.push({ kind: "search", target: item.query, subpath: "", title: title ?? item.query, raw });
+        out.push({ kind: "search", target: item.query, subpath: "", title: title ?? item.query, raw, group });
     }
   };
-  walk(items);
+  walk(items, []);
   return out;
 }
 
