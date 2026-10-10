@@ -814,3 +814,30 @@
   width: 13px;
   height: 13px;
 }
+
+/* Mobile back button: a full 44px touch target in the title row. */
+.ps-back {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: 0 2px 0 -12px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-normal);
+}
+.ps-back svg {
+  width: 28px;
+  height: 28px;
+}
+.ps-back:active {
+  background: var(--background-modifier-hover);
+}
+.ps-sidebar.is-mobile .ps-header-row {
+  align-items: center;
+}

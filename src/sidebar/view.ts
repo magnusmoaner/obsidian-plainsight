@@ -791,14 +791,6 @@ export class SidebarView extends ItemView {
     this.filtersEl.empty();
     this.bodyEl.empty();
 
-    if (Platform.isMobile) {
-      const back = this.headerEl.createDiv("ps-back");
-      setIcon(back, "chevron-left");
-      back.addEventListener("click", () => {
-        this.mobilePane = "nav";
-        this.render();
-      });
-    }
 
     if (this.place.kind === "tasks") {
       this.renderTasks();
@@ -975,6 +967,16 @@ export class SidebarView extends ItemView {
 
   private renderHeader(title: string, count: number | null): void {
     const row = this.headerEl.createDiv("ps-header-row");
+    // Mobile shows one column at a time: a full-size back button in the
+    // title row returns to the places list.
+    if (Platform.isMobile) {
+      const back = row.createEl("button", { cls: "ps-back", attr: { "aria-label": "Back to places" } });
+      setIcon(back, "chevron-left");
+      back.addEventListener("click", () => {
+        this.mobilePane = "nav";
+        this.render();
+      });
+    }
     row.createSpan({ cls: "ps-title", text: title });
     if (count !== null) row.createSpan({ cls: "ps-count", text: String(count) });
     const actions = row.createDiv("ps-actions");
