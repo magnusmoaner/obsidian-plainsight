@@ -174,6 +174,7 @@ export class SidebarView extends ItemView {
     this.bodyEl = list.createDiv("ps-list-body");
 
     this.makeResizable(divider);
+    this.watchListWidth();
     this.unsubscribe = this.plugin.index.subscribe(() => this.queueRender());
     this.watchBookmarks();
     this.registerEvent(this.app.workspace.on("file-open", () => this.markActive()));
@@ -190,6 +191,8 @@ export class SidebarView extends ItemView {
   }
 
   async onClose(): Promise<void> {
+    this.resizeObserver?.disconnect();
+    if (this.fitFrame !== null) window.cancelAnimationFrame(this.fitFrame);
     this.unsubscribe?.();
     this.unsubscribeBookmarks?.();
     this.disconnectObservers();
@@ -890,6 +893,81 @@ export class SidebarView extends ItemView {
     step();
   }
 
+  private fitFrame: number | null = null;
+  private resizeObserver: ResizeObserver | null = null;
+  private lastBodyWidth = 0;
+
+  /** Fit newly rendered cards' tag rows on the next frame, once per batch. */
+  private queueFitTags(): void {
+    if (this.fitFrame !== null) return;
+    this.fitFrame = window.requestAnimationFrame(() => {
+      this.fitFrame = null;
+      this.fitTagRows();
+    });
+  }
+
+  /**
+   * Keep each card's meta row on one line: show as many tags as fit after
+   * the date and badge, and fold the rest into "+N". All widths are read
+   * first, then all rows written, so a batch costs one layout pass. Rows
+   * are refitted only when the list's width changes.
+   */
+  private fitTagRows(): void {
+    const rows = Array.from(this.bodyEl.querySelectorAll<HTMLElement>('.ps-card-meta[data-fit="pending"]'));
+    if (!rows.length) return;
+    const GAP = 6;
+    const MORE = 34; // room kept for a "+N" chip
+    // Reset phase (writes only): show everything again before measuring.
+    for (const row of rows) {
+      for (const el of Array.from(row.children) as HTMLElement[]) el.style.display = "";
+    }
+    // Read phase (reads only): one layout for the whole batch.
+    const plans = rows.map((row) => {
+      const children = Array.from(row.children) as HTMLElement[];
+      const tags = children.filter((el) => el.hasClass("ps-card-tag"));
+      const fixed = children.filter((el) => !el.hasClass("ps-card-tag") && !el.hasClass("ps-card-more"));
+      return {
+        row,
+        tags,
+        available: row.clientWidth,
+        fixedWidth: fixed.reduce((sum, el) => sum + el.offsetWidth + GAP, 0),
+        tagWidths: tags.map((el) => el.offsetWidth),
+      };
+    });
+    // Write phase.
+    for (const { row, tags, available, fixedWidth, tagWidths } of plans) {
+      let used = fixedWidth;
+      let shown = 0;
+      for (let i = 0; i < tags.length; i++) {
+        const reserve = i < tags.length - 1 ? MORE : 0;
+        if (used + tagWidths[i] + GAP + reserve > available) break;
+        used += tagWidths[i] + GAP;
+        shown++;
+      }
+      tags.forEach((el, i) => (el.style.display = i < shown ? "" : "none"));
+      const more = row.querySelector<HTMLElement>(".ps-card-more");
+      if (more) {
+        const hidden = tags.length - shown;
+        more.textContent = hidden ? `+${hidden}` : "";
+        more.style.display = hidden ? "" : "none";
+        if (hidden) more.title = tags.slice(shown).map((el) => el.textContent).join(", ");
+      }
+      row.dataset.fit = "done";
+    }
+  }
+
+  /** Refit every rendered row when the list column changes width. */
+  private watchListWidth(): void {
+    this.resizeObserver = new ResizeObserver((entries) => {
+      const width = Math.round(entries[0]?.contentRect.width ?? 0);
+      if (width === this.lastBodyWidth) return;
+      this.lastBodyWidth = width;
+      this.bodyEl.querySelectorAll<HTMLElement>(".ps-card-meta").forEach((row) => (row.dataset.fit = "pending"));
+      this.queueFitTags();
+    });
+    this.resizeObserver.observe(this.bodyEl);
+  }
+
   private disconnectObservers(): void {
     for (const o of this.observers) o.disconnect();
     this.observers = [];
@@ -974,24 +1052,27 @@ export class SidebarView extends ItemView {
     if (note.pinned) setIcon(title.createSpan("ps-card-pin"), "pin");
     if (note.snippet) text.createDiv({ cls: "ps-card-snippet", text: note.snippet });
 
+    // One line: date · task badge (or a board's/canvas's count) · tags,
+    // with tags that don't fit folded into "+N" by fitTagRows().
+    const meta = text.createDiv({ cls: "ps-card-meta", attr: { "data-fit": "pending" } });
+    const time = this.sort === "created" ? note.ctime : note.mtime;
+    meta.createSpan({ cls: "ps-card-date", text: cardDate(time) });
     const { closed, total } = taskProgress(note);
     if (note.kind !== "note") {
       // Boards: card count (their checkboxes are cards, not progress);
       // canvases: how many boxes they hold.
       const label = note.kind === "board" ? "card" : "box";
-      const chip = text.createDiv("ps-card-tasks ps-card-items");
+      const chip = meta.createSpan("ps-card-tasks ps-card-items");
       setIcon(chip.createSpan(), note.kind === "board" ? "square-stack" : "shapes");
       chip.createSpan({ text: `${note.items} ${label}${note.items === 1 ? "" : label === "box" ? "es" : "s"}` });
     } else if (total) {
-      const chip = text.createDiv("ps-card-tasks");
+      const chip = meta.createSpan("ps-card-tasks");
       setIcon(chip.createSpan(), "check-circle-2");
       chip.createSpan({ text: `${closed}/${total}` });
     }
-
-    const meta = text.createDiv("ps-card-meta");
-    const time = this.sort === "created" ? note.ctime : note.mtime;
-    meta.createSpan({ cls: "ps-card-date", text: cardDate(time) });
-    for (const tag of note.tags.slice(0, 3)) meta.createSpan({ cls: "ps-card-tag", text: tag });
+    for (const tag of note.tags) meta.createSpan({ cls: "ps-card-tag", text: tag });
+    if (note.tags.length) meta.createSpan({ cls: "ps-card-more" });
+    this.queueFitTags();
 
     const src = this.imageSrc(note);
     if (src) {

@@ -639,10 +639,10 @@
   overflow: hidden;
 }
 .ps-card-tasks {
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-top: 6px;
   padding: 1px 6px;
   border-radius: 4px;
   background: rgba(var(--color-purple-rgb), 0.12);
@@ -652,16 +652,24 @@
   width: 14px;
   height: 14px;
 }
+/* One line: date · badge · tags (overflow folded into "+N" in code). */
 .ps-card-meta {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  white-space: nowrap;
   gap: 6px;
   align-items: center;
   margin-top: 6px;
   color: var(--text-faint);
   font-size: var(--font-ui-smaller);
 }
-.ps-card-tag {
+.ps-card-date {
+  flex: 0 0 auto;
+}
+.ps-card-tag,
+.ps-card-more {
+  flex: 0 0 auto;
   padding: 1px 6px;
   border-radius: 4px;
   background: var(--background-modifier-hover);
@@ -785,4 +793,9 @@
   color: var(--text-muted);
   text-decoration-color: var(--text-faint);
   text-decoration-style: dotted;
+}
+
+/* The "+N" chip stays out of the way until fitTagRows gives it a number. */
+.ps-card-more:empty {
+  display: none;
 }
