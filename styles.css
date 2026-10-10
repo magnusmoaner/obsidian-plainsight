@@ -861,10 +861,11 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
-/* Inside a white box, white can't mark the selection: tint it instead. */
+/* The selected entry looks like a selected nav item: same tint, no border. */
 .ps-card.is-active,
 .ps-card.is-active:hover,
 .ps-task.is-active,
 .ps-task.is-active:hover {
-  background: var(--background-secondary);
+  background: var(--background-modifier-active-hover);
+  outline: none;
 }
