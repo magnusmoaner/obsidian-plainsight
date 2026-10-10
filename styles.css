@@ -799,3 +799,18 @@
 .ps-card-more:empty {
   display: none;
 }
+/* Badge icon and text centred on the same line, not on the text baseline. */
+.ps-card-tasks {
+  line-height: 1;
+  padding: 3px 7px;
+}
+.ps-card-tasks > span {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+.ps-card-tasks svg {
+  display: block;
+  width: 13px;
+  height: 13px;
+}
