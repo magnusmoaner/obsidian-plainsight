@@ -851,3 +851,20 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---------- Experiment: the list column as a rounded white card ---------- */
+.ps-list {
+  background: var(--background-primary);
+  margin: 8px 8px 8px 4px;
+  border-radius: 12px;
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+/* Inside a white box, white can't mark the selection: tint it instead. */
+.ps-card.is-active,
+.ps-card.is-active:hover,
+.ps-task.is-active,
+.ps-task.is-active:hover {
+  background: var(--background-secondary);
+}
