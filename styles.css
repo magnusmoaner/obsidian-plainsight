@@ -254,12 +254,13 @@
 .ps-nav-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 8px;
+  gap: 10px;
+  padding: 6px 10px;
+  margin-bottom: 2px;
   border-radius: 6px;
 }
 .ps-nav-heading {
-  margin-top: 10px;
+  margin-top: 16px;
   color: var(--text-muted);
   cursor: pointer;
 }
@@ -288,7 +289,7 @@
 .ps-nav-heading,
 .ps-nav-item {
   position: relative;
-  min-height: 28px;
+  min-height: 32px;
   box-sizing: border-box;
 }
 .ps-fold-slot {
@@ -390,7 +391,7 @@
   text-decoration: line-through;
 }
 .ps-nav-item {
-  padding-left: calc(8px + var(--ps-depth, 0) * 14px);
+  padding-left: calc(10px + var(--ps-depth, 0) * 16px);
   cursor: pointer;
   color: var(--text-normal);
 }
