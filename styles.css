@@ -455,15 +455,17 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Only shown if the browser can't open the date picker directly. */
-.ps-dialog-date {
+/* Only shown if the browser can't open the date picker directly. Specific
+   enough to beat Obsidian's own input[type=date] padding and width, which
+   otherwise leave an invisible gap in the chip row. */
+.ps-dialog input.ps-dialog-date {
   position: absolute;
   width: 0;
   height: 0;
   opacity: 0;
   pointer-events: none;
 }
-.ps-dialog-date.is-shown {
+.ps-dialog input.ps-dialog-date.is-shown {
   position: static;
   width: auto;
   height: 28px;
@@ -520,15 +522,12 @@
   margin-top: var(--size-4-2);
   align-items: center;
 }
-.ps-dialog-footer-start {
-  margin-right: auto;
+/* Natural-width buttons on the right, not stretched across the dialog. */
+.ps-dialog .modal-button-container {
+  justify-content: flex-end;
 }
-.ps-dialog-link {
-  font-size: var(--font-ui-small);
-  color: var(--text-muted);
-}
-.ps-dialog-link:hover {
-  color: var(--text-accent);
+.ps-dialog .modal-button-container button {
+  flex: 0 0 auto;
 }
 .ps-nav-item .ps-nav-chevron {
   cursor: pointer;

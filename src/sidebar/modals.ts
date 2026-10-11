@@ -123,8 +123,6 @@ export class NotePickerModal extends FuzzySuggestModal<TFile> {
 interface Dialog {
   body: HTMLElement;
   error: HTMLElement;
-  /** The left end of the button bar, for a secondary link. */
-  footerStart: HTMLElement;
   cta: HTMLButtonElement;
 }
 
@@ -134,11 +132,10 @@ function dialog(modal: Modal, title: string, ctaLabel: string, submit: () => voi
   const body = modal.contentEl.createDiv({ cls: "ps-dialog-body" });
   const error = modal.contentEl.createDiv({ cls: "ps-modal-error" });
   const footer = modal.contentEl.createDiv({ cls: "modal-button-container" });
-  const footerStart = footer.createDiv({ cls: "ps-dialog-footer-start" });
   footer.createEl("button", { text: "Cancel" }).addEventListener("click", () => modal.close());
   const cta = footer.createEl("button", { cls: "mod-cta", text: ctaLabel });
   cta.addEventListener("click", submit);
-  return { body, error, footerStart, cta };
+  return { body, error, cta };
 }
 
 /** A full-width text input; Enter submits, and it's focused on open. */
