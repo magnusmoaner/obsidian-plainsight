@@ -476,9 +476,15 @@
   gap: var(--size-4-2);
 }
 .ps-dialog-field {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--size-4-3);
+}
+/* The hidden date input sits under the value button, so the calendar opens there. */
+.ps-dialog-field input.ps-dialog-date {
+  left: calc(84px + var(--size-4-3));
+  bottom: 0;
 }
 .ps-dialog-field-label {
   flex: 0 0 84px;
@@ -486,6 +492,8 @@
   font-size: var(--font-ui-small);
 }
 .ps-dialog .ps-dialog-field-value {
+  /* Obsidian's buttons are inline-flex, where text-overflow does nothing. */
+  display: block;
   flex: 1 1 auto;
   min-width: 0;
   justify-content: flex-start;
@@ -542,6 +550,9 @@
 .ps-dialog-details-inner {
   min-height: 0;
   overflow: hidden;
+  /* Room for the buttons' focus rings, which overflow: hidden would clip. */
+  padding: 3px;
+  margin: -3px;
 }
 .ps-dialog .modal-button-container {
   margin-top: var(--size-4-2);
