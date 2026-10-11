@@ -23,31 +23,51 @@ export interface TaskLineOptions {
   created?: string;
 }
 
+/** Repeat rules offered in the dialog; all are valid Tasks recurrence text. */
+export const RECURRENCES = ["every day", "every weekday", "every week", "every month", "every year"];
+
 export interface NewTask extends TaskLineOptions {
   text: string;
   /** YYYY-MM-DD */
   due?: string;
+  scheduled?: string;
+  start?: string;
   priority?: Priority;
+  /** One of RECURRENCES. */
+  recurrence?: string;
+  /** Repeat from the completion date instead of the original date. */
+  whenDone?: boolean;
 }
 
-/** The task line, or null if there's no text or the date isn't YYYY-MM-DD. */
+/**
+ * The task line, or null if there's no text, a date isn't YYYY-MM-DD, the
+ * repeat rule isn't one we offer, or a repeating task has no date to repeat.
+ */
 export function buildTaskLine(task: NewTask): string | null {
   // A newline would turn one appended task into several lines.
   const text = task.text.replace(/\s+/g, " ").trim();
   if (!text) return null;
   const date = /^\d{4}-\d{2}-\d{2}$/;
-  if ((task.due && !date.test(task.due)) || (task.created && !date.test(task.created))) return null;
+  const dates = [task.due, task.scheduled, task.start, task.created];
+  if (dates.some((d) => d !== undefined && d !== "" && !date.test(d))) return null;
+  if (task.recurrence) {
+    if (!RECURRENCES.includes(task.recurrence)) return null;
+    if (!task.due && !task.scheduled && !task.start) return null;
+  }
   const filter = task.globalFilter?.trim();
-  // Tasks' order: description, priority, created, due.
+  // Tasks' own order: description, priority, recurrence, created, start, scheduled, due.
   const parts = [filter && !text.split(" ").includes(filter) ? `- [ ] ${filter} ${text}` : `- [ ] ${text}`];
   const priority = PRIORITIES.find((p) => p.value === task.priority);
   if (priority) parts.push(priority.emoji);
+  if (task.recurrence) parts.push(`🔁 ${task.recurrence}${task.whenDone ? " when done" : ""}`);
   if (task.created) parts.push(`➕ ${task.created}`);
+  if (task.start) parts.push(`🛫 ${task.start}`);
+  if (task.scheduled) parts.push(`⏳ ${task.scheduled}`);
   if (task.due) parts.push(`📅 ${task.due}`);
   return parts.join(" ");
 }
 
-/** Quick due dates relative to `today` (YYYY-MM-DD); next week is the coming Monday. */
+/** Quick dates relative to `today` (YYYY-MM-DD); next week is the coming Monday. */
 export function duePresets(today: string): { label: string; date: string }[] {
   const [y, m, d] = today.split("-").map(Number);
   const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0 = Sunday

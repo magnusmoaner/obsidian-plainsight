@@ -412,6 +412,12 @@
   align-items: center;
   gap: var(--size-4-2);
 }
+.ps-dialog-chips.is-end {
+  justify-content: flex-end;
+}
+.ps-dialog .ps-dialog-chip-end {
+  margin-left: auto;
+}
 .ps-dialog-chips-label {
   color: var(--text-muted);
   font-size: var(--font-ui-small);
@@ -463,6 +469,49 @@
   height: 28px;
   opacity: 1;
   pointer-events: auto;
+}
+/* "More details": the dialog grows and shrinks instead of being replaced. */
+.ps-dialog .ps-dialog-disclosure {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: auto;
+  padding: 2px 4px 2px 0;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+.ps-dialog .ps-dialog-disclosure:hover {
+  background: transparent;
+  color: var(--text-normal);
+}
+.ps-dialog-disclosure-icon {
+  display: inline-flex;
+  transition: transform 0.15s ease-in-out;
+}
+.ps-dialog-disclosure-icon svg {
+  width: 14px;
+  height: 14px;
+}
+.ps-dialog-disclosure.is-open .ps-dialog-disclosure-icon {
+  transform: rotate(90deg);
+}
+.ps-dialog-details {
+  display: grid;
+  grid-template-rows: 0fr;
+  margin-top: calc(-1 * var(--size-4-2));
+  transition: grid-template-rows 0.2s ease-in-out, margin-top 0.2s ease-in-out;
+}
+.ps-dialog-details.is-open {
+  grid-template-rows: 1fr;
+  margin-top: 0;
+}
+.ps-dialog-details-inner {
+  min-height: 0;
+  overflow: hidden;
 }
 .ps-dialog .modal-button-container {
   margin-top: var(--size-4-2);

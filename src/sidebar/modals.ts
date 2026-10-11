@@ -12,12 +12,20 @@ import {
 } from "obsidian";
 import { folderNameError, normalizeTag } from "./core/edits";
 import { dueDateLabel } from "./core/format";
-import { buildTaskLine, duePresets, Priority, PRIORITIES, TaskLineOptions } from "./core/task-line";
+import {
+  buildTaskLine,
+  duePresets,
+  NewTask,
+  Priority,
+  PRIORITIES,
+  RECURRENCES,
+  TaskLineOptions,
+} from "./core/task-line";
 
 /*
  * Dialogs behind the sidebar's "+" buttons, built from Obsidian's own Modal
  * and suggest classes so they look and behave like native dialogs. New tasks
- * use QuickTaskModal; the Tasks plugin's full dialog is one click away.
+ * use QuickTaskModal, which covers the Tasks fields people use day to day.
  */
 
 /** Type-ahead over a fixed list of strings, attached to a text input. */
@@ -79,11 +87,19 @@ export class NoteSuggest extends AbstractInputSuggest<TFile> {
   }
 }
 
+/** The key hints under a picker, as in Obsidian's own Move dialog. */
+const PICKER_KEYS = [
+  { command: "↑↓", purpose: "to navigate" },
+  { command: "↵", purpose: "to choose" },
+  { command: "esc", purpose: "to dismiss" },
+];
+
 /** Fuzzy picker over notes, used once to choose where new tasks go. */
 export class NotePickerModal extends FuzzySuggestModal<TFile> {
   constructor(app: App, placeholder: string, private onPick: (file: TFile) => void) {
     super(app);
     this.setPlaceholder(placeholder);
+    this.setInstructions(PICKER_KEYS);
   }
 
   getItems(): TFile[] {
@@ -163,6 +179,7 @@ function dialogChip(row: HTMLElement, icon: string, onClick: (evt: MouseEvent) =
   const label = button.createSpan({ cls: "ps-dialog-chip-label" });
   button.addEventListener("click", onClick);
   return {
+    el: button,
     set(text: string, active: boolean) {
       label.setText(text);
       button.toggleClass("is-set", active);
@@ -199,7 +216,7 @@ export class NotebookModal extends Modal {
       d.cta.disabled = !v.trim();
     }, submit);
     d.cta.disabled = true;
-    const row = d.body.createDiv({ cls: "ps-dialog-chips" });
+    const row = d.body.createDiv({ cls: "ps-dialog-chips is-end" });
     row.createSpan({ cls: "ps-dialog-chips-label", text: "in" });
     const chip = dialogChip(row, "folder", () => {
       new PickerModal(
@@ -261,122 +278,174 @@ export interface QuickTask {
   target: TFile;
 }
 
+// "More details" stays open once opened, for the rest of the session.
+let detailsOpen = false;
+
 /**
- * Quick-add for a task: one line of text plus Due, Priority and Note chips.
- * Writes a Tasks-format line, so it works with or without the Tasks plugin.
- * `onMore`, when given, hands over to Tasks' full dialog with the text typed.
+ * New task: one line of text, then Due, Priority, Repeat and Note chips, and
+ * Scheduled and Start under "More details", which expands in place. Writes
+ * one line in the Tasks plugin's format, so it works with or without Tasks.
  */
 export class QuickTaskModal extends Modal {
-  private text = "";
-  private due = "";
-  private priority: Priority | undefined;
+  private task: NewTask = { text: "" };
 
   constructor(
     app: App,
     private target: TFile,
     private today: string,
-    private tasks: TaskLineOptions,
-    private onSubmit: (task: QuickTask) => void,
-    private onMore?: (text: string, target: TFile) => void
+    tasks: TaskLineOptions,
+    private onSubmit: (task: QuickTask) => void
   ) {
     super(app);
+    this.task = { text: "", ...tasks };
   }
 
   onOpen(): void {
+    const t = this.task;
     const submit = () => {
-      const line = buildTaskLine({
-        text: this.text,
-        due: this.due || undefined,
-        priority: this.priority,
-        ...this.tasks,
-      });
-      if (!line) return void d.error.setText("Describe the task.");
+      if (!t.text.trim()) return void d.error.setText("Describe the task.");
+      if (t.recurrence && !t.due && !t.scheduled && !t.start) {
+        return void d.error.setText("A repeating task needs a due, scheduled or start date.");
+      }
+      const line = buildTaskLine(t);
+      if (!line) return void d.error.setText("Couldn't write that task.");
       this.close();
       this.onSubmit({ line, target: this.target });
     };
     const d = dialog(this, "New task", "Add task", submit);
     const input = dialogInput(d, { placeholder: "What needs doing?" }, (v) => {
-      this.text = v;
+      t.text = v;
       d.cta.disabled = !v.trim();
     }, submit);
     d.cta.disabled = true;
-    const row = d.body.createDiv({ cls: "ps-dialog-chips" });
-
-    // Due: presets in a menu, plus a native date picker.
-    const picker = row.createEl("input", { type: "date", cls: "ps-dialog-date" });
-    picker.addEventListener("change", () => setDue(picker.value));
-    const due = dialogChip(row, "calendar", (evt) => {
-      const menu = new Menu();
-      for (const p of duePresets(this.today)) {
-        menu.addItem((i) => i.setTitle(p.label).setChecked(this.due === p.date).onClick(() => setDue(p.date)));
-      }
-      menu.addItem((i) =>
-        i.setTitle("Pick a date…").onClick(() => {
-          picker.value = this.due;
-          try {
-            picker.showPicker();
-          } catch {
-            picker.addClass("is-shown");
-            picker.focus();
-          }
-        })
-      );
-      if (this.due) menu.addItem((i) => i.setTitle("No due date").onClick(() => setDue("")));
-      menu.showAtMouseEvent(evt);
-    });
-    const setDue = (date: string) => {
-      this.due = date;
-      due.set(date ? dueDateLabel(date, this.today) : "Due", !!date);
+    const refocus = () => {
+      d.error.setText("");
       input.focus();
     };
-    setDue("");
 
-    // Priority.
+    /** A chip for one date field: quick presets, a date picker, and Clear. */
+    const dateChip = (
+      row: HTMLElement,
+      icon: string,
+      name: string,
+      key: "due" | "scheduled" | "start"
+    ) => {
+      const picker = row.createEl("input", { type: "date", cls: "ps-dialog-date" });
+      const set = (date: string) => {
+        t[key] = date || undefined;
+        chip.set(date ? `${name} ${dueDateLabel(date, this.today).toLowerCase()}` : name, !!date);
+        refocus();
+      };
+      picker.addEventListener("change", () => set(picker.value));
+      const chip = dialogChip(row, icon, (evt) => {
+        const menu = new Menu();
+        for (const p of duePresets(this.today)) {
+          menu.addItem((i) => i.setTitle(p.label).setChecked(t[key] === p.date).onClick(() => set(p.date)));
+        }
+        menu.addItem((i) =>
+          i.setTitle("Pick a date…").onClick(() => {
+            picker.value = t[key] ?? "";
+            try {
+              picker.showPicker();
+            } catch {
+              picker.addClass("is-shown");
+              picker.focus();
+            }
+          })
+        );
+        if (t[key]) menu.addItem((i) => i.setTitle("Clear").onClick(() => set("")));
+        menu.showAtMouseEvent(evt);
+      });
+      chip.set(name, false);
+    };
+
+    const row = d.body.createDiv({ cls: "ps-dialog-chips" });
+    dateChip(row, "calendar", "Due", "due");
+
     const priority = dialogChip(row, "flag", (evt) => {
       const menu = new Menu();
       for (const p of PRIORITIES) {
         menu.addItem((i) =>
-          i.setTitle(`${p.emoji} ${p.label}`).setChecked(this.priority === p.value).onClick(() => setPriority(p.value))
+          i.setTitle(`${p.emoji} ${p.label}`).setChecked(t.priority === p.value).onClick(() => setPriority(p.value))
         );
       }
-      if (this.priority) menu.addItem((i) => i.setTitle("No priority").onClick(() => setPriority(undefined)));
+      if (t.priority) menu.addItem((i) => i.setTitle("No priority").onClick(() => setPriority(undefined)));
       menu.showAtMouseEvent(evt);
     });
     const setPriority = (value: Priority | undefined) => {
-      this.priority = value;
+      t.priority = value;
       const p = PRIORITIES.find((x) => x.value === value);
       priority.set(p ? p.label : "Priority", !!p);
-      input.focus();
+      refocus();
     };
     setPriority(undefined);
 
-    // Note: where this one task goes (the default stays as it is).
+    const repeat = dialogChip(row, "repeat", (evt) => {
+      const menu = new Menu();
+      for (const r of RECURRENCES) {
+        menu.addItem((i) => i.setTitle(capitalize(r)).setChecked(t.recurrence === r).onClick(() => setRepeat(r)));
+      }
+      if (t.recurrence) {
+        menu.addSeparator();
+        menu.addItem((i) =>
+          i
+            .setTitle("Count from when it's done")
+            .setChecked(!!t.whenDone)
+            .onClick(() => {
+              t.whenDone = !t.whenDone;
+              setRepeat(t.recurrence);
+            })
+        );
+        menu.addItem((i) => i.setTitle("Don't repeat").onClick(() => setRepeat(undefined)));
+      }
+      menu.showAtMouseEvent(evt);
+    });
+    const setRepeat = (value: string | undefined) => {
+      t.recurrence = value;
+      if (!value) t.whenDone = false;
+      repeat.set(value ? `${capitalize(value)}${t.whenDone ? ", when done" : ""}` : "Repeat", !!value);
+      refocus();
+    };
+    setRepeat(undefined);
+
+    // Where this one task goes (the default note stays as it is).
     const note = dialogChip(row, "file-text", () => {
       new NotePickerModal(this.app, "Add this task to…", (file) => {
         this.target = file;
         note.set(file.basename, true);
-        input.focus();
+        refocus();
       }).open();
     });
+    note.el.addClass("ps-dialog-chip-end");
     note.set(this.target.basename, true);
 
-    if (this.onMore) {
-      const more = d.footerStart.createEl("a", { cls: "ps-dialog-link", text: "More options…", href: "#" });
-      more.addEventListener("click", (evt) => {
-        evt.preventDefault();
-        if (this.due || this.priority) {
-          // Tasks' API can't take them, so say so rather than drop them quietly.
-          new Notice("Set the due date and priority again in Tasks' dialog; only the text carries over.");
-        }
-        this.close();
-        this.onMore?.(this.text, this.target);
-      });
-    }
+    // More details: expands in place (a CSS grid-row transition).
+    const toggle = d.body.createEl("button", { cls: "ps-dialog-disclosure" });
+    setIcon(toggle.createSpan({ cls: "ps-dialog-disclosure-icon" }), "chevron-right");
+    toggle.createSpan({ text: "More details" });
+    const details = d.body.createDiv({ cls: "ps-dialog-details" });
+    const extra = details.createDiv({ cls: "ps-dialog-details-inner" }).createDiv({ cls: "ps-dialog-chips" });
+    dateChip(extra, "calendar-clock", "Scheduled", "scheduled");
+    dateChip(extra, "calendar-plus", "Start", "start");
+    const show = (open: boolean) => {
+      detailsOpen = open;
+      toggle.toggleClass("is-open", open);
+      details.toggleClass("is-open", open);
+    };
+    toggle.addEventListener("click", () => {
+      show(!detailsOpen);
+      input.focus();
+    });
+    show(detailsOpen);
   }
 
   onClose(): void {
     this.contentEl.empty();
   }
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 /** Generic type-ahead picker over any list (e.g. "notes with tasks"). */
@@ -390,6 +459,7 @@ export class PickerModal<T> extends FuzzySuggestModal<T> {
   ) {
     super(app);
     this.setPlaceholder(placeholder);
+    this.setInstructions(PICKER_KEYS);
   }
 
   getItems(): T[] {

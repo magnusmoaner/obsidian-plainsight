@@ -22,6 +22,30 @@ describe("buildTaskLine", () => {
     expect(buildTaskLine({ text: "x", globalFilter: "  " })).toBe("- [ ] x");
   });
 
+  it("writes every field in Tasks' order", () => {
+    expect(
+      buildTaskLine({
+        text: "Pay rent",
+        priority: "medium",
+        recurrence: "every month",
+        whenDone: true,
+        created: "2026-10-11",
+        start: "2026-10-20",
+        scheduled: "2026-10-25",
+        due: "2026-11-01",
+      })
+    ).toBe("- [ ] Pay rent 🔼 🔁 every month when done ➕ 2026-10-11 🛫 2026-10-20 ⏳ 2026-10-25 📅 2026-11-01");
+  });
+
+  it("refuses a repeat without a date, or one it doesn't offer", () => {
+    expect(buildTaskLine({ text: "x", recurrence: "every week" })).toBeNull();
+    expect(buildTaskLine({ text: "x", recurrence: "every 🔥", due: "2026-10-12" })).toBeNull();
+    expect(buildTaskLine({ text: "x", recurrence: "every week", scheduled: "2026-10-12" })).toBe(
+      "- [ ] x 🔁 every week ⏳ 2026-10-12"
+    );
+    expect(buildTaskLine({ text: "x", start: "2026-1-1" })).toBeNull();
+  });
+
   it("keeps the task on one line", () => {
     expect(buildTaskLine({ text: "  a\nb\r\n  c  " })).toBe("- [ ] a b c");
   });

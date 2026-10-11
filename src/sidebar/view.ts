@@ -75,7 +75,6 @@ import {
   readBookmarks,
   removeBookmark,
   runCommand,
-  hasTasksDialog,
   tasksLineOptions,
   tasksCreateModal,
   templateOptions,
@@ -697,10 +696,7 @@ export class SidebarView extends ItemView {
 
   // ---------- "+" flows ----------
 
-  /**
-   * Our quick-add dialog; "More options…" hands over to the Tasks plugin's
-   * full dialog when it's installed. Either way one line is appended.
-   */
+  /** Our quick-add dialog; the finished task is appended as one line. */
   private async newTask(): Promise<void> {
     const target = await this.taskNote();
     if (!target) return;
@@ -713,15 +709,15 @@ export class SidebarView extends ItemView {
         new Notice(`Couldn't add the task to ${file.basename}: ${(err as Error).message}\n${line}`, 0);
       }
     };
-    const fromTasks = (text: string, file: TFile) =>
-      void tasksCreateModal(this.app, text)?.then((line) => add(file, line), () => undefined);
     const today = localISODate();
     const options = await tasksLineOptions(this.app, today);
     // Tasks is installed but its settings can't be read: we can't write a
     // line it would accept, so use its own dialog.
-    if (options === null) return fromTasks("", target);
-    const more = hasTasksDialog(this.app) ? fromTasks : undefined;
-    new QuickTaskModal(this.app, target, today, options, (task) => void add(task.target, task.line), more).open();
+    if (options === null) {
+      void tasksCreateModal(this.app)?.then((line) => add(target, line), () => undefined);
+      return;
+    }
+    new QuickTaskModal(this.app, target, today, options, (task) => void add(task.target, task.line)).open();
   }
 
   /** The default task note; the first time (or if it's gone), ask and remember. */

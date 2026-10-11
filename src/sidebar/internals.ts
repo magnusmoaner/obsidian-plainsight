@@ -181,35 +181,14 @@ export async function tasksLineOptions(
   }
 }
 
-/** Whether the Tasks plugin's "Create task" dialog can be opened. */
-export function hasTasksDialog(app: App): boolean {
-  const api = tasksApi(app) as { createTaskLineModal?: unknown } | undefined;
-  return typeof api?.createTaskLineModal === "function";
-}
-
 /**
  * Open the Tasks plugin's own "Create task" dialog (due, scheduled, priority,
  * recurrence…). Resolves to the finished task line, or "" if cancelled.
  * Returns null when the Tasks API isn't available.
  */
-export function tasksCreateModal(app: App, description = ""): Promise<string> | null {
+export function tasksCreateModal(app: App): Promise<string> | null {
   const api = tasksApi(app) as { createTaskLineModal?(): Promise<string> } | undefined;
-  if (typeof api?.createTaskLineModal !== "function") return null;
-  const result = api.createTaskLineModal();
-  // The API takes no initial text, so carry over what was typed by filling
-  // the dialog's description field. Best effort: if its markup changes, the
-  // field just starts empty.
-  if (description) {
-    window.setTimeout(() => {
-      const modals = document.querySelectorAll(".modal-container");
-      const field = modals[modals.length - 1]?.querySelector("textarea");
-      if (field instanceof HTMLTextAreaElement && !field.value) {
-        field.value = description;
-        field.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-    }, 0);
-  }
-  return result;
+  return typeof api?.createTaskLineModal === "function" ? api.createTaskLineModal() : null;
 }
 
 /**
