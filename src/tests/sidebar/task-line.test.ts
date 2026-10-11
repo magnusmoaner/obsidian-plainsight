@@ -13,6 +13,15 @@ describe("buildTaskLine", () => {
     expect(buildTaskLine({ text: "x", priority: "lowest" })).toBe("- [ ] x ⏬");
   });
 
+  it("adds Tasks' global filter and created date, as its own dialog would", () => {
+    expect(
+      buildTaskLine({ text: "Call", priority: "high", due: "2026-10-12", globalFilter: "#task", created: "2026-10-11" })
+    ).toBe("- [ ] #task Call ⏫ ➕ 2026-10-11 📅 2026-10-12");
+    // Not added twice when typed.
+    expect(buildTaskLine({ text: "Call #task", globalFilter: "#task" })).toBe("- [ ] Call #task");
+    expect(buildTaskLine({ text: "x", globalFilter: "  " })).toBe("- [ ] x");
+  });
+
   it("keeps the task on one line", () => {
     expect(buildTaskLine({ text: "  a\nb\r\n  c  " })).toBe("- [ ] a b c");
   });

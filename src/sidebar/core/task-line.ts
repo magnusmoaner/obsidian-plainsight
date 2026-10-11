@@ -15,7 +15,15 @@ export const PRIORITIES: { value: Priority; label: string; emoji: string }[] = [
   { value: "lowest", label: "Lowest", emoji: "⏬" },
 ];
 
-export interface NewTask {
+/** What the Tasks plugin's own dialog would add, from its settings. */
+export interface TaskLineOptions {
+  /** Tasks' global filter (e.g. "#task"); lines without it aren't tasks to Tasks. */
+  globalFilter?: string;
+  /** Today's date (YYYY-MM-DD) when Tasks' "set created date" is on. */
+  created?: string;
+}
+
+export interface NewTask extends TaskLineOptions {
   text: string;
   /** YYYY-MM-DD */
   due?: string;
@@ -27,10 +35,14 @@ export function buildTaskLine(task: NewTask): string | null {
   // A newline would turn one appended task into several lines.
   const text = task.text.replace(/\s+/g, " ").trim();
   if (!text) return null;
-  if (task.due && !/^\d{4}-\d{2}-\d{2}$/.test(task.due)) return null;
-  const parts = [`- [ ] ${text}`];
+  const date = /^\d{4}-\d{2}-\d{2}$/;
+  if ((task.due && !date.test(task.due)) || (task.created && !date.test(task.created))) return null;
+  const filter = task.globalFilter?.trim();
+  // Tasks' order: description, priority, created, due.
+  const parts = [filter && !text.split(" ").includes(filter) ? `- [ ] ${filter} ${text}` : `- [ ] ${text}`];
   const priority = PRIORITIES.find((p) => p.value === task.priority);
   if (priority) parts.push(priority.emoji);
+  if (task.created) parts.push(`➕ ${task.created}`);
   if (task.due) parts.push(`📅 ${task.due}`);
   return parts.join(" ");
 }

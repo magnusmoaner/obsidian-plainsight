@@ -12,7 +12,7 @@ import {
 } from "obsidian";
 import { folderNameError, normalizeTag } from "./core/edits";
 import { dueDateLabel } from "./core/format";
-import { buildTaskLine, duePresets, Priority, PRIORITIES } from "./core/task-line";
+import { buildTaskLine, duePresets, Priority, PRIORITIES, TaskLineOptions } from "./core/task-line";
 
 /*
  * Dialogs behind the sidebar's "+" buttons, built from Obsidian's own Modal
@@ -275,6 +275,7 @@ export class QuickTaskModal extends Modal {
     app: App,
     private target: TFile,
     private today: string,
+    private tasks: TaskLineOptions,
     private onSubmit: (task: QuickTask) => void,
     private onMore?: (text: string, target: TFile) => void
   ) {
@@ -283,7 +284,12 @@ export class QuickTaskModal extends Modal {
 
   onOpen(): void {
     const submit = () => {
-      const line = buildTaskLine({ text: this.text, due: this.due || undefined, priority: this.priority });
+      const line = buildTaskLine({
+        text: this.text,
+        due: this.due || undefined,
+        priority: this.priority,
+        ...this.tasks,
+      });
       if (!line) return void d.error.setText("Describe the task.");
       this.close();
       this.onSubmit({ line, target: this.target });
@@ -358,6 +364,10 @@ export class QuickTaskModal extends Modal {
       const more = d.footerStart.createEl("a", { cls: "ps-dialog-link", text: "More options…", href: "#" });
       more.addEventListener("click", (evt) => {
         evt.preventDefault();
+        if (this.due || this.priority) {
+          // Tasks' API can't take them, so say so rather than drop them quietly.
+          new Notice("Set the due date and priority again in Tasks' dialog; only the text carries over.");
+        }
         this.close();
         this.onMore?.(this.text, this.target);
       });
@@ -395,11 +405,6 @@ export class PickerModal<T> extends FuzzySuggestModal<T> {
   }
 }
 
-/**
- * Rename a note, canvas, attachment or folder. Obsidian has no public rename
- * dialog, so this is a small one around the public fileManager.renameFile,
- * which also updates links to the file. The extension is kept.
- */
 /**
  * Rename a note, canvas, attachment or folder. Obsidian has no public rename
  * dialog, so this is a small one around the public fileManager.renameFile,

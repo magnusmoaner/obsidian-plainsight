@@ -76,6 +76,7 @@ import {
   removeBookmark,
   runCommand,
   hasTasksDialog,
+  tasksLineOptions,
   tasksCreateModal,
   templateOptions,
 } from "./internals";
@@ -705,13 +706,22 @@ export class SidebarView extends ItemView {
     if (!target) return;
     const add = async (file: TFile, line: string) => {
       if (!line.trim()) return; // cancelled
-      await addTaskLine(this.app, file, line);
-      new Notice(`Task added to ${file.basename}`);
+      try {
+        await addTaskLine(this.app, file, line);
+        new Notice(`Task added to ${file.basename}`);
+      } catch (err) {
+        new Notice(`Couldn't add the task to ${file.basename}: ${(err as Error).message}\n${line}`, 0);
+      }
     };
-    const more = hasTasksDialog(this.app)
-      ? (text: string, file: TFile) => void tasksCreateModal(this.app, text)?.then((line) => add(file, line))
-      : undefined;
-    new QuickTaskModal(this.app, target, localISODate(), (task) => void add(task.target, task.line), more).open();
+    const fromTasks = (text: string, file: TFile) =>
+      void tasksCreateModal(this.app, text)?.then((line) => add(file, line), () => undefined);
+    const today = localISODate();
+    const options = await tasksLineOptions(this.app, today);
+    // Tasks is installed but its settings can't be read: we can't write a
+    // line it would accept, so use its own dialog.
+    if (options === null) return fromTasks("", target);
+    const more = hasTasksDialog(this.app) ? fromTasks : undefined;
+    new QuickTaskModal(this.app, target, today, options, (task) => void add(task.target, task.line), more).open();
   }
 
   /** The default task note; the first time (or if it's gone), ask and remember. */
