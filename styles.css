@@ -488,6 +488,9 @@
   background: transparent;
   color: var(--text-normal);
 }
+.ps-dialog-disclosure-summary {
+  color: var(--text-normal);
+}
 .ps-dialog-disclosure-icon {
   display: inline-flex;
   transition: transform 0.15s ease-in-out;

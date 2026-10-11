@@ -302,6 +302,7 @@ export class QuickTaskModal extends Modal {
 
   onOpen(): void {
     const t = this.task;
+    const today = this.today;
     const submit = () => {
       if (!t.text.trim()) return void d.error.setText("Describe the task.");
       if (t.recurrence && !t.due && !t.scheduled && !t.start) {
@@ -330,10 +331,12 @@ export class QuickTaskModal extends Modal {
       name: string,
       key: "due" | "scheduled" | "start"
     ) => {
-      const picker = row.createEl("input", { type: "date", cls: "ps-dialog-date" });
+      // Invisible; only opened through showPicker(), so kept out of the Tab order.
+      const picker = row.createEl("input", { type: "date", cls: "ps-dialog-date", attr: { tabindex: "-1" } });
       const set = (date: string) => {
         t[key] = date || undefined;
-        chip.set(date ? `${name} ${dueDateLabel(date, this.today).toLowerCase()}` : name, !!date);
+        chip.set(date ? dateLabel(name, dueDateLabel(date, this.today)) : name, !!date);
+        summarize();
         refocus();
       };
       picker.addEventListener("change", () => set(picker.value));
@@ -354,7 +357,7 @@ export class QuickTaskModal extends Modal {
           })
         );
         if (t[key]) menu.addItem((i) => i.setTitle("Clear").onClick(() => set("")));
-        menu.showAtMouseEvent(evt);
+        showUnder(menu, evt);
       });
       chip.set(name, false);
     };
@@ -370,7 +373,7 @@ export class QuickTaskModal extends Modal {
         );
       }
       if (t.priority) menu.addItem((i) => i.setTitle("No priority").onClick(() => setPriority(undefined)));
-      menu.showAtMouseEvent(evt);
+      showUnder(menu, evt);
     });
     const setPriority = (value: Priority | undefined) => {
       t.priority = value;
@@ -398,7 +401,7 @@ export class QuickTaskModal extends Modal {
         );
         menu.addItem((i) => i.setTitle("Don't repeat").onClick(() => setRepeat(undefined)));
       }
-      menu.showAtMouseEvent(evt);
+      showUnder(menu, evt);
     });
     const setRepeat = (value: string | undefined) => {
       t.recurrence = value;
@@ -423,6 +426,15 @@ export class QuickTaskModal extends Modal {
     const toggle = d.body.createEl("button", { cls: "ps-dialog-disclosure" });
     setIcon(toggle.createSpan({ cls: "ps-dialog-disclosure-icon" }), "chevron-right");
     toggle.createSpan({ text: "More details" });
+    // Collapsed with a date set: say so, so nothing is written unseen.
+    const summary = toggle.createSpan({ cls: "ps-dialog-disclosure-summary" });
+    function summarize() {
+      const set = [
+        t.scheduled ? dateLabel("Scheduled", dueDateLabel(t.scheduled, today)) : "",
+        t.start ? dateLabel("Start", dueDateLabel(t.start, today)) : "",
+      ].filter(Boolean);
+      summary.setText(!detailsOpen && set.length ? `· ${set.join(", ")}` : "");
+    }
     const details = d.body.createDiv({ cls: "ps-dialog-details" });
     const extra = details.createDiv({ cls: "ps-dialog-details-inner" }).createDiv({ cls: "ps-dialog-chips" });
     dateChip(extra, "calendar-clock", "Scheduled", "scheduled");
@@ -431,6 +443,9 @@ export class QuickTaskModal extends Modal {
       detailsOpen = open;
       toggle.toggleClass("is-open", open);
       details.toggleClass("is-open", open);
+      // Collapsed chips leave the Tab order too.
+      details.inert = !open;
+      summarize();
     };
     toggle.addEventListener("click", () => {
       show(!detailsOpen);
@@ -442,6 +457,19 @@ export class QuickTaskModal extends Modal {
   onClose(): void {
     this.contentEl.empty();
   }
+}
+
+/** Open a chip's menu under the chip, also when it's activated by keyboard. */
+function showUnder(menu: Menu, evt: MouseEvent): void {
+  const el = evt.currentTarget instanceof HTMLElement ? evt.currentTarget : null;
+  if (!el) return void menu.showAtMouseEvent(evt);
+  const r = el.getBoundingClientRect();
+  menu.showAtPosition({ x: r.left, y: r.bottom + 4 });
+}
+
+/** "Due tomorrow", "Due in 3 days", "Due Oct 20": lowercase only the relative words. */
+function dateLabel(name: string, label: string): string {
+  return `${name} ${/^(Today|Tomorrow|Yesterday)$/.test(label) ? label.toLowerCase() : label}`;
 }
 
 function capitalize(s: string): string {
