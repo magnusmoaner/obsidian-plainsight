@@ -494,6 +494,10 @@
 .ps-dialog .ps-dialog-field-value {
   /* Obsidian's buttons are inline-flex, where text-overflow does nothing. */
   display: block;
+  /* As a block the text no longer centres itself vertically. */
+  line-height: calc(var(--input-height) - 2px);
+  padding-top: 0;
+  padding-bottom: 0;
   flex: 1 1 auto;
   min-width: 0;
   justify-content: flex-start;
