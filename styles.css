@@ -415,9 +415,6 @@
 .ps-dialog-chips.is-end {
   justify-content: flex-end;
 }
-.ps-dialog .ps-dialog-chip-end {
-  margin-left: auto;
-}
 .ps-dialog-chips-label {
   color: var(--text-muted);
   font-size: var(--font-ui-small);
@@ -471,6 +468,34 @@
   height: 28px;
   opacity: 1;
   pointer-events: auto;
+}
+/* Labelled fields: label on the left, a dropdown-styled button on the right. */
+.ps-dialog-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2);
+}
+.ps-dialog-field {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-3);
+}
+.ps-dialog-field-label {
+  flex: 0 0 84px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+.ps-dialog .ps-dialog-field-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-start;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ps-dialog .ps-dialog-field-value.is-empty {
+  color: var(--text-faint);
 }
 /* "More details": the dialog grows and shrinks instead of being replaced. */
 .ps-dialog .ps-dialog-disclosure {

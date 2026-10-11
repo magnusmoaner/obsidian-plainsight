@@ -279,8 +279,8 @@ export interface QuickTask {
 let detailsOpen = false;
 
 /**
- * New task: one line of text, then Due, Priority, Repeat and Note chips, and
- * Scheduled and Start under "More details", which expands in place. Writes
+ * New task: one line of text, then labelled Due, Priority, Repeat and Note
+ * fields, and Scheduled and Start under "More details", which expands in place. Writes
  * one line in the Tasks plugin's format, so it works with or without Tasks.
  */
 export class QuickTaskModal extends Modal {
@@ -321,25 +321,32 @@ export class QuickTaskModal extends Modal {
       input.focus();
     };
 
-    /** A chip for one date field: quick presets, a date picker, and Clear. */
-    const dateChip = (
-      row: HTMLElement,
-      icon: string,
-      name: string,
-      key: "due" | "scheduled" | "start"
-    ) => {
-      // Invisible; only opened through showPicker(), so kept out of the Tab order.
-      const picker = row.createEl("input", { type: "date", cls: "ps-dialog-date", attr: { tabindex: "-1" } });
+    /** One labelled row: the label, then a dropdown-styled button. */
+    const field = (container: HTMLElement, label: string, onClick: (evt: MouseEvent) => void) => {
+      const row = container.createDiv({ cls: "ps-dialog-field" });
+      row.createDiv({ cls: "ps-dialog-field-label", text: label });
+      const button = row.createEl("button", { cls: "dropdown ps-dialog-field-value" });
+      button.addEventListener("click", onClick);
+      return {
+        row,
+        set(text: string, active: boolean) {
+          button.setText(text);
+          button.toggleClass("is-empty", !active);
+        },
+      };
+    };
+
+    /** A date field: quick presets, a date picker, and Clear. */
+    const dateField = (container: HTMLElement, label: string, key: "due" | "scheduled" | "start") => {
       const set = (date: string) => {
         t[key] = date || undefined;
-        chip.set(date ? dateLabel(name, dueDateLabel(date, this.today)) : name, !!date);
+        f.set(date ? dateValue(date, today) : "None", !!date);
         summarize();
         refocus();
       };
-      picker.addEventListener("change", () => set(picker.value));
-      const chip = dialogChip(row, icon, (evt) => {
+      const f = field(container, label, (evt) => {
         const menu = new Menu();
-        for (const p of duePresets(this.today)) {
+        for (const p of duePresets(today)) {
           menu.addItem((i) => i.setTitle(p.label).setChecked(t[key] === p.date).onClick(() => set(p.date)));
         }
         menu.addItem((i) =>
@@ -353,34 +360,37 @@ export class QuickTaskModal extends Modal {
             }
           })
         );
-        if (t[key]) menu.addItem((i) => i.setTitle("Clear").onClick(() => set("")));
+        if (t[key]) menu.addItem((i) => i.setTitle("None").onClick(() => set("")));
         showUnder(menu, evt);
       });
-      chip.set(name, false);
+      // Invisible; only opened through showPicker(), so kept out of the Tab order.
+      const picker = f.row.createEl("input", { type: "date", cls: "ps-dialog-date", attr: { tabindex: "-1" } });
+      picker.addEventListener("change", () => set(picker.value));
+      f.set("None", false);
     };
 
-    const row = d.body.createDiv({ cls: "ps-dialog-chips" });
-    dateChip(row, "calendar", "Due", "due");
+    const fields = d.body.createDiv({ cls: "ps-dialog-fields" });
+    dateField(fields, "Due", "due");
 
-    const priority = dialogChip(row, "flag", (evt) => {
+    const priority = field(fields, "Priority", (evt) => {
       const menu = new Menu();
       for (const p of PRIORITIES) {
         menu.addItem((i) =>
           i.setTitle(`${p.emoji} ${p.label}`).setChecked(t.priority === p.value).onClick(() => setPriority(p.value))
         );
       }
-      if (t.priority) menu.addItem((i) => i.setTitle("No priority").onClick(() => setPriority(undefined)));
+      if (t.priority) menu.addItem((i) => i.setTitle("None").onClick(() => setPriority(undefined)));
       showUnder(menu, evt);
     });
     const setPriority = (value: Priority | undefined) => {
       t.priority = value;
       const p = PRIORITIES.find((x) => x.value === value);
-      priority.set(p ? p.label : "Priority", !!p);
+      priority.set(p ? `${p.emoji} ${p.label}` : "None", !!p);
       refocus();
     };
     setPriority(undefined);
 
-    const repeat = dialogChip(row, "repeat", (evt) => {
+    const repeat = field(fields, "Repeat", (evt) => {
       const menu = new Menu();
       for (const r of RECURRENCES) {
         menu.addItem((i) => i.setTitle(capitalize(r)).setChecked(t.recurrence === r).onClick(() => setRepeat(r)));
@@ -396,27 +406,26 @@ export class QuickTaskModal extends Modal {
               setRepeat(t.recurrence);
             })
         );
-        menu.addItem((i) => i.setTitle("Don't repeat").onClick(() => setRepeat(undefined)));
+        menu.addItem((i) => i.setTitle("Never").onClick(() => setRepeat(undefined)));
       }
       showUnder(menu, evt);
     });
     const setRepeat = (value: string | undefined) => {
       t.recurrence = value;
       if (!value) t.whenDone = false;
-      repeat.set(value ? `${capitalize(value)}${t.whenDone ? ", when done" : ""}` : "Repeat", !!value);
+      repeat.set(value ? `${capitalize(value)}${t.whenDone ? ", from when done" : ""}` : "Never", !!value);
       refocus();
     };
     setRepeat(undefined);
 
     // Where this one task goes (the default note stays as it is).
-    const note = dialogChip(row, "file-text", () => {
+    const note = field(fields, "Note", () => {
       new NotePickerModal(this.app, "Add this task to…", (file) => {
         this.target = file;
         note.set(file.basename, true);
         refocus();
       }).open();
     });
-    note.el.addClass("ps-dialog-chip-end");
     note.set(this.target.basename, true);
 
     // More details: expands in place (a CSS grid-row transition).
@@ -433,14 +442,14 @@ export class QuickTaskModal extends Modal {
       summary.setText(!detailsOpen && set.length ? `· ${set.join(", ")}` : "");
     }
     const details = d.body.createDiv({ cls: "ps-dialog-details" });
-    const extra = details.createDiv({ cls: "ps-dialog-details-inner" }).createDiv({ cls: "ps-dialog-chips" });
-    dateChip(extra, "calendar-clock", "Scheduled", "scheduled");
-    dateChip(extra, "calendar-plus", "Start", "start");
+    const extra = details.createDiv({ cls: "ps-dialog-details-inner" }).createDiv({ cls: "ps-dialog-fields" });
+    dateField(extra, "Scheduled", "scheduled");
+    dateField(extra, "Start", "start");
     const show = (open: boolean) => {
       detailsOpen = open;
       toggle.toggleClass("is-open", open);
       details.toggleClass("is-open", open);
-      // Collapsed chips leave the Tab order too.
+      // Collapsed fields leave the Tab order too.
       details.inert = !open;
       summarize();
     };
@@ -462,6 +471,18 @@ function showUnder(menu: Menu, evt: MouseEvent): void {
   if (!el) return void menu.showAtMouseEvent(evt);
   const r = el.getBoundingClientRect();
   menu.showAtPosition({ x: r.left, y: r.bottom + 4 });
+}
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "Tomorrow · Mon, Oct 12": the relative label plus the actual date. */
+function dateValue(iso: string, today: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  const relative = dueDateLabel(iso, today);
+  const absolute = `${WEEKDAYS[date.getDay()]}, ${MONTHS[m - 1]} ${d}${y !== Number(today.slice(0, 4)) ? `, ${y}` : ""}`;
+  return /\d/.test(relative) && !/days?/.test(relative) ? absolute : `${capitalize(relative)} · ${absolute}`;
 }
 
 /** "Due tomorrow", "Due in 3 days", "Due Oct 20": lowercase only the relative words. */
