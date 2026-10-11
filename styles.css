@@ -377,6 +377,107 @@
   color: var(--text-error);
   font-size: var(--font-ui-smaller);
 }
+
+/* ---------- Dialogs: one input, chips, and a right-aligned button bar ---------- */
+.ps-dialog {
+  width: min(480px, calc(100vw - 32px));
+}
+/* Title and close button on one line. */
+.ps-dialog .modal-title {
+  margin-bottom: var(--size-4-3);
+  padding-right: 32px;
+  line-height: var(--line-height-tight);
+}
+.ps-dialog .modal-close-button {
+  top: var(--size-4-4);
+}
+.ps-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2);
+}
+.ps-dialog-subtitle {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  margin-top: calc(-1 * var(--size-4-2));
+}
+.ps-dialog .ps-dialog-input {
+  width: 100%;
+  height: 40px;
+  font-size: var(--font-ui-medium);
+}
+.ps-dialog-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--size-4-2);
+}
+.ps-dialog-chips-label {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+.ps-dialog .ps-dialog-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  max-width: 100%;
+  padding: 0 10px;
+  border-radius: 14px;
+  border: 1px solid var(--background-modifier-border-hover);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+.ps-dialog .ps-dialog-chip:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.ps-dialog .ps-dialog-chip.is-set {
+  color: var(--text-normal);
+}
+.ps-dialog-chip-icon {
+  display: inline-flex;
+}
+.ps-dialog-chip-icon svg {
+  width: 14px;
+  height: 14px;
+}
+.ps-dialog-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Only shown if the browser can't open the date picker directly. */
+.ps-dialog-date {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.ps-dialog-date.is-shown {
+  position: static;
+  width: auto;
+  height: 28px;
+  opacity: 1;
+  pointer-events: auto;
+}
+.ps-dialog .modal-button-container {
+  margin-top: var(--size-4-2);
+  align-items: center;
+}
+.ps-dialog-footer-start {
+  margin-right: auto;
+}
+.ps-dialog-link {
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+}
+.ps-dialog-link:hover {
+  color: var(--text-accent);
+}
 .ps-nav-item .ps-nav-chevron {
   cursor: pointer;
   border-radius: 3px;

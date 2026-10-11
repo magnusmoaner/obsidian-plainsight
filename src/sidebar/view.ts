@@ -62,7 +62,7 @@ import {
   NotePickerModal,
   PickerModal,
   TagModal,
-  TaskModal,
+  QuickTaskModal,
 } from "./modals";
 import {
   attachmentFolderSetting,
@@ -75,6 +75,7 @@ import {
   readBookmarks,
   removeBookmark,
   runCommand,
+  hasTasksDialog,
   tasksCreateModal,
   templateOptions,
 } from "./internals";
@@ -695,17 +696,22 @@ export class SidebarView extends ItemView {
 
   // ---------- "+" flows ----------
 
-  /** Tasks' own dialog when available; the result is appended to the task note. */
+  /**
+   * Our quick-add dialog; "More options…" hands over to the Tasks plugin's
+   * full dialog when it's installed. Either way one line is appended.
+   */
   private async newTask(): Promise<void> {
     const target = await this.taskNote();
     if (!target) return;
-    const fromTasks = tasksCreateModal(this.app);
-    const line = fromTasks
-      ? await fromTasks
-      : await new Promise<string>((resolve) => new TaskModal(this.app, resolve).open());
-    if (!line.trim()) return; // cancelled
-    await addTaskLine(this.app, target, line);
-    new Notice(`Task added to ${target.basename}`);
+    const add = async (file: TFile, line: string) => {
+      if (!line.trim()) return; // cancelled
+      await addTaskLine(this.app, file, line);
+      new Notice(`Task added to ${file.basename}`);
+    };
+    const more = hasTasksDialog(this.app)
+      ? (text: string, file: TFile) => void tasksCreateModal(this.app, text)?.then((line) => add(file, line))
+      : undefined;
+    new QuickTaskModal(this.app, target, localISODate(), (task) => void add(task.target, task.line), more).open();
   }
 
   /** The default task note; the first time (or if it's gone), ask and remember. */
