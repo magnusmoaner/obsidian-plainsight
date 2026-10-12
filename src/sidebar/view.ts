@@ -62,7 +62,7 @@ import {
   NotePickerModal,
   PickerModal,
   TagModal,
-  TaskModal,
+  QuickTaskModal,
 } from "./modals";
 import {
   attachmentFolderSetting,
@@ -75,6 +75,7 @@ import {
   readBookmarks,
   removeBookmark,
   runCommand,
+  tasksLineOptions,
   tasksCreateModal,
   templateOptions,
 } from "./internals";
@@ -695,17 +696,28 @@ export class SidebarView extends ItemView {
 
   // ---------- "+" flows ----------
 
-  /** Tasks' own dialog when available; the result is appended to the task note. */
+  /** Our quick-add dialog; the finished task is appended as one line. */
   private async newTask(): Promise<void> {
     const target = await this.taskNote();
     if (!target) return;
-    const fromTasks = tasksCreateModal(this.app);
-    const line = fromTasks
-      ? await fromTasks
-      : await new Promise<string>((resolve) => new TaskModal(this.app, resolve).open());
-    if (!line.trim()) return; // cancelled
-    await addTaskLine(this.app, target, line);
-    new Notice(`Task added to ${target.basename}`);
+    const add = async (file: TFile, line: string) => {
+      if (!line.trim()) return; // cancelled
+      try {
+        await addTaskLine(this.app, file, line);
+        new Notice(`Task added to ${file.basename}`);
+      } catch (err) {
+        new Notice(`Couldn't add the task to ${file.basename}: ${(err as Error).message}\n${line}`, 0);
+      }
+    };
+    const today = localISODate();
+    const options = await tasksLineOptions(this.app, today);
+    // Tasks is installed but its settings can't be read: we can't write a
+    // line it would accept, so use its own dialog.
+    if (options === null) {
+      void tasksCreateModal(this.app)?.then((line) => add(target, line), () => undefined);
+      return;
+    }
+    new QuickTaskModal(this.app, target, today, options, (task) => void add(task.target, task.line)).open();
   }
 
   /** The default task note; the first time (or if it's gone), ask and remember. */

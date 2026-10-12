@@ -158,6 +158,30 @@ function tasksApi(app: App): Record<string, unknown> | undefined {
 }
 
 /**
+ * What Tasks' own dialog adds to a new task: its global filter, and today's
+ * date when "set created date" is on. Read from the plugin's saved settings.
+ * Returns {} without Tasks, and null when Tasks is installed but its settings
+ * can't be read, so the caller can fall back to Tasks' own dialog.
+ */
+export async function tasksLineOptions(
+  app: App,
+  today: string
+): Promise<{ globalFilter?: string; created?: string } | null> {
+  if (!tasksApi(app)) return {};
+  try {
+    const raw = await app.vault.adapter.read(`${app.vault.configDir}/plugins/obsidian-tasks-plugin/data.json`);
+    const data = JSON.parse(raw) as { globalFilter?: unknown; setCreatedDate?: unknown };
+    if (data.globalFilter !== undefined && typeof data.globalFilter !== "string") return null;
+    return {
+      globalFilter: (data.globalFilter as string | undefined) ?? "",
+      created: data.setCreatedDate === true ? today : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Open the Tasks plugin's own "Create task" dialog (due, scheduled, priority,
  * recurrence…). Resolves to the finished task line, or "" if cancelled.
  * Returns null when the Tasks API isn't available.
