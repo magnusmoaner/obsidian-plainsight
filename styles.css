@@ -220,7 +220,8 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  border: 1px solid var(--background-modifier-border);
+  /* The plain border colour vanishes on the grey sidebar; this one shows. */
+  border: 1px solid var(--background-modifier-border-hover);
   color: var(--text-muted);
   cursor: pointer;
 }
@@ -230,6 +231,7 @@
 }
 .ps-round-button:hover {
   background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-focus);
   color: var(--text-normal);
 }
 .ps-new-note {
@@ -1027,8 +1029,14 @@
   width: 28px;
   height: 28px;
 }
-.ps-back:active {
-  background: var(--background-modifier-hover);
+/* Transparent in every state: Obsidian's button styling and a hover that
+   sticks after a tap on touch screens would otherwise grey it. */
+.ps-sidebar .ps-back,
+.ps-sidebar .ps-back:hover,
+.ps-sidebar .ps-back:active,
+.ps-sidebar .ps-back:focus {
+  background: transparent;
+  box-shadow: none;
 }
 .ps-sidebar.is-mobile .ps-header-row {
   align-items: center;
@@ -1042,4 +1050,22 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ---------- Experiment: the list column as a rounded white card ---------- */
+.ps-list {
+  background: var(--background-primary);
+  margin: 8px 8px 8px 4px;
+  border-radius: 12px;
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+/* The selected entry looks like a selected nav item: same tint, no border. */
+.ps-card.is-active,
+.ps-card.is-active:hover,
+.ps-task.is-active,
+.ps-task.is-active:hover {
+  background: var(--background-modifier-active-hover);
+  outline: none;
 }
