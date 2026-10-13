@@ -1,7 +1,8 @@
-import { NOTE_GROUPINGS, NoteGrouping, TASK_GROUPINGS, TaskGrouping } from "./queries";
+import { NOTE_GROUPINGS, NoteGrouping, TASK_GROUPINGS, TaskFilter, TaskGrouping } from "./queries";
 
 export type KindFilter = "all" | "note" | "board" | "canvas";
 const KIND_FILTERS: KindFilter[] = ["all", "note", "board", "canvas"];
+const TASK_FILTERS: TaskFilter[] = ["open", "overdue", "done"];
 
 /**
  * Sidebar state that belongs to one device, not to the vault: how wide the
@@ -16,6 +17,8 @@ export interface ViewState {
   collapsed: string[];
   /** How the Tasks page groups rows. */
   taskGroupBy: TaskGrouping;
+  /** Which tasks the Tasks page shows: open, overdue or done. */
+  taskFilter: TaskFilter;
   /** Note lists: which kind to show. */
   noteKindFilter: KindFilter;
   /** How note lists group cards. */
@@ -29,6 +32,7 @@ export const DEFAULT_VIEW_STATE: ViewState = {
   navWidth: 200,
   collapsed: [],
   taskGroupBy: "due",
+  taskFilter: "open",
   noteKindFilter: "all",
   noteGroupBy: "date",
 };
@@ -52,13 +56,14 @@ export function parseViewState(raw: unknown): ViewState {
         : Math.round(Math.min(NAV_WIDTH.max, Math.max(NAV_WIDTH.min, width))),
     collapsed,
     taskGroupBy: oneOf(data.taskGroupBy, TASK_GROUPINGS, DEFAULT_VIEW_STATE.taskGroupBy),
+    taskFilter: oneOf(data.taskFilter, TASK_FILTERS, DEFAULT_VIEW_STATE.taskFilter),
     noteKindFilter: oneOf(data.noteKindFilter, KIND_FILTERS, DEFAULT_VIEW_STATE.noteKindFilter),
     noteGroupBy: oneOf(data.noteGroupBy, NOTE_GROUPINGS, DEFAULT_VIEW_STATE.noteGroupBy),
   };
 }
 
-/** Where earlier versions kept each field: in the plugin's data.json. */
-const LEGACY_KEYS: Record<keyof ViewState, string> = {
+/** Where earlier versions kept fields in the plugin's data.json. */
+const LEGACY_KEYS: Partial<Record<keyof ViewState, string>> = {
   navWidth: "sidebarNavWidth",
   collapsed: "sidebarCollapsed",
   taskGroupBy: "taskGroupBy",
@@ -66,7 +71,7 @@ const LEGACY_KEYS: Record<keyof ViewState, string> = {
   noteGroupBy: "noteGroupBy",
 };
 
-export const LEGACY_VIEW_KEYS: readonly string[] = Object.values(LEGACY_KEYS);
+export const LEGACY_VIEW_KEYS: readonly string[] = Object.values(LEGACY_KEYS) as string[];
 
 /** View state an earlier version saved in data.json, keyed by field, or
  * null if there's none. Validate it with parseViewState before use. */

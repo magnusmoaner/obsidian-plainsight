@@ -13,6 +13,7 @@ describe("parseViewState", () => {
       navWidth: 240,
       collapsed: ["section:tags", "notebook:Inbox"],
       taskGroupBy: "board",
+      taskFilter: "done",
       noteKindFilter: "canvas",
       noteGroupBy: "folder",
     };
@@ -25,6 +26,7 @@ describe("parseViewState", () => {
         navWidth: "wide",
         collapsed: ["section:tags", 7, null, "section:tags"],
         taskGroupBy: "priority",
+        taskFilter: "someday",
         noteKindFilter: "pdf",
         noteGroupBy: "kind",
       })

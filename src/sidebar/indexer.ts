@@ -9,14 +9,10 @@ const indexed = (file: TFile) => file.extension === "md" || file.extension === "
 
 /** Keeps a NoteIndex in step with the vault. */
 export class Indexer {
-  /** Paths live events wrote or removed while a fill was running; a fill
-   * leaves these alone. Empty whenever no fill runs. */
+  /** Paths live events wrote or removed while the fill was running; the
+   * fill leaves these alone. Empty once it's done. */
   private touched = new Set<string>();
-  /** Fills running now: the initial one, or a metadata catch-up. */
-  private fills = 0;
-  /** Notes summarized before Obsidian had metadata for them, so without
-   * their tags and properties; summarized again once it has. */
-  private awaitingMetadata = new Set<string>();
+  private filling = false;
   private stopped = false;
 
   constructor(private app: App, private index: NoteIndex) {}
@@ -31,17 +27,7 @@ export class Indexer {
       .getFiles()
       .filter(indexed)
       .sort((a, b) => b.stat.mtime - a.stat.mtime);
-    await this.fill(files);
-    await this.catchUpMetadata();
-  }
-
-  /** Stop any fill (the plugin is unloading). */
-  stop(): void {
-    this.stopped = true;
-  }
-
-  private async fill(files: TFile[]): Promise<void> {
-    this.fills++;
+    this.filling = true;
     try {
       await fillIndex(this.index, {
         files,
@@ -52,33 +38,26 @@ export class Indexer {
         stopped: () => this.stopped,
       });
     } finally {
-      if (--this.fills === 0) this.touched.clear();
+      this.filling = false;
+      this.touched.clear();
     }
   }
 
-  /**
-   * Summarize again, in batches, the notes read before Obsidian had their
-   * metadata. Runs when the initial fill ends and on 'resolved'; never
-   * alongside another fill, whose older reads could undo it.
-   */
-  private async catchUpMetadata(): Promise<void> {
-    if (this.fills > 0) return;
-    const ready: TFile[] = [];
-    for (const path of [...this.awaitingMetadata]) {
-      const file = this.app.vault.getAbstractFileByPath(path);
-      if (!(file instanceof TFile)) this.awaitingMetadata.delete(path);
-      else if (this.app.metadataCache.getFileCache(file)) ready.push(file);
-    }
-    if (ready.length) await this.fill(ready);
+  /** Stop the fill (the plugin is unloading). */
+  stop(): void {
+    this.stopped = true;
   }
 
   /** Call once, inside onLayoutReady, before build(). */
   start(register: (ref: EventRef) => void): void {
     const { vault, metadataCache } = this.app;
     const touch = (path: string) => {
-      if (this.fills > 0) this.touched.add(path);
+      if (this.filling) this.touched.add(path);
     };
-    // 'changed' carries the new text, so no extra read is needed.
+    // 'changed' carries the new text, so no extra read is needed. Obsidian
+    // loads its metadata cache before layout-ready, so the fill sees every
+    // unchanged note's tags; a note changed while Obsidian was closed is
+    // re-parsed after startup and arrives here with its new metadata.
     register(
       metadataCache.on("changed", (file, data) => {
         if (file.extension !== "md") return;
@@ -86,11 +65,6 @@ export class Indexer {
         this.index.set(this.fromText(file, data));
       })
     );
-    // Obsidian loads its metadata cache in the background at startup: a note
-    // read before its metadata was there has no tags or properties, and an
-    // unchanged note gets no 'changed' event to fix that. 'resolved' fires
-    // once the cache is complete (and again after later changes).
-    register(metadataCache.on("resolved", () => void this.catchUpMetadata()));
     register(
       vault.on("create", (file) => {
         touch(file.path);
@@ -155,10 +129,6 @@ export class Indexer {
 
   private fromText(file: TFile, text: string): NoteSummary {
     const cache = this.app.metadataCache.getFileCache(file);
-    if (file.extension === "md") {
-      if (cache) this.awaitingMetadata.delete(file.path);
-      else this.awaitingMetadata.add(file.path);
-    }
     const parent = file.parent;
     const facts: FileFacts = {
       path: file.path,
