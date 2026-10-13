@@ -1,6 +1,6 @@
 # Plainsight: working rules for Claude
 
-Plainsight is an Obsidian plugin with two parts: a CodeMirror 6 editor extension that renders Markdown without showing its syntax (`src/editor/`), and a two-column notes sidebar (`src/sidebar/`). The plugin id is `plainsight`; the repo folder is still named `obsidian-wysiwyg-editor`.
+Plainsight is an Obsidian plugin with two parts: a CodeMirror 6 editor extension that renders Markdown without showing its syntax (`src/editor/`), and a two-column notes sidebar (`src/sidebar/`). The plugin id is `plainsight`, and both the repo folder and the GitHub repo are named `obsidian-plainsight`.
 
 ## Keep README.md up to date
 
