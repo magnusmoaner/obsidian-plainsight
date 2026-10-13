@@ -21,11 +21,14 @@ import {
 } from "./editor/commands";
 import { wysiwyg } from "./editor/extension";
 import { treeOf } from "./editor/parser";
+import { parseSettings, serializeSettings } from "./settings-data";
 import { NoteIndex } from "./sidebar/core/note-index";
+import { legacyViewState } from "./sidebar/core/view-state";
 import { cursorTracker } from "./sidebar/cursor";
 import { Indexer } from "./sidebar/indexer";
 import { SIDEBAR_VIEW, SidebarView } from "./sidebar/view";
 import { readBookmarks, removeBookmark } from "./sidebar/internals";
+import { ViewStateStore } from "./sidebar/view-state-store";
 import {
   DEFAULT_SETTINGS,
   WysiwygSettings,
@@ -47,7 +50,19 @@ type ConfigVault = {
 };
 
 export default class WysiwygPlugin extends Plugin {
-  settings!: WysiwygSettings;
+  settings: WysiwygSettings = { ...DEFAULT_SETTINGS };
+  /** The sidebar's per-device state: folds, column width, grouping. */
+  viewState!: ViewStateStore;
+  /** Keys in data.json this version doesn't know, written back unchanged. */
+  private settingsExtra: Record<string, unknown> = {};
+  /**
+   * data.json as last read: "file" (read fine), "none" (no file yet: a fresh
+   * install, or a sync service that hasn't delivered it) or "unreadable"
+   * (there, but not valid JSON, typically mid-way through a sync).
+   */
+  private settingsSource: "file" | "none" | "unreadable" = "none";
+  /** Changes not yet written, kept on top of whatever the file turns out to hold. */
+  private unsavedSettings: Partial<WysiwygSettings> = {};
   private extensions: Extension[] = [];
   /** Live Preview setting as we found it, restored when we hand control back. */
   private savedLivePreview: boolean | null = null;
@@ -60,6 +75,7 @@ export default class WysiwygPlugin extends Plugin {
   private sidebarApplied: boolean | null = null;
 
   async onload(): Promise<void> {
+    this.viewState = new ViewStateStore(this.app);
     await this.loadSettings();
     this.sidebarApplied = this.settings.sidebar;
     this.refreshExtensions();
@@ -70,10 +86,7 @@ export default class WysiwygPlugin extends Plugin {
     this.addCommand({
       id: "toggle-wysiwyg",
       name: "Toggle WYSIWYG editing",
-      callback: async () => {
-        this.settings.enabled = !this.settings.enabled;
-        await this.saveSettings();
-      },
+      callback: () => this.updateSettings({ enabled: !this.settings.enabled }),
     });
 
     // Palette commands; inside the editor the CM keymap (Mod+B/I/`) already
@@ -162,11 +175,13 @@ export default class WysiwygPlugin extends Plugin {
       name: "Open notes sidebar",
       callback: () => void this.openSidebar(),
     });
-    this.app.workspace.onLayoutReady(async () => {
-      // Listen first, then build: build() re-reads if anything changed meanwhile.
+    this.app.workspace.onLayoutReady(() => {
+      // Listen first, then fill: the fill never overwrites what an event
+      // wrote meanwhile. The sidebar opens at once and fills in as notes are
+      // read, rather than after the whole vault has been.
       this.indexer.start((ref) => this.registerEvent(ref));
-      await this.indexer.build();
-      if (this.settings.sidebar) await this.openSidebar();
+      void this.indexer.build();
+      if (this.settings.sidebar) void this.openSidebar();
     });
   }
 
@@ -204,14 +219,95 @@ export default class WysiwygPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    this.adoptSettings(await this.readSettingsFile());
+    if (this.settingsSource === "unreadable") {
+      new Notice(
+        "Plainsight couldn't read its settings file, perhaps because it's still syncing. " +
+          "It's using the defaults for now and leaves the file untouched."
+      );
+    }
   }
 
-  async saveSettings(): Promise<void> {
-    await this.saveData(this.settings);
-    this.refreshExtensions();
-    this.applyRenderingMode();
-    this.applySidebarSetting();
+  /** Change settings: they apply at once, and are written to data.json as
+   * soon as that's safe (see writeSettings). */
+  async updateSettings(patch: Partial<WysiwygSettings>): Promise<void> {
+    const before = this.settings;
+    this.settings = { ...this.settings, ...patch };
+    this.unsavedSettings = { ...this.unsavedSettings, ...patch };
+    await this.writeSettings();
+    this.applySettings(before);
+  }
+
+  /** A sync service (or another program) changed data.json. */
+  async onExternalSettingsChange(): Promise<void> {
+    const before = this.settings;
+    this.adoptSettings(await this.readSettingsFile());
+    // Changes made while the file couldn't be read can be written now.
+    if (this.settingsSource === "file" && Object.keys(this.unsavedSettings).length) await this.writeSettings();
+    this.applySettings(before);
+  }
+
+  /**
+   * loadData() gives null when data.json doesn't exist and undefined when it
+   * exists but isn't valid JSON, typically because a sync service is part-way
+   * through writing it. Give that a moment to finish before concluding.
+   */
+  private async readSettingsFile(): Promise<unknown> {
+    for (let attempt = 1; ; attempt++) {
+      const data: unknown = await this.loadData();
+      if (data !== undefined || attempt === 3) return data;
+      await new Promise((resolve) => window.setTimeout(resolve, 300));
+    }
+  }
+
+  /** Take settings from a read of data.json, with unsaved changes on top.
+   * A missing or unreadable file leaves the settings in memory as they are. */
+  private adoptSettings(data: unknown): void {
+    if (data === undefined) {
+      this.settingsSource = "unreadable";
+      return;
+    }
+    if (data === null) {
+      this.settingsSource = "none";
+      return;
+    }
+    const { settings, extra } = parseSettings(data);
+    this.settings = { ...settings, ...this.unsavedSettings };
+    this.settingsExtra = extra;
+    this.settingsSource = "file";
+    if (typeof data === "object") this.viewState.adopt(legacyViewState(data as Record<string, unknown>));
+  }
+
+  /**
+   * Write data.json, but never over a file that couldn't be read: a sync
+   * service may not have delivered it in full yet, and writing now would
+   * replace the real settings on every device. Unless the last read was
+   * clean, read again first; while the file stays unreadable, changes wait
+   * in memory and are written once it can be read.
+   */
+  private async writeSettings(): Promise<void> {
+    if (this.settingsSource !== "file") {
+      this.adoptSettings(await this.readSettingsFile());
+      if (this.settingsSource === "unreadable") return;
+    }
+    await this.saveData(serializeSettings(this.settings, this.settingsExtra));
+    this.unsavedSettings = {};
+    this.settingsSource = "file";
+  }
+
+  /** Act on what changed between two versions of the settings. */
+  private applySettings(before: WysiwygSettings): void {
+    const now = this.settings;
+    if (
+      before.enabled !== now.enabled ||
+      before.takeOverRendering !== now.takeOverRendering ||
+      before.sidebar !== now.sidebar
+    ) {
+      this.refreshExtensions();
+      this.applyRenderingMode();
+      this.applySidebarSetting();
+    }
+    if (before.boardCardsInTasks !== now.boardCardsInTasks) this.refreshSidebar();
   }
 
   /**
@@ -325,6 +421,7 @@ export default class WysiwygPlugin extends Plugin {
   }
 
   onunload(): void {
+    this.indexer?.stop();
     this.onunloadCursor();
     this.restoreLivePreview();
   }

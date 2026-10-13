@@ -4,9 +4,34 @@ import { inFolder, NoteSummary } from "./types";
 export class NoteIndex {
   private notes = new Map<string, NoteSummary>();
   private listeners = new Set<() => void>();
+  private progress: { done: number; total: number } | null = null;
 
   get size(): number {
     return this.notes.size;
+  }
+
+  /** How far the initial fill has got, or null when it isn't running. */
+  get loading(): { done: number; total: number } | null {
+    return this.progress;
+  }
+
+  beginLoading(total: number): void {
+    this.progress = { done: 0, total };
+    this.emit();
+  }
+
+  endLoading(): void {
+    if (!this.progress) return;
+    this.progress = null;
+    this.emit();
+  }
+
+  /** Add or replace several notes with one notification. While loading,
+   * `done` is how many files the fill has now read. */
+  setMany(summaries: NoteSummary[], done?: number): void {
+    for (const summary of summaries) this.notes.set(summary.path, summary);
+    if (this.progress && done !== undefined) this.progress = { done, total: this.progress.total };
+    this.emit();
   }
 
   get(path: string): NoteSummary | undefined {

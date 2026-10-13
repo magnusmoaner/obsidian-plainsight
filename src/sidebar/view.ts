@@ -20,10 +20,8 @@ import {
   groupNotes,
   groupNotesBy,
   kindCounts,
-  NOTE_GROUPINGS,
   NoteGrouping,
   groupTaskRows,
-  TASK_GROUPINGS,
   TaskGrouping,
   TaskRow,
   notesOfTaskRows,
@@ -46,6 +44,7 @@ import {
 } from "./core/attachments";
 import { taskDisplayText, taskTextColumn } from "./core/tasks";
 import { isClosed, NoteSummary, renamedPath } from "./core/types";
+import { NAV_WIDTH } from "./core/view-state";
 import {
   addTagToNote,
   addTaskLine,
@@ -155,7 +154,7 @@ export class SidebarView extends ItemView {
     root.empty();
     root.addClass("ps-sidebar");
     root.toggleClass("is-mobile", Platform.isMobile);
-    root.style.setProperty("--ps-nav-width", `${this.plugin.settings.sidebarNavWidth}px`);
+    root.style.setProperty("--ps-nav-width", `${this.plugin.viewState.state.navWidth}px`);
 
     this.navEl = root.createDiv("ps-nav");
     const divider = root.createDiv("ps-divider");
@@ -220,20 +219,15 @@ export class SidebarView extends ItemView {
       this.place = { kind: "notebook", folder: renamedPath(this.place.folder, from, to) };
     }
     if (this.taskNoteFilter) this.taskNoteFilter = renamedPath(this.taskNoteFilter, from, to);
-    const settings = this.plugin.settings;
-    let changed = false;
-    settings.sidebarCollapsed = settings.sidebarCollapsed.map((key) => {
-      if (!key.startsWith("notebook:")) return key;
-      const next = `notebook:${renamedPath(key.slice("notebook:".length), from, to)}`;
-      changed = changed || next !== key;
-      return next;
-    });
-    if (settings.defaultTaskNote) {
-      const next = renamedPath(settings.defaultTaskNote, from, to);
-      changed = changed || next !== settings.defaultTaskNote;
-      settings.defaultTaskNote = next;
+    const collapsed = this.plugin.viewState.state.collapsed;
+    const renamed = collapsed.map((key) =>
+      key.startsWith("notebook:") ? `notebook:${renamedPath(key.slice("notebook:".length), from, to)}` : key
+    );
+    if (renamed.some((key, i) => key !== collapsed[i])) this.plugin.viewState.update({ collapsed: renamed });
+    const taskNote = this.plugin.settings.defaultTaskNote;
+    if (taskNote && renamedPath(taskNote, from, to) !== taskNote) {
+      void this.plugin.updateSettings({ defaultTaskNote: renamedPath(taskNote, from, to) });
     }
-    if (changed) void this.plugin.saveData(settings);
     this.queueRender();
   }
 
@@ -520,7 +514,6 @@ export class SidebarView extends ItemView {
 
   /** Fold or unfold every section and nested folder/tag at once. */
   private setAllCollapsed(collapsed: boolean): void {
-    const settings = this.plugin.settings;
     if (collapsed) {
       const { notes, isAttachmentFolder } = this.partition();
       const templates = templateOptions(this.app).folder;
@@ -528,17 +521,18 @@ export class SidebarView extends ItemView {
         visibleRows(rows, new Set())
           .filter((r) => r.hasChildren)
           .map((r) => `${prefix}:${r.path}`);
-      settings.sidebarCollapsed = [
-        "section:bookmarks",
-        "section:notebooks",
-        "section:tags",
-        ...parents(folderRows(this.plugin.indexer.folders(), notes, templates, isAttachmentFolder), "notebook"),
-        ...parents(tagRows(notes), "tag"),
-      ];
+      this.plugin.viewState.update({
+        collapsed: [
+          "section:bookmarks",
+          "section:notebooks",
+          "section:tags",
+          ...parents(folderRows(this.plugin.indexer.folders(), notes, templates, isAttachmentFolder), "notebook"),
+          ...parents(tagRows(notes), "tag"),
+        ],
+      });
     } else {
-      settings.sidebarCollapsed = [];
+      this.plugin.viewState.update({ collapsed: [] });
     }
-    void this.plugin.saveData(settings);
     this.renderNav();
   }
 
@@ -552,7 +546,7 @@ export class SidebarView extends ItemView {
   }
 
   private isCollapsed(key: string): boolean {
-    return this.plugin.settings.sidebarCollapsed.includes(key);
+    return this.plugin.viewState.state.collapsed.includes(key);
   }
 
   private toggleCollapsed(key: string): void {
@@ -562,13 +556,9 @@ export class SidebarView extends ItemView {
 
   /** Record a fold state without re-rendering (callers render once after). */
   private setCollapsed(key: string, collapsed: boolean): void {
-    const list = this.plugin.settings.sidebarCollapsed;
-    const at = list.indexOf(key);
-    if (collapsed && at === -1) list.push(key);
-    else if (!collapsed && at !== -1) list.splice(at, 1);
-    else return;
-    // saveData, not saveSettings: no need to reconfigure every editor.
-    void this.plugin.saveData(this.plugin.settings);
+    const list = this.plugin.viewState.state.collapsed;
+    if (collapsed === list.includes(key)) return;
+    this.plugin.viewState.update({ collapsed: collapsed ? [...list, key] : list.filter((k) => k !== key) });
   }
 
   private navRow(
@@ -613,7 +603,7 @@ export class SidebarView extends ItemView {
     icon: string | null = null
   ): void {
     const collapsed = new Set(
-      this.plugin.settings.sidebarCollapsed
+      this.plugin.viewState.state.collapsed
         .filter((k) => k.startsWith(`${keyPrefix}:`))
         .map((k) => k.slice(keyPrefix.length + 1))
     );
@@ -728,8 +718,7 @@ export class SidebarView extends ItemView {
     if (current instanceof TFile && canHoldTasks(this.app, current)) return Promise.resolve(current);
     return new Promise((resolve) => {
       new NotePickerModal(this.app, "Choose the note new tasks are added to", (file) => {
-        this.plugin.settings.defaultTaskNote = file.path;
-        void this.plugin.saveData(this.plugin.settings);
+        void this.plugin.updateSettings({ defaultTaskNote: file.path });
         new Notice(`New tasks will go to ${file.basename}. Change it in Plainsight settings.`);
         resolve(file);
       }).open();
@@ -777,17 +766,16 @@ export class SidebarView extends ItemView {
       down.preventDefault();
       const startX = down.clientX;
       const startWidth = this.navEl.getBoundingClientRect().width;
+      let width = startWidth;
       const move = (evt: MouseEvent) => {
-        const width = Math.min(360, Math.max(140, startWidth + evt.clientX - startX));
+        width = Math.min(NAV_WIDTH.max, Math.max(NAV_WIDTH.min, startWidth + evt.clientX - startX));
         this.contentEl.style.setProperty("--ps-nav-width", `${width}px`);
-        this.plugin.settings.sidebarNavWidth = Math.round(width);
       };
       const up = () => {
         document.removeEventListener("mousemove", move);
         document.removeEventListener("mouseup", up);
-        // saveData, not saveSettings: the latter reconfigures every editor and
-        // re-applies the rendering mode — pointless work for a divider drag.
-        void this.plugin.saveData(this.plugin.settings);
+        // Saved once, when the drag ends.
+        this.plugin.viewState.update({ navWidth: Math.round(width) });
       };
       document.addEventListener("mousemove", move);
       document.addEventListener("mouseup", up);
@@ -823,18 +811,19 @@ export class SidebarView extends ItemView {
   }
 
   private renderNotes(): void {
-    const settings = this.plugin.settings;
+    const view = this.plugin.viewState.state;
     const everything = notesFor(this.partition().notes, this.place, this.queryOptions());
     const counts = kindCounts(everything);
     // A remembered kind this place doesn't have would show an empty list
     // with no visible cause; fall back to all.
-    const kind = settings.noteKindFilter !== "all" && counts[settings.noteKindFilter] ? settings.noteKindFilter : null;
+    const kind = view.noteKindFilter !== "all" && counts[view.noteKindFilter] ? view.noteKindFilter : null;
     const list = kind ? everything.filter((n) => n.kind === kind) : everything;
-    const grouping: NoteGrouping = NOTE_GROUPINGS.includes(settings.noteGroupBy) ? settings.noteGroupBy : "date";
+    const grouping: NoteGrouping = view.noteGroupBy;
     this.renderHeader(this.placeTitle(), list.length);
     this.kindChips(counts, kind);
     if (!list.length) {
-      this.bodyEl.createDiv({ cls: "ps-empty", text: this.search ? "No matches" : "No notes" });
+      const text = this.plugin.index.loading ? "Loading notes…" : this.search ? "No matches" : "No notes";
+      this.bodyEl.createDiv({ cls: "ps-empty", text });
       return;
     }
     const items: ListItem[] = [];
@@ -863,8 +852,7 @@ export class SidebarView extends ItemView {
       el.createSpan({ cls: "ps-filter-count", text: String(count) });
       el.toggleClass("is-active", (active ?? "all") === value);
       el.addEventListener("click", () => {
-        this.plugin.settings.noteKindFilter = value;
-        void this.plugin.saveData(this.plugin.settings);
+        this.plugin.viewState.update({ noteKindFilter: value });
         this.resetScroll();
         this.renderList();
       });
@@ -993,6 +981,13 @@ export class SidebarView extends ItemView {
     }
     row.createSpan({ cls: "ps-title", text: title });
     if (count !== null) row.createSpan({ cls: "ps-count", text: String(count) });
+    // While notes are still being read, counts are still growing: say so.
+    const loading = this.plugin.index.loading;
+    if (loading && loading.total > 0) {
+      const label = `Reading notes: ${loading.done.toLocaleString()} of ${loading.total.toLocaleString()}`;
+      const bar = this.headerEl.createDiv({ cls: "ps-loading", attr: { "aria-label": label, role: "progressbar" } });
+      bar.setCssProps({ "--ps-progress": `${Math.round((loading.done / loading.total) * 100)}%` });
+    }
     const actions = row.createDiv("ps-actions");
 
     const add = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "New note" } });
@@ -1279,10 +1274,9 @@ export class SidebarView extends ItemView {
         item
           .setTitle(label)
           .setIcon(icon)
-          .setChecked(this.plugin.settings.noteGroupBy === key)
+          .setChecked(this.plugin.viewState.state.noteGroupBy === key)
           .onClick(() => {
-            this.plugin.settings.noteGroupBy = key;
-            void this.plugin.saveData(this.plugin.settings);
+            this.plugin.viewState.update({ noteGroupBy: key });
             this.resetScroll();
             this.renderList();
           })
@@ -1305,10 +1299,9 @@ export class SidebarView extends ItemView {
         item
           .setTitle(label)
           .setIcon(icon)
-          .setChecked(this.plugin.settings.taskGroupBy === key)
+          .setChecked(this.plugin.viewState.state.taskGroupBy === key)
           .onClick(() => {
-            this.plugin.settings.taskGroupBy = key;
-            void this.plugin.saveData(this.plugin.settings);
+            this.plugin.viewState.update({ taskGroupBy: key });
             this.resetScroll();
             this.renderList();
           })
@@ -1401,9 +1394,8 @@ export class SidebarView extends ItemView {
 
   private renderTasks(): void {
     const today = localISODate();
-    // A stale or hand-edited setting falls back to the default.
-    const stored = this.plugin.settings.taskGroupBy;
-    const grouping: TaskGrouping = TASK_GROUPINGS.includes(stored) ? stored : "due";
+    // Validated when loaded: anything unknown is already the default.
+    const grouping: TaskGrouping = this.plugin.viewState.state.taskGroupBy;
     const all = taskRows(
       this.partition().notes,
       this.taskFilter,
@@ -1455,7 +1447,9 @@ export class SidebarView extends ItemView {
     if (!groups.length) {
       // Board grouping drops tasks from ordinary notes; say so rather than
       // leave an empty list with no visible cause.
-      const empty = this.search
+      const empty = this.plugin.index.loading
+        ? "Loading tasks…"
+        : this.search
         ? "No matches"
         : grouping === "board" && rows.length
           ? "These tasks aren't on a Kanban board. Change Group by to see them."
