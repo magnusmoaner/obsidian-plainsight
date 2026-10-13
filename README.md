@@ -47,6 +47,10 @@ It replaces File explorer with two columns: places on the left, and the selected
 
 **Creating things:** the **Note** button, the round **New folder** and **New task** buttons, and the `+` that appears when you hover Tasks, Folders or Tags. New tasks open a quick-add dialog: type the task, then optionally set a due date (Today, Tomorrow, Next week or any date), a priority, a repeat (daily, weekdays, weekly, monthly, yearly, optionally counted from when it's done) and which note it goes into; **More details** expands the dialog with scheduled and start dates. The task is written in the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) plugin's format (including its global filter and created date, if you use them) and added to the end of a note you choose once (changeable in settings, or per task in the dialog). New tags are added to the note you have open. The **⋯** menu creates tags, canvases and Kanban boards, inserts a template into the open note, opens search, the quick switcher, the graph view and the Importer, and has expand/collapse all, bookmark cleanup and settings. Items for plugins you don't have (Kanban, Importer) are hidden.
 
+**Starting up:** the sidebar opens straight away and fills in while your notes are read, most recently changed first, with a thin progress bar under the list header. Tags and properties appear as soon as Obsidian has indexed each note.
+
+**Per device:** folded sections, the column width, and how lists are grouped and filtered are remembered on each device and don't sync, so your phone and your computer can each keep their own. (This needs Obsidian 1.8.7 or later; older versions forget them on restart.)
+
 Turn off the core **File explorer** (Settings → Core plugins) to use the sidebar in its place.
 
 ## How Plainsight treats your notes
@@ -66,6 +70,8 @@ Turn off the core **File explorer** (Settings → Core plugins) to use the sideb
 | Notes sidebar | On | Shows the two-column sidebar |
 | Default note for new tasks | (asked the first time) | Where the sidebar's "New task" adds tasks (any note except a Kanban board) |
 | Show Kanban cards in Tasks | Off | Kanban cards are checkbox lines too; off keeps them out of Tasks |
+
+Settings live in the plugin's `data.json`, which syncs with your vault. If a sync service hasn't finished delivering that file when Obsidian starts, Plainsight uses the defaults without writing anything, and picks up your real settings when the file arrives. A change you make in the meantime is applied then, on top of them.
 
 ## Installation
 

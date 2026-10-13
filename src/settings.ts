@@ -2,40 +2,8 @@ import { App, PluginSettingTab, Setting } from "obsidian";
 import { NoteSuggest } from "./sidebar/modals";
 import type WysiwygPlugin from "./main";
 
-export interface WysiwygSettings {
-  enabled: boolean;
-  /** Force Source mode so this plugin is the only renderer. */
-  takeOverRendering: boolean;
-  /** Show the Plainsight notes sidebar. */
-  sidebar: boolean;
-  /** Width of the sidebar's nav column, in px. */
-  sidebarNavWidth: number;
-  /** Collapsed nav sections and tree nodes, e.g. "section:tags", "notebook:Inbox". */
-  sidebarCollapsed: string[];
-  /** Note that the sidebar's "+" on Tasks appends new tasks to; "" = ask. */
-  defaultTaskNote: string;
-  /** List Kanban board cards on the Tasks page (they're `- [ ]` lines too). */
-  boardCardsInTasks: boolean;
-  /** How the Tasks page groups rows. */
-  taskGroupBy: "due" | "folder" | "note" | "board" | "none";
-  /** Note lists: which kind to show ("all", "note", "board", "canvas"). */
-  noteKindFilter: "all" | "note" | "board" | "canvas";
-  /** How note lists group cards. */
-  noteGroupBy: "date" | "folder" | "kind" | "none";
-}
-
-export const DEFAULT_SETTINGS: WysiwygSettings = {
-  enabled: true,
-  takeOverRendering: false,
-  sidebar: true,
-  sidebarNavWidth: 200,
-  sidebarCollapsed: [],
-  defaultTaskNote: "",
-  boardCardsInTasks: false,
-  taskGroupBy: "due",
-  noteKindFilter: "all",
-  noteGroupBy: "date",
-};
+export { DEFAULT_SETTINGS } from "./settings-data";
+export type { WysiwygSettings } from "./settings-data";
 
 export class WysiwygSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: WysiwygPlugin) {
@@ -51,8 +19,7 @@ export class WysiwygSettingTab extends PluginSettingTab {
       )
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.enabled).onChange(async (value) => {
-          this.plugin.settings.enabled = value;
-          await this.plugin.saveSettings();
+          await this.plugin.updateSettings({ enabled: value });
         })
       );
 
@@ -69,8 +36,7 @@ export class WysiwygSettingTab extends PluginSettingTab {
         toggle
           .setValue(this.plugin.settings.takeOverRendering)
           .onChange(async (value) => {
-            this.plugin.settings.takeOverRendering = value;
-            await this.plugin.saveSettings();
+            await this.plugin.updateSettings({ takeOverRendering: value });
           })
       );
 
@@ -82,8 +48,7 @@ export class WysiwygSettingTab extends PluginSettingTab {
       )
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.sidebar).onChange(async (value) => {
-          this.plugin.settings.sidebar = value;
-          await this.plugin.saveSettings();
+          await this.plugin.updateSettings({ sidebar: value });
         })
       );
 
@@ -93,12 +58,10 @@ export class WysiwygSettingTab extends PluginSettingTab {
       .addText((text) => {
         text.setPlaceholder("e.g. Tasks.md").setValue(this.plugin.settings.defaultTaskNote);
         text.onChange(async (value) => {
-          this.plugin.settings.defaultTaskNote = value.trim();
-          await this.plugin.saveData(this.plugin.settings);
+          await this.plugin.updateSettings({ defaultTaskNote: value.trim() });
         });
         new NoteSuggest(this.app, text.inputEl, async (file) => {
-          this.plugin.settings.defaultTaskNote = file.path;
-          await this.plugin.saveData(this.plugin.settings);
+          await this.plugin.updateSettings({ defaultTaskNote: file.path });
         });
       });
 
@@ -107,9 +70,7 @@ export class WysiwygSettingTab extends PluginSettingTab {
       .setDesc("Kanban boards store cards as checkbox lines. Off: the Tasks page lists only real tasks.")
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.boardCardsInTasks).onChange(async (value) => {
-          this.plugin.settings.boardCardsInTasks = value;
-          await this.plugin.saveData(this.plugin.settings);
-          this.plugin.refreshSidebar();
+          await this.plugin.updateSettings({ boardCardsInTasks: value });
         })
       );
   }
