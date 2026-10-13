@@ -5,6 +5,7 @@ import {
   editorInfoField,
   MarkdownPostProcessorContext,
   Menu,
+  normalizePath,
   Notice,
   Plugin,
   WorkspaceLeaf,
@@ -42,6 +43,10 @@ import {
  */
 const SAFE_LINK_SCHEMES = new Set(["http:", "https:", "mailto:"]);
 
+/** How long after startup a missing data.json may still be on its way from a
+ * sync service, so a change made meanwhile waits rather than replace it. */
+const SETTINGS_GRACE_MS = 60_000;
+
 /** vault.getConfig/setConfig are undocumented but long-stable, the same
  * category as the `editor.cm` handle this plugin already relies on. */
 type ConfigVault = {
@@ -63,6 +68,8 @@ export default class WysiwygPlugin extends Plugin {
   private settingsSource: "file" | "none" | "unreadable" = "none";
   /** Changes not yet written, kept on top of whatever the file turns out to hold. */
   private unsavedSettings: Partial<WysiwygSettings> = {};
+  private settingsLoadedAt = 0;
+  private settingsRetry: number | null = null;
   private extensions: Extension[] = [];
   /** Live Preview setting as we found it, restored when we hand control back. */
   private savedLivePreview: boolean | null = null;
@@ -219,6 +226,7 @@ export default class WysiwygPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
+    this.settingsLoadedAt = Date.now();
     this.adoptSettings(await this.readSettingsFile());
     if (this.settingsSource === "unreadable") {
       new Notice(
@@ -250,13 +258,26 @@ export default class WysiwygPlugin extends Plugin {
   /**
    * loadData() gives null when data.json doesn't exist and undefined when it
    * exists but isn't valid JSON, typically because a sync service is part-way
-   * through writing it. Give that a moment to finish before concluding.
+   * through writing it. Give that a moment to finish before concluding. An
+   * iCloud placeholder (".data.json.icloud": the file exists but hasn't been
+   * downloaded) counts as unreadable, not missing.
    */
   private async readSettingsFile(): Promise<unknown> {
     for (let attempt = 1; ; attempt++) {
       const data: unknown = await this.loadData();
+      if (data === null) return (await this.settingsPlaceholder()) ? undefined : null;
       if (data !== undefined || attempt === 3) return data;
       await new Promise((resolve) => window.setTimeout(resolve, 300));
+    }
+  }
+
+  private async settingsPlaceholder(): Promise<boolean> {
+    const dir = this.manifest.dir;
+    if (!dir) return false;
+    try {
+      return await this.app.vault.adapter.exists(normalizePath(`${dir}/.data.json.icloud`));
+    } catch {
+      return false;
     }
   }
 
@@ -279,20 +300,35 @@ export default class WysiwygPlugin extends Plugin {
   }
 
   /**
-   * Write data.json, but never over a file that couldn't be read: a sync
-   * service may not have delivered it in full yet, and writing now would
-   * replace the real settings on every device. Unless the last read was
-   * clean, read again first; while the file stays unreadable, changes wait
-   * in memory and are written once it can be read.
+   * Write data.json, but never over a file that may hold the real settings
+   * and hasn't been read: a sync service may not have delivered it (fully)
+   * yet, and writing now would replace the settings on every device. Unless
+   * the last read was clean, read again first. Changes wait in memory, and
+   * are retried every few seconds, while the file is unreadable, or missing
+   * during the first minute after startup; a file still missing after that
+   * is taken to be a fresh install.
    */
   private async writeSettings(): Promise<void> {
     if (this.settingsSource !== "file") {
       this.adoptSettings(await this.readSettingsFile());
-      if (this.settingsSource === "unreadable") return;
+      const mayArrive =
+        this.settingsSource === "unreadable" ||
+        (this.settingsSource === "none" && Date.now() - this.settingsLoadedAt < SETTINGS_GRACE_MS);
+      if (mayArrive) return this.retrySettingsWrite();
     }
     await this.saveData(serializeSettings(this.settings, this.settingsExtra));
     this.unsavedSettings = {};
     this.settingsSource = "file";
+  }
+
+  private retrySettingsWrite(): void {
+    if (this.settingsRetry !== null) return;
+    this.settingsRetry = window.setTimeout(() => {
+      this.settingsRetry = null;
+      if (!Object.keys(this.unsavedSettings).length) return;
+      const before = this.settings;
+      void this.writeSettings().then(() => this.applySettings(before));
+    }, 5000);
   }
 
   /** Act on what changed between two versions of the settings. */
@@ -422,6 +458,7 @@ export default class WysiwygPlugin extends Plugin {
 
   onunload(): void {
     this.indexer?.stop();
+    if (this.settingsRetry !== null) window.clearTimeout(this.settingsRetry);
     this.onunloadCursor();
     this.restoreLivePreview();
   }

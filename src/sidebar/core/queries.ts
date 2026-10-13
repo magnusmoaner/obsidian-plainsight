@@ -58,8 +58,17 @@ function matchesSearch(note: NoteSummary, search: string): boolean {
   return terms.every((term) => note.searchText.includes(term));
 }
 
-const byTitle = (a: NoteSummary, b: NoteSummary) =>
-  a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: "base" });
+/**
+ * Name order: "Note 2" before "Note 10", case and accents ignored. One shared
+ * collator: localeCompare with options builds a new one on every call, which
+ * dominates sorting a large vault.
+ */
+const nameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+export const compareNames = nameCollator.compare;
+/** Like compareNames, but case-sensitive. */
+const numericCollator = new Intl.Collator(undefined, { numeric: true });
+
+const byTitle = (a: NoteSummary, b: NoteSummary) => compareNames(a.title, b.title);
 
 function comparator(sort: SortKey) {
   return (a: NoteSummary, b: NoteSummary): number => {
@@ -77,6 +86,8 @@ export function notesFor(notes: NoteSummary[], place: Place, opts: QueryOptions)
     .sort(comparator(opts.sort));
 }
 
+const MONTH_LABEL = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" });
+
 /** Pinned notes first, then (for date sorts) one group per month. */
 export function groupNotes<T extends Dated>(sorted: T[], sort: SortKey): NoteGroup<T>[] {
   const groups: NoteGroup<T>[] = [];
@@ -89,11 +100,16 @@ export function groupNotes<T extends Dated>(sorted: T[], sort: SortKey): NoteGro
     return groups;
   }
   let current: NoteGroup<T> | null = null;
+  // Format a label only when the month changes, not once per note.
+  let month = NaN;
+  let label = "";
   for (const n of rest) {
-    const label = new Date(sort === "created" ? n.ctime : n.mtime).toLocaleString("en-US", {
-      month: "long",
-      year: "numeric",
-    });
+    const date = new Date(sort === "created" ? n.ctime : n.mtime);
+    const key = date.getFullYear() * 12 + date.getMonth();
+    if (key !== month) {
+      month = key;
+      label = MONTH_LABEL.format(date);
+    }
     if (!current || current.label !== label) {
       current = { label, notes: [] };
       groups.push(current);
@@ -126,9 +142,7 @@ function treeRows(counts: Map<string, number>): TreeRow[] {
   }
   const rows: TreeRow[] = [];
   const walk = (parent: string, depth: number) => {
-    const kids = (children.get(parent) ?? []).sort((a, b) =>
-      a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
-    );
+    const kids = (children.get(parent) ?? []).sort(compareNames);
     for (const path of kids) {
       rows.push({ path, name: path.slice(path.lastIndexOf("/") + 1), depth, count: counts.get(path)! });
       walk(path, depth + 1);
@@ -149,8 +163,16 @@ export function folderRows(
   templatesFolder: string | null,
   exclude: (folder: string) => boolean = () => false
 ): TreeRow[] {
+  // Notes per folder, subfolders included, in one pass over the notes rather
+  // than one pass per folder.
+  const under = new Map<string, number>();
+  for (const note of notes) {
+    for (let folder = note.folder; folder; folder = parentOf(folder)) {
+      under.set(folder, (under.get(folder) ?? 0) + 1);
+    }
+  }
+  const countUnder = (folder: string) => under.get(folder) ?? 0;
   const counts = new Map<string, number>();
-  const countUnder = (folder: string) => notes.filter((n) => inFolder(n.folder, folder)).length;
   for (const folder of folders) {
     if (!folder || (templatesFolder && inFolder(folder, templatesFolder)) || exclude(folder)) continue;
     counts.set(folder, countUnder(folder));
@@ -272,7 +294,7 @@ export function notesOfTaskRows(rows: TaskRow[]): Array<{ note: NoteSummary; cou
     else counts.set(note.path, { note, count: 1 });
   }
   return [...counts.values()].sort(
-    (a, b) => b.count - a.count || a.note.title.localeCompare(b.note.title, undefined, { numeric: true })
+    (a, b) => b.count - a.count || numericCollator.compare(a.note.title, b.note.title)
   );
 }
 
@@ -324,7 +346,7 @@ const byKeys = (a: Bucket, b: Bucket): number => {
     const y = b.order[i];
     if (x === y) continue;
     if (typeof x === "number" && typeof y === "number") return x - y;
-    return String(x).localeCompare(String(y), undefined, { numeric: true, sensitivity: "base" });
+    return compareNames(String(x), String(y));
   }
   return 0;
 };
@@ -423,7 +445,7 @@ export function groupNotesBy(sorted: NoteSummary[], sort: SortKey, by: NoteGroup
   const keys = [...buckets.keys()];
   if (by === "folder") {
     keys.sort((a, b) =>
-      a === "" ? -1 : b === "" ? 1 : a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+      a === "" ? -1 : b === "" ? 1 : compareNames(a, b)
     );
   } else {
     keys.sort((a, b) => KIND_ORDER.indexOf(a as NoteKind) - KIND_ORDER.indexOf(b as NoteKind));

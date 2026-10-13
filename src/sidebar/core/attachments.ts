@@ -1,4 +1,5 @@
 import { inFolder, NoteSummary } from "./types";
+import { compareNames } from "./queries";
 import type { SortKey } from "./queries";
 
 /** A non-note file, as the Attachments place shows it. */
@@ -52,7 +53,7 @@ export function attachmentsFor(
     return terms.every((term) => text.includes(term));
   });
   const byName = (a: AttachmentFile, b: AttachmentFile) =>
-    a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+    compareNames(a.name, b.name);
   return matches.sort((a, b) => {
     if (sort === "title") return byName(a, b);
     const key = sort === "created" ? "ctime" : "mtime";

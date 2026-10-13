@@ -35,6 +35,7 @@ import {
   taskRows,
   TreeRow,
   visibleRows,
+  compareNames,
 } from "./core/queries";
 import {
   AttachmentFile,
@@ -111,7 +112,6 @@ export class SidebarView extends ItemView {
   private place: Place = { kind: "notes" };
   private sort: SortKey = "modified";
   private search = "";
-  private taskFilter: TaskFilter = "open";
   /** Tasks page: only this note's tasks, or all notes when null. */
   private taskNoteFilter: string | null = null;
   /** Mobile shows one column at a time. */
@@ -130,6 +130,12 @@ export class SidebarView extends ItemView {
   private taskRowEls = new Map<string, HTMLElement>();
   private activeTaskEl: HTMLElement | null = null;
   private unsubscribe: (() => void) | null = null;
+  /** Whether the list has been drawn since the running fill began. */
+  private drawnWhileLoading = false;
+  /** A mouse button or finger is down inside the sidebar. */
+  private pointerHeld = false;
+  /** A render came due while the pointer was held; run it on release. */
+  private renderWaiting = false;
   private unsubscribeBookmarks: (() => void) | null = null;
   private watchedBookmarks: unknown = null;
 
@@ -175,7 +181,20 @@ export class SidebarView extends ItemView {
 
     this.makeResizable(divider);
     this.watchListWidth();
-    this.unsubscribe = this.plugin.index.subscribe(() => this.queueRender());
+    this.unsubscribe = this.plugin.index.subscribe(() => this.onIndexChange());
+    // Rebuilding the DOM between pointerdown and pointerup would swallow the
+    // click; renders that come due meanwhile wait for the release.
+    this.registerDomEvent(this.contentEl, "pointerdown", () => (this.pointerHeld = true));
+    const release = () => {
+      this.pointerHeld = false;
+      if (this.renderWaiting) {
+        this.renderWaiting = false;
+        this.queueRender();
+      }
+    };
+    this.registerDomEvent(window, "pointerup", release);
+    this.registerDomEvent(window, "pointercancel", release);
+    this.registerDomEvent(window, "blur", release);
     this.watchBookmarks();
     this.registerEvent(this.app.workspace.on("file-open", () => this.markActive()));
     // The index tracks .md only; everything else (attachments, and bookmarked
@@ -204,8 +223,35 @@ export class SidebarView extends ItemView {
     if (this.renderTimer !== null) return;
     this.renderTimer = window.setTimeout(() => {
       this.renderTimer = null;
-      this.render();
+      if (this.pointerHeld) this.renderWaiting = true;
+      else this.render();
     }, 150);
+  }
+
+  /**
+   * While the index fills, a full render per batch would redo work
+   * proportional to the whole vault every 150 ms. Draw the list once the
+   * first batch is in (the most recent notes), then only move the progress
+   * bar, and draw everything once more when the fill ends.
+   */
+  private onIndexChange(): void {
+    const loading = this.plugin.index.loading;
+    if (!loading) {
+      this.drawnWhileLoading = false;
+      this.queueRender();
+    } else if (!this.drawnWhileLoading && this.plugin.index.size > 0) {
+      this.drawnWhileLoading = true;
+      this.queueRender();
+    } else {
+      const bar = this.headerEl.querySelector<HTMLElement>(".ps-loading");
+      if (bar) this.showProgress(bar, loading);
+      else this.queueRender(); // nothing drawn yet: cheap, the index is still empty
+    }
+  }
+
+  private showProgress(bar: HTMLElement, loading: { done: number; total: number }): void {
+    bar.setAttr("aria-label", `Reading notes: ${loading.done.toLocaleString()} of ${loading.total.toLocaleString()}`);
+    bar.setCssProps({ "--ps-progress": `${Math.round((loading.done / Math.max(loading.total, 1)) * 100)}%` });
   }
 
   /**
@@ -730,7 +776,7 @@ export class SidebarView extends ItemView {
     const folders = this.plugin.indexer
       .folders()
       .filter((f) => !isAttachmentFolder(f) && !(templates && (f === templates || f.startsWith(`${templates}/`))))
-      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true }));
+      .sort(compareNames);
     const parent = parentFolder ?? (this.place.kind === "notebook" ? this.place.folder : "");
     new NotebookModal(this.app, folders, parent, (path) => {
       void this.app.vault.createFolder(path).then(
@@ -984,9 +1030,7 @@ export class SidebarView extends ItemView {
     // While notes are still being read, counts are still growing: say so.
     const loading = this.plugin.index.loading;
     if (loading && loading.total > 0) {
-      const label = `Reading notes: ${loading.done.toLocaleString()} of ${loading.total.toLocaleString()}`;
-      const bar = this.headerEl.createDiv({ cls: "ps-loading", attr: { "aria-label": label, role: "progressbar" } });
-      bar.setCssProps({ "--ps-progress": `${Math.round((loading.done / loading.total) * 100)}%` });
+      this.showProgress(this.headerEl.createDiv({ cls: "ps-loading", attr: { role: "progressbar" } }), loading);
     }
     const actions = row.createDiv("ps-actions");
 
@@ -1398,7 +1442,7 @@ export class SidebarView extends ItemView {
     const grouping: TaskGrouping = this.plugin.viewState.state.taskGroupBy;
     const all = taskRows(
       this.partition().notes,
-      this.taskFilter,
+      this.plugin.viewState.state.taskFilter,
       today,
       templateOptions(this.app).folder,
       // Grouping by board is an explicit ask for board cards.
@@ -1434,9 +1478,9 @@ export class SidebarView extends ItemView {
       const tab = this.filtersEl.createDiv({ cls: "ps-filter" });
       tab.createSpan({ text: label });
       tab.createSpan({ cls: "ps-filter-count", text: String(countFor(key)) });
-      tab.toggleClass("is-active", this.taskFilter === key);
+      tab.toggleClass("is-active", this.plugin.viewState.state.taskFilter === key);
       tab.addEventListener("click", () => {
-        this.taskFilter = key;
+        this.plugin.viewState.update({ taskFilter: key });
         this.resetScroll();
         this.renderList();
       });
