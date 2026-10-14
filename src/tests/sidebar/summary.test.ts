@@ -136,6 +136,34 @@ describe("Kanban boards", () => {
 
   test("an ordinary note is a note", () => {
     expect(summarize(facts(), "## Todo\n- a").kind).toBe("note");
+    expect(summarize(facts(), "## Todo\n- a").taskListBoard).toBe(false);
+  });
+});
+
+describe("Task List Kanban boards", () => {
+  // The plugin stores its settings as a JSON string (or an empty mapping) in
+  // a kanban_plugin property; the board shows tasks from other notes.
+  test("a note with a kanban_plugin property is a board without cards of its own", () => {
+    const s = summarize(facts({ frontmatter: { kanban_plugin: '{"openSourceFileOpenMode":"all"}' } }), "");
+    expect(s.kind).toBe("board");
+    expect(s.taskListBoard).toBe(true);
+    expect(s.columns).toEqual([]);
+    expect(s.items).toBe(0);
+  });
+
+  test("an empty mapping counts too, as it does for the plugin", () => {
+    expect(summarize(facts({ frontmatter: { kanban_plugin: {} } }), "").taskListBoard).toBe(true);
+    expect(summarize(facts({ frontmatter: { kanban_plugin: "" } }), "").kind).toBe("note");
+  });
+
+  test("task lines in its file are ordinary tasks, not lane cards", () => {
+    const s = summarize(facts({ frontmatter: { kanban_plugin: "{}" } }), "## Later\n- [ ] Call the bank\n");
+    expect(s.tasks.map((t) => t.text)).toEqual(["Call the bank"]);
+    expect(s.columns).toEqual([]);
+  });
+
+  test("a Kanban plugin board is not a Task List Kanban board", () => {
+    expect(summarize(facts({ frontmatter: { "kanban-plugin": "board" } }), BOARD).taskListBoard).toBe(false);
   });
 });
 

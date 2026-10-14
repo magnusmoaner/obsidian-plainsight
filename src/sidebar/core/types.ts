@@ -15,10 +15,12 @@ export interface TaskItem {
 }
 
 /**
- * What a sidebar item is. Boards (Kanban plugin) are Markdown notes with a
- * `kanban-plugin` property; canvases are JSON. Only plain notes take the
- * sidebar's text edits (pin, tags, task toggles): writing a frontmatter
- * line or a task line into a canvas's JSON would corrupt it.
+ * What a sidebar item is. Boards are Markdown notes: a Kanban plugin board
+ * (a `kanban-plugin` property; its lists and cards are in the file) or a
+ * Task List Kanban board (a `kanban_plugin` property; it shows tasks from
+ * other notes). Canvases are JSON. Only plain notes take the sidebar's text
+ * edits (pin, tags, task toggles): writing a frontmatter line or a task line
+ * into a canvas's JSON would corrupt it.
  */
 export type NoteKind = "note" | "board" | "canvas";
 
@@ -26,9 +28,9 @@ export type NoteKind = "note" | "board" | "canvas";
 export interface NoteSummary {
   path: string;
   kind: NoteKind;
-  /** Boards: column (lane) names. Empty for other kinds. */
+  /** Kanban plugin boards: column (lane) names. Empty otherwise. */
   columns: string[];
-  /** Boards: number of cards; canvases: number of nodes. 0 otherwise. */
+  /** Kanban plugin boards: number of cards; canvases: number of nodes. 0 otherwise. */
   items: number;
   title: string;
   /** Parent folder path; "" for the vault root. */
@@ -57,6 +59,18 @@ export interface NoteSummary {
    * looks like a file link until it's resolved.
    */
   sourceLinks: string[];
+  /**
+   * A Task List Kanban board: kind "board", but it holds no lists or cards
+   * of its own (it shows tasks gathered from other notes, by rules kept in
+   * that plugin's settings), so it has no columns or card count here, and a
+   * task line in its file is an ordinary task.
+   */
+  taskListBoard: boolean;
+}
+
+/** A Kanban plugin board, whose checkbox lines are cards in its lists. */
+export function holdsCards(note: NoteSummary): boolean {
+  return note.kind === "board" && !note.taskListBoard;
 }
 
 /** Done or cancelled — no longer an open task. */

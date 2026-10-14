@@ -1,4 +1,4 @@
-import { App, normalizePath } from "obsidian";
+import { App, normalizePath, TFolder } from "obsidian";
 
 /**
  * Undocumented Obsidian and plugin APIs, isolated so they're easy to audit.
@@ -202,4 +202,26 @@ export function tasksToggle(app: App, line: string, path: string): string | null
     | undefined;
   if (typeof api?.executeToggleTaskDoneCommand !== "function") return null;
   return api.executeToggleTaskDoneCommand(line, path);
+}
+
+/** Registered only while the Kanban plugin is enabled. */
+export const KANBAN_NEW_BOARD = "obsidian-kanban:create-new-kanban-board";
+/** Registered only while the Task List Kanban plugin is enabled. */
+export const TASK_LIST_KANBAN_NEW_BOARD = "task-list-kanban:create-new-kanban-board";
+
+/**
+ * Create a Kanban plugin board in `folder` (null = Obsidian's default
+ * location) and open it, through the plugin's own newKanban(folder), which
+ * its folder menu uses. Without that method, run its command, which uses
+ * the default location.
+ */
+export async function newKanbanBoard(app: App, folder: string | null): Promise<void> {
+  const plugins = (app as unknown as { plugins?: { getPlugin?(id: string): unknown } }).plugins;
+  const kanban = plugins?.getPlugin?.("obsidian-kanban") as { newKanban?(folder?: TFolder): Promise<void> } | null;
+  const target = folder ? app.vault.getAbstractFileByPath(folder) : null;
+  if (typeof kanban?.newKanban === "function") {
+    await kanban.newKanban(target instanceof TFolder ? target : undefined);
+  } else {
+    runCommand(app, KANBAN_NEW_BOARD);
+  }
 }
