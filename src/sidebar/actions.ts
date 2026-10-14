@@ -100,6 +100,32 @@ export async function createCanvas(app: App, folder: string | null): Promise<voi
   await openFile(app, file, false);
 }
 
+/**
+ * Create a Task List Kanban board in `folder` (null = Obsidian's default
+ * location) and open it, as that plugin's own "New kanban" folder action
+ * does: a note holding only an empty kanban_plugin property. The plugin
+ * shows such a note as a board when it becomes the active tab, so wait
+ * (briefly) until Obsidian has read the property, then open it active.
+ */
+export async function createTaskListBoard(app: App, folder: string | null): Promise<void> {
+  const parent = folder ?? app.fileManager.getNewFileParent("").path;
+  const path = availablePath(app, parent === "/" ? "" : parent, "Untitled Task List Kanban");
+  const file = await app.vault.create(path, "---\nkanban_plugin: {}\n---\n");
+  await new Promise<void>((resolve) => {
+    if (app.metadataCache.getFileCache(file)?.frontmatter) return resolve();
+    const done = () => {
+      app.metadataCache.offref(ref);
+      window.clearTimeout(timer);
+      resolve();
+    };
+    const ref = app.metadataCache.on("changed", (changed) => {
+      if (changed.path === file.path) done();
+    });
+    const timer = window.setTimeout(done, 1500);
+  });
+  await app.workspace.getLeaf(false).openFile(file, { active: true });
+}
+
 /** Create a note in `folder` (null = Obsidian's default location) and open it. */
 export async function createNote(app: App, folder: string | null, template?: TFile): Promise<void> {
   const parent = folder ?? app.fileManager.getNewFileParent("").path;

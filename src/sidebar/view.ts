@@ -51,6 +51,7 @@ import {
   addTaskLine,
   createCanvas,
   createNote,
+  createTaskListBoard,
   openFile,
   toggleTask,
   togglePin,
@@ -72,9 +73,12 @@ import {
   openGlobalSearch,
   openSettingsTab,
   hasCommand,
+  KANBAN_NEW_BOARD,
+  newKanbanBoard,
   readBookmarks,
   removeBookmark,
   runCommand,
+  TASK_LIST_KANBAN_NEW_BOARD,
   tasksLineOptions,
   tasksCreateModal,
   templateOptions,
@@ -84,7 +88,6 @@ export const SIDEBAR_VIEW = "plainsight-sidebar";
 
 // Commands the More menu runs, as registered by Obsidian or the plugins.
 // Items whose command isn't registered (plugin off or missing) are hidden.
-const KANBAN_NEW = "obsidian-kanban:create-new-kanban-board";
 const IMPORTER = "obsidian-importer:open-modal";
 const INSERT_TEMPLATE = "templates:insert-template";
 const NAV_COMMANDS: Array<[string, string, string]> = [
@@ -480,6 +483,28 @@ export class SidebarView extends ItemView {
     button.addEventListener("click", onClick);
   }
 
+  /**
+   * Ways to create a board, for each board plugin that's enabled (its create
+   * command is registered only then). Boards go in the folder being viewed.
+   */
+  private boardMakers(): Array<{ label: string; icon: string; make: () => void }> {
+    const folder = this.currentFolder();
+    const run = (make: () => Promise<void>) => () =>
+      void make().catch((err: Error) => new Notice(`Couldn't create the board: ${err.message}`));
+    const makers: Array<{ label: string; icon: string; make: () => void }> = [];
+    if (hasCommand(this.app, KANBAN_NEW_BOARD)) {
+      makers.push({ label: "New Kanban board", icon: "kanban", make: run(() => newKanbanBoard(this.app, folder)) });
+    }
+    if (hasCommand(this.app, TASK_LIST_KANBAN_NEW_BOARD)) {
+      makers.push({
+        label: "New Task List Kanban board",
+        icon: "square-kanban",
+        make: run(() => createTaskListBoard(this.app, folder)),
+      });
+    }
+    return makers;
+  }
+
   private moreMenu(evt: MouseEvent, tags: string[]): void {
     const menu = new Menu();
     const folder = this.currentFolder();
@@ -492,10 +517,8 @@ export class SidebarView extends ItemView {
         .setIcon("layout-dashboard")
         .onClick(() => void createCanvas(this.app, folder))
     );
-    if (hasCommand(this.app, KANBAN_NEW)) {
-      menu.addItem((i) =>
-        i.setTitle("New Kanban board").setIcon("kanban").onClick(() => runCommand(this.app, KANBAN_NEW))
-      );
+    for (const board of this.boardMakers()) {
+      menu.addItem((i) => i.setTitle(board.label).setIcon(board.icon).onClick(() => board.make()));
     }
     if (hasCommand(this.app, INSERT_TEMPLATE)) {
       menu.addItem((i) =>
@@ -1037,6 +1060,21 @@ export class SidebarView extends ItemView {
     const add = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "New note" } });
     setIcon(add, "file-plus-2");
     add.addEventListener("click", () => void createNote(this.app, this.currentFolder()));
+
+    // New board: only for board plugins that are enabled. With one, a click
+    // creates that kind; with both, it asks which.
+    const boards = this.boardMakers();
+    if (boards.length) {
+      const label = boards.length === 1 ? boards[0].label : "New board";
+      const board = actions.createDiv({ cls: "ps-action", attr: { "aria-label": label } });
+      setIcon(board, "kanban");
+      board.addEventListener("click", (evt) => {
+        if (boards.length === 1) return boards[0].make();
+        const menu = new Menu();
+        for (const b of boards) menu.addItem((i) => i.setTitle(b.label).setIcon(b.icon).onClick(() => b.make()));
+        menu.showAtMouseEvent(evt);
+      });
+    }
 
     if (this.place.kind === "tasks") {
       const task = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "New task" } });
