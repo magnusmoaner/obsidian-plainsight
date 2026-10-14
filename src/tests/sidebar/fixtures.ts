@@ -20,6 +20,7 @@ export function note(path: string, over: Partial<NoteSummary> = {}): NoteSummary
     searchText: path.toLowerCase(),
     extracted: false,
     sourceLinks: [],
+    taskListBoard: false,
     ...over,
   };
 }

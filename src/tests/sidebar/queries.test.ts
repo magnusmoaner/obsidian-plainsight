@@ -176,6 +176,11 @@ describe("taskRows", () => {
     expect(keys(taskRows([...list, board], "open", "2026-10-07", null, true))).toContain("Board.md:0");
   });
 
+  test("tasks written in a Task List Kanban board's own file are ordinary tasks", () => {
+    const board = note("Tasks board.md", { kind: "board", taskListBoard: true, tasks: [t(0, " ")] });
+    expect(keys(taskRows([...list, board], "open", "2026-10-07"))).toContain("Tasks board.md:0");
+  });
+
   test("tasks inside the templates folder are excluded", () => {
     const withTemplate = [...list, note("Templates/t.md", { tasks: [t(0, " ")] })];
     expect(keys(taskRows(withTemplate, "open", "2026-10-07", "Templates"))).toEqual([
@@ -313,6 +318,14 @@ describe("groupTaskRows", () => {
       row("Note.md", null, "Todo"),
     ];
     expect(labels(groupTaskRows(rows, "board", today))).toEqual(["Proj › Todo:2", "Proj › Doing:1"]);
+  });
+
+  test("a Task List Kanban board has no lanes of its own, so its tasks aren't board cards", () => {
+    const rows = [
+      { ...row("Tasks board.md", null, "Later", "board"), note: note("Tasks board.md", { kind: "board", taskListBoard: true }) },
+      row("Proj.md", null, "Todo", "board", { columns: ["Todo"] }),
+    ];
+    expect(labels(groupTaskRows(rows, "board", today))).toEqual(["Proj › Todo:1"]);
   });
 
   test("boards come alphabetically, whatever the due-date order of their cards", () => {

@@ -44,7 +44,7 @@ import {
   formatSize,
 } from "./core/attachments";
 import { taskDisplayText, taskTextColumn } from "./core/tasks";
-import { isClosed, NoteSummary, renamedPath } from "./core/types";
+import { holdsCards, isClosed, NoteSummary, renamedPath } from "./core/types";
 import { NAV_WIDTH } from "./core/view-state";
 import {
   addTagToNote,
@@ -1113,7 +1113,13 @@ export class SidebarView extends ItemView {
     const time = this.sort === "created" ? note.ctime : note.mtime;
     meta.createSpan({ cls: "ps-card-date", text: cardDate(time) });
     const { closed, total } = taskProgress(note);
-    if (note.kind !== "note") {
+    if (note.taskListBoard) {
+      // Its cards are tasks from other notes, chosen by that plugin's rules:
+      // name the kind of board rather than guess a count.
+      const chip = meta.createSpan("ps-card-tasks ps-card-items");
+      setIcon(chip.createSpan(), "list-checks");
+      chip.createSpan({ text: "Task List Kanban" });
+    } else if (note.kind !== "note") {
       // Boards: card count (their checkboxes are cards, not progress);
       // canvases: how many boxes they hold.
       const label = note.kind === "board" ? "card" : "box";
@@ -1472,7 +1478,7 @@ export class SidebarView extends ItemView {
       const rowsFor = taskRows(notes, filter, today, templates, withBoards);
       const note = this.taskNoteFilter && rowsFor.some((r) => r.note.path === this.taskNoteFilter) ? this.taskNoteFilter : null;
       const visible = filterTaskRows(rowsFor, this.search, note);
-      return grouping === "board" ? visible.filter((r) => r.note.kind === "board").length : visible.length;
+      return grouping === "board" ? visible.filter((r) => holdsCards(r.note)).length : visible.length;
     };
     for (const [key, label] of filters) {
       const tab = this.filtersEl.createDiv({ cls: "ps-filter" });

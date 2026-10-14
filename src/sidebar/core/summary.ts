@@ -99,9 +99,12 @@ export function summarize(facts: FileFacts, text: string): NoteSummary {
   const pinned = facts.frontmatter?.pinned;
   const extracted = facts.frontmatter?.type === "extracted-text";
   const board = facts.frontmatter?.["kanban-plugin"] !== undefined ? parseBoard(text) : null;
+  // Task List Kanban's own test: any truthy kanban_plugin value (its
+  // settings, a JSON string, or an empty mapping for a new board).
+  const taskListBoard = !board && Boolean(facts.frontmatter?.kanban_plugin);
   return {
     path: facts.path,
-    kind: board ? "board" : "note",
+    kind: board || taskListBoard ? "board" : "note",
     columns: board?.columns ?? [],
     items: board?.cards ?? 0,
     title: facts.basename,
@@ -119,6 +122,7 @@ export function summarize(facts: FileFacts, text: string): NoteSummary {
     searchText: `${facts.basename} ${tags.join(" ")} ${text.slice(0, SEARCH_CAP)}`.toLowerCase(),
     extracted,
     sourceLinks: extracted ? fileLinks(text) : [],
+    taskListBoard,
   };
 }
 
@@ -157,5 +161,6 @@ export function summarizeCanvas(facts: FileFacts, json: string): NoteSummary {
     searchText: `${facts.basename} ${body.slice(0, SEARCH_CAP)}`.toLowerCase(),
     extracted: false,
     sourceLinks: [],
+    taskListBoard: false,
   };
 }

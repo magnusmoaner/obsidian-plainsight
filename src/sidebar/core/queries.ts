@@ -1,4 +1,4 @@
-import { inFolder, isClosed, NoteKind, NoteSummary, TaskItem } from "./types";
+import { holdsCards, inFolder, isClosed, NoteKind, NoteSummary, TaskItem } from "./types";
 
 export type Place =
   | { kind: "notes" }
@@ -225,7 +225,7 @@ export function taskRows(
 ): TaskRow[] {
   const rows = notes
     .filter((note) => templatesFolder === null || !inFolder(note.folder, templatesFolder))
-    .filter((note) => includeBoardCards || note.kind !== "board")
+    .filter((note) => includeBoardCards || !holdsCards(note))
     .flatMap((note) => note.tasks.map((task) => ({ note, task })));
   const keep = rows.filter(({ task }) => {
     if (filter === "done") return isClosed(task);
@@ -386,7 +386,7 @@ export function groupTaskRows(rows: TaskRow[], by: TaskGrouping, today: string):
       add(note.folder, label, [note.folder === "" ? 0 : 1, label], row);
     } else if (by === "note") {
       add(note.path, note.title, [seen++], row);
-    } else if (note.kind === "board") {
+    } else if (holdsCards(note)) {
       const lane = task.section ? note.columns.indexOf(task.section) : -1;
       const label = task.section ? `${note.title} › ${task.section}` : note.title;
       add(`${note.path}\u0000${task.section ?? ""}`, label, [note.title, note.path, lane === -1 ? 1e9 : lane], row);
