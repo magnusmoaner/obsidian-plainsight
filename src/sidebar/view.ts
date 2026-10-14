@@ -1057,9 +1057,17 @@ export class SidebarView extends ItemView {
     }
     const actions = row.createDiv("ps-actions");
 
-    const add = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "New note" } });
-    setIcon(add, "file-plus-2");
-    add.addEventListener("click", () => void createNote(this.app, this.currentFolder()));
+    // The first button creates what this place lists: a task on Tasks, a
+    // note everywhere else.
+    if (this.place.kind === "tasks") {
+      const task = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "New task" } });
+      setIcon(task, "list-checks");
+      task.addEventListener("click", () => void this.newTask());
+    } else {
+      const add = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "New note" } });
+      setIcon(add, "file-plus-2");
+      add.addEventListener("click", () => void createNote(this.app, this.currentFolder()));
+    }
 
     // New board: only for board plugins that are enabled. With one, a click
     // creates that kind; with both, it asks which.
@@ -1077,9 +1085,6 @@ export class SidebarView extends ItemView {
     }
 
     if (this.place.kind === "tasks") {
-      const task = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "New task" } });
-      setIcon(task, "list-checks");
-      task.addEventListener("click", () => void this.newTask());
       const group = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "Group by" } });
       setIcon(group, "group");
       group.addEventListener("click", (evt) => this.groupMenu(evt));
