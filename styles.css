@@ -364,20 +364,13 @@
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
-/* Touch screens have no hover: keep the chevron and "+" visible there. */
+/* Touch screens have no hover: keep the fold chevron visible there. */
 @media (hover: none) {
   .ps-fold-slot .ps-fold-icon {
     opacity: 0;
   }
   .ps-fold-slot .ps-nav-chevron {
     opacity: 1;
-  }
-  .ps-nav-add {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  .ps-nav-count:has(~ .ps-nav-add) {
-    opacity: 0;
   }
 }
 /* The count fades out where the "+" fades in, keeping its width. */
@@ -386,6 +379,17 @@
 }
 .ps-nav-item:hover .ps-nav-count:has(~ .ps-nav-add) {
   opacity: 0;
+}
+/* …and leave the hover "+" out, so counts always show: the Note pill, the ⋯
+   menu and the list header create things there. (After the rule above, as
+   a tap can leave :hover stuck on.) */
+@media (hover: none) {
+  .ps-nav-add {
+    display: none;
+  }
+  .ps-nav-item:hover .ps-nav-count:has(~ .ps-nav-add) {
+    opacity: 1;
+  }
 }
 /* While the notes index fills in at startup: a thin bar under the list header. */
 .ps-loading {
