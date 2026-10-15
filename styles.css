@@ -1149,11 +1149,15 @@
 }
 
 /* ---------- Search everywhere ---------- */
-/* On a phone, set in code to the room above the keyboard. Desktop keeps
-   Obsidian's own limit. */
-.is-mobile .ps-search-modal .prompt-results {
-  max-height: var(--ps-search-room, none);
-  overflow-y: auto;
+/* Phones and tablets: Obsidian draws the on-screen keyboard over the app
+   and reports its height as --keyboard-height (0 when it's closed). Shrink
+   the search window to end above it, so the input (at the bottom on phones)
+   and every result can be seen. */
+.is-phone .prompt.ps-search-modal {
+  height: calc(100vh - var(--prompt-top) - var(--keyboard-height, 0px));
+}
+.is-mobile .prompt.ps-search-modal {
+  max-height: calc(100vh - var(--prompt-top, var(--size-4-8)) - var(--keyboard-height, 0px));
 }
 /* Group headings: their own lines between the results, not selectable. */
 .ps-search-modal .ps-search-group {
