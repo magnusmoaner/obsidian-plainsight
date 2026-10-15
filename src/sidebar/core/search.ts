@@ -255,6 +255,23 @@ export function matchAttachment(file: AttachmentFile, extracted: string, q: Sear
   return textMatches(`${name} ${extracted}`, q);
 }
 
+/** The query without its words, phrases and exclusions: what's left to
+ * check on results another engine (Omnisearch) found by their text. */
+export function filtersOnly(q: SearchQuery): SearchQuery {
+  const rest = { ...q, words: [], phrases: [], excludes: [] };
+  rest.empty =
+    !rest.tags.length &&
+    !rest.excludeTags.length &&
+    !rest.paths.length &&
+    !rest.excludePaths.length &&
+    !rest.files.length &&
+    !rest.is.length &&
+    !rest.due &&
+    !rest.scheduled &&
+    !rest.priority;
+  return rest;
+}
+
 // ---------- ranking (Search everywhere) ----------
 
 const searchTerms = (q: SearchQuery) => [...q.phrases, ...q.words];
@@ -349,6 +366,64 @@ export function toObsidianQuery(q: SearchQuery): string {
     ...q.excludePaths.map((p) => `-path:${quote(p)}`),
     ...q.files.map((f) => `file:${quote(f)}`),
   ].join(" ");
+}
+
+/** Words, phrases and exclusions, in the syntax Omnisearch understands. */
+export function toOmnisearchQuery(q: SearchQuery): string {
+  return [...q.words, ...q.phrases.map((p) => `"${p}"`), ...q.excludes.map((e) => `-${quote(e)}`)].join(" ");
+}
+
+/**
+ * The query as a Tasks plugin query block, in the wording its documentation
+ * uses ("not done", "due before today", "priority is high", "tags include
+ * #x", "description includes x", …), so a search can be saved in a note.
+ * What Tasks can't express is noted in comment lines rather than dropped
+ * silently.
+ */
+export function toTasksQuery(q: SearchQuery, input: string): string {
+  const lines: string[] = [`# From Plainsight search: ${input.trim()}`];
+  const kinds = q.is.filter((i) => i === "note" || i === "board" || i === "canvas" || i === "pinned");
+  if (kinds.length) lines.push(`# Tasks has no filter for: ${kinds.map((k) => `is:${k}`).join(" ")}`);
+  if (q.is.includes("done")) lines.push("done");
+  else if (q.is.includes("open") || q.is.includes("overdue")) lines.push("not done");
+  if (q.is.includes("overdue")) lines.push("due before today");
+  if (q.is.includes("recurring")) lines.push("is recurring");
+  const dates = (field: "due" | "scheduled", filter: DateFilter | null) => {
+    if (!filter) return;
+    switch (filter.kind) {
+      case "today":
+      case "tomorrow":
+        lines.push(`${field} on ${filter.kind}`);
+        return;
+      case "week":
+        lines.push(`# ${field}:week means the next 7 days`, `${field} on or after today`, `${field} on or before in 7 days`);
+        return;
+      case "overdue":
+        lines.push("not done", `${field} before today`);
+        return;
+      case "none":
+        lines.push(`no ${field} date`);
+        return;
+      case "any":
+        lines.push(`has ${field} date`);
+        return;
+      default:
+        lines.push(`${field} ${filter.kind} ${filter.date}`);
+    }
+  };
+  dates("due", q.due);
+  dates("scheduled", q.scheduled);
+  if (q.priority) lines.push(`priority is ${q.priority === "normal" ? "none" : q.priority}`);
+  lines.push(
+    ...q.tags.map((t) => `tags include #${t}`),
+    ...q.excludeTags.map((t) => `tags do not include #${t}`),
+    ...q.paths.map((p) => `path includes ${p}`),
+    ...q.excludePaths.map((p) => `path does not include ${p}`),
+    ...q.files.map((f) => `filename includes ${f}`),
+    ...[...q.words, ...q.phrases].map((w) => `description includes ${w}`),
+    ...q.excludes.map((e) => `description does not include ${e}`)
+  );
+  return ["```tasks", ...new Set(lines), "```"].join("\n");
 }
 
 const FRONTMATTER = /^﻿?---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;

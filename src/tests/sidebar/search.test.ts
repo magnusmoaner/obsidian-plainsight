@@ -8,6 +8,8 @@ import {
   rankNotes,
   rankTasks,
   toObsidianQuery,
+  toOmnisearchQuery,
+  toTasksQuery,
 } from "../../sidebar/core/search";
 import { TaskItem } from "../../sidebar/core/types";
 import { note } from "./fixtures";
@@ -159,3 +161,59 @@ describe("excerpt", () => {
     expect(excerpt("nothing here", parseQuery("#tag"))).toBeNull();
   });
 });
+
+describe("toTasksQuery", () => {
+  test("a Tasks code block in the plugin's documented wording", () => {
+    const input = 'bank "monthly fee" -loan #work -#home path:Inbox file:plan is:overdue priority:high';
+    expect(toTasksQuery(parseQuery(input), input)).toBe(
+      [
+        "```tasks",
+        `# From Plainsight search: ${input}`,
+        "not done",
+        "due before today",
+        "priority is high",
+        "tags include #work",
+        "tags do not include #home",
+        "path includes inbox",
+        "filename includes plan",
+        "description includes bank",
+        "description includes monthly fee",
+        "description does not include loan",
+        "```",
+      ].join("\n")
+    );
+  });
+
+  test("date values", () => {
+    const lines = (input: string) => toTasksQuery(parseQuery(input), input).split("\n").slice(2, -1);
+    expect(lines("due:today")).toEqual(["due on today"]);
+    expect(lines("due:tomorrow")).toEqual(["due on tomorrow"]);
+    expect(lines("due:none")).toEqual(["no due date"]);
+    expect(lines("due:any")).toEqual(["has due date"]);
+    expect(lines("due:<2026-11-01")).toEqual(["due before 2026-11-01"]);
+    expect(lines("scheduled:>2026-11-01")).toEqual(["scheduled after 2026-11-01"]);
+    expect(lines("scheduled:2026-11-01")).toEqual(["scheduled on 2026-11-01"]);
+    expect(lines("priority:normal is:recurring is:done")).toEqual(["done", "is recurring", "priority is none"]);
+  });
+
+  test("the next 7 days, which Tasks has no documented filter for, says how it's written", () => {
+    expect(toTasksQuery(parseQuery("due:week"), "due:week").split("\n").slice(2, -1)).toEqual([
+      "# due:week means the next 7 days",
+      "due on or after today",
+      "due on or before in 7 days",
+    ]);
+  });
+
+  test("note kinds have no Tasks equivalent and are noted, not dropped silently", () => {
+    expect(toTasksQuery(parseQuery("is:board"), "is:board").split("\n").slice(2, -1)).toEqual([
+      "# Tasks has no filter for: is:board",
+    ]);
+  });
+});
+
+describe("toOmnisearchQuery", () => {
+  test("words, phrases and exclusions", () => {
+    expect(toOmnisearchQuery(parseQuery('bank "monthly fee" -loan #work due:week'))).toBe('bank "monthly fee" -loan');
+  });
+});
+

@@ -3,15 +3,20 @@ import type { AttachmentFile } from "./core/attachments";
 import { formatSize } from "./core/attachments";
 import { cardDate, dueDateLabel, localISODate } from "./core/format";
 import type { TaskRow } from "./core/queries";
+import { omnisearch } from "./internals";
 import {
   excerpt,
+  filtersOnly,
   matchAttachment,
+  matchNote,
   nameScore,
   parseQuery,
   rankNotes,
   rankTasks,
   SearchQuery,
   toObsidianQuery,
+  toOmnisearchQuery,
+  toTasksQuery,
 } from "./core/search";
 import { taskDetails } from "./core/task-details";
 import { PRIORITIES } from "./core/task-line";
@@ -34,6 +39,10 @@ export interface SearchSource {
   /** Show a place in the sidebar with this text in its Filter. */
   showInList(list: "notes" | "tasks" | "attachments", filter: string): void;
   obsidianSearch(query: string): void;
+  /** Whether the Tasks plugin is enabled, so a query block would work. */
+  tasksAvailable(): boolean;
+  /** Put a Tasks query block into the note being edited. */
+  insertTasksQuery(block: string): void;
 }
 
 type Excerpt = ReturnType<typeof excerpt>;
@@ -45,6 +54,7 @@ type Item = { group?: string } & (
   | { kind: "tag"; tag: string }
   | { kind: "more"; list: "notes" | "tasks" | "attachments"; count: number }
   | { kind: "obsidian"; query: string }
+  | { kind: "tasks-query"; block: string }
 );
 
 const SHOWN = { notes: 8, tasks: 5, attachments: 5, places: 3 };
@@ -108,26 +118,45 @@ export class SearchModal extends SuggestModal<Item> {
     const rankedTasks = rankTasks(this.source.taskRows(), q, today);
     group("Tasks", rankedTasks.slice(0, SHOWN.tasks).map((row) => ({ kind: "task" as const, row })), rankedTasks.length, "tasks");
 
-    const rankedNotes = rankNotes(notes, q, today);
+    // With Omnisearch installed, its ranking (fuzzy, and covering PDFs and
+    // images through Text Extractor) orders the notes and attachments it
+    // finds; the query's other filters still apply, and Plainsight's own
+    // matches it missed follow.
+    const omni = await this.omnisearch(q);
+    const rest = filtersOnly(q);
+    const ours = rankNotes(notes, q, today);
+    const rankedNotes = omni
+      ? [
+          ...notes
+            .filter((n) => omni.rank.has(n.path) && matchNote(n, rest, today))
+            .sort((a, b) => omni.rank.get(a.path)! - omni.rank.get(b.path)!),
+          ...ours.filter((n) => !omni.rank.has(n.path)),
+        ]
+      : ours;
     const noteItems = await Promise.all(
       rankedNotes.slice(0, SHOWN.notes).map(async (note) => ({
         kind: "note" as const,
         note,
-        excerpt: await this.excerptOf(note.path, q),
+        excerpt: (await this.excerptOf(note.path, q)) ?? omni?.excerpt(note.path) ?? null,
       }))
     );
-    group("Notes", noteItems, rankedNotes.length, "notes");
+    group(omni ? "Notes, ranked by Omnisearch" : "Notes", noteItems, rankedNotes.length, "notes");
 
     const files = this.source
       .attachments()
-      .filter((a) => matchAttachment(a.file, a.extracted, q))
-      .map((a) => ({ ...a, score: nameScore(a.file.name.replace(/\.[^.]+$/, ""), q) + (a.extracted ? 1 : 0) }))
+      .filter((a) => (omni?.rank.has(a.file.path) && matchAttachment(a.file, a.extracted, rest)) || matchAttachment(a.file, a.extracted, q))
+      .map((a) => ({
+        ...a,
+        score: omni?.rank.has(a.file.path)
+          ? 1000 - omni.rank.get(a.file.path)!
+          : nameScore(a.file.name.replace(/\.[^.]+$/, ""), q) + (a.extracted ? 1 : 0),
+      }))
       .sort((a, b) => b.score - a.score || b.file.mtime - a.file.mtime);
     const fileItems = await Promise.all(
       files.slice(0, SHOWN.attachments).map(async (a) => ({
         kind: "attachment" as const,
         file: a.file,
-        excerpt: a.companion ? await this.excerptOf(a.companion, q) : null,
+        excerpt: (a.companion ? await this.excerptOf(a.companion, q) : null) ?? omni?.excerpt(a.file.path) ?? null,
       }))
     );
     group("Attachments", fileItems, files.length, "attachments");
@@ -150,9 +179,38 @@ export class SearchModal extends SuggestModal<Item> {
     places.sort((a, b) => nameScore(placeName(b), q) - nameScore(placeName(a), q));
     group("Folders and tags", places.slice(0, SHOWN.places), places.length);
 
+    // Elsewhere: Obsidian's own search, and the query saved as a Tasks block.
+    const elsewhere: Item[] = [];
     const obsidian = toObsidianQuery(q);
-    if (obsidian) items.push({ kind: "obsidian", query: obsidian, group: "Elsewhere" });
+    if (obsidian) elsewhere.push({ kind: "obsidian", query: obsidian });
+    if (this.source.tasksAvailable()) elsewhere.push({ kind: "tasks-query", block: toTasksQuery(q, input) });
+    elsewhere.forEach((item, i) => items.push(i === 0 ? { ...item, group: "Elsewhere" } : item));
     return items;
+  }
+
+  /** Omnisearch's results for the query's words, if it's installed: each
+   * path's rank, and its excerpt as plain text. */
+  private async omnisearch(
+    q: SearchQuery
+  ): Promise<{ rank: Map<string, number>; excerpt(path: string): Excerpt } | null> {
+    const api = omnisearch();
+    const text = toOmnisearchQuery(q);
+    if (!api || !q.words.length && !q.phrases.length) return null;
+    try {
+      const results = await api.search(text);
+      const rank = new Map(results.map((r, i) => [r.path, i]));
+      const excerpts = new Map(results.map((r) => [r.path, r.excerpt]));
+      return {
+        rank,
+        excerpt: (path) => {
+          const raw = excerpts.get(path);
+          const plain = raw ? raw.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim() : "";
+          return plain ? { text: plain, highlights: [] } : null;
+        },
+      };
+    } catch {
+      return null; // Omnisearch failed or isn't ready: Plainsight's own ranking stands
+    }
   }
 
   private async excerptOf(path: string, q: SearchQuery): Promise<Excerpt> {
@@ -233,6 +291,15 @@ export class SearchModal extends SuggestModal<Item> {
         body.createDiv({ cls: "ps-search-title", text: "Show in Obsidian search" });
         body.createDiv({ cls: "ps-search-meta", text: item.query });
         break;
+      case "tasks-query":
+        el.addClass("ps-search-more");
+        setIcon(icon, "list-checks");
+        body.createDiv({ cls: "ps-search-title", text: "Insert as Tasks query" });
+        body.createDiv({
+          cls: "ps-search-meta",
+          text: item.block.split("\n").filter((l) => l && !l.startsWith("```") && !l.startsWith("#")).join(" · "),
+        });
+        break;
     }
   }
 
@@ -253,6 +320,8 @@ export class SearchModal extends SuggestModal<Item> {
         return this.source.showInList(item.list, this.input);
       case "obsidian":
         return this.source.obsidianSearch(item.query);
+      case "tasks-query":
+        return this.source.insertTasksQuery(item.block);
     }
   }
 }

@@ -77,6 +77,7 @@ import {
   openGlobalSearch,
   openSettingsTab,
   hasCommand,
+  hasTasksPlugin,
   KANBAN_NEW_BOARD,
   newKanbanBoard,
   readBookmarks,
@@ -968,6 +969,29 @@ export class SidebarView extends ItemView {
       },
       obsidianSearch: (query) => {
         if (!openGlobalSearch(this.app, query)) new Notice("The core Search plugin is turned off.");
+      },
+      tasksAvailable: () => hasTasksPlugin(this.app),
+      // Into the note last edited, on lines of its own at the caret; with no
+      // note open, onto the clipboard instead.
+      insertTasksQuery: (block) => {
+        const leaf = this.app.workspace.getMostRecentLeaf();
+        const view = leaf?.view;
+        if (!(view instanceof MarkdownView)) {
+          void navigator.clipboard.writeText(block).then(
+            () => new Notice("No note is open, so the Tasks query was copied instead."),
+            () => new Notice("Open a note to insert the Tasks query into.")
+          );
+          return;
+        }
+        this.app.workspace.setActiveLeaf(view.leaf, { focus: true });
+        // After the caret's line if it has text, else on it; with a blank line
+        // between the block and any text above. One edit, so one undo.
+        const editor = view.editor;
+        const { line } = editor.getCursor();
+        const text = editor.getLine(line);
+        const above = text.trim() !== "" || (line > 0 && editor.getLine(line - 1).trim() !== "");
+        const at = { line, ch: text.trim() ? text.length : 0 };
+        editor.replaceRange(`${text.trim() ? "\n" : ""}${above ? "\n" : ""}${block}\n`, at);
       },
     };
   }
