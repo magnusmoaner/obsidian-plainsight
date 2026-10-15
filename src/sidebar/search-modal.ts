@@ -1,4 +1,4 @@
-import { App, Keymap, prepareSimpleSearch, renderMatches, setIcon, SuggestModal, TFile } from "obsidian";
+import { App, Keymap, Platform, prepareSimpleSearch, renderMatches, setIcon, SuggestModal, TFile } from "obsidian";
 import type { AttachmentFile } from "./core/attachments";
 import { formatSize } from "./core/attachments";
 import { cardDate, dueDateLabel, localISODate } from "./core/format";
@@ -68,6 +68,7 @@ const SHOWN = { notes: 8, tasks: 5, attachments: 5, places: 3 };
 export class SearchModal extends SuggestModal<Item> {
   private latest: Promise<Item[]> | null = null;
   private input = "";
+  private stopFitting: (() => void) | null = null;
 
   constructor(app: App, private source: SearchSource, initial = "") {
     super(app);
@@ -88,6 +89,33 @@ export class SearchModal extends SuggestModal<Item> {
       return false;
     });
     if (initial) this.inputEl.value = initial;
+  }
+
+  onOpen(): void {
+    super.onOpen();
+    // On a phone the on-screen keyboard covers the bottom of the screen;
+    // keep the results list within what's visible, so all of it scrolls into
+    // view. The visual viewport is the part the keyboard leaves.
+    const viewport = window.visualViewport;
+    if (!Platform.isMobile || !viewport) return;
+    const fit = () => {
+      const top = this.resultContainerEl.getBoundingClientRect().top;
+      const room = Math.max(120, viewport.offsetTop + viewport.height - top - 12);
+      this.resultContainerEl.setCssProps({ "--ps-search-room": `${Math.round(room)}px` });
+    };
+    viewport.addEventListener("resize", fit);
+    viewport.addEventListener("scroll", fit);
+    this.stopFitting = () => {
+      viewport.removeEventListener("resize", fit);
+      viewport.removeEventListener("scroll", fit);
+    };
+    fit();
+  }
+
+  onClose(): void {
+    super.onClose();
+    this.stopFitting?.();
+    this.stopFitting = null;
   }
 
   /** Results come from file reads (excerpts), so an older query can finish

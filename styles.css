@@ -1149,6 +1149,11 @@
 }
 
 /* ---------- Search everywhere ---------- */
+/* On a phone, set in code to the room above the keyboard. */
+.ps-search-modal .prompt-results {
+  max-height: var(--ps-search-room, none);
+  overflow-y: auto;
+}
 /* Group headings: their own lines between the results, not selectable. */
 .ps-search-modal .ps-search-group {
   padding: var(--size-4-3) var(--size-4-3) var(--size-4-1);
