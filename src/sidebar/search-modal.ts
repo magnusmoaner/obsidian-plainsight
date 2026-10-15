@@ -198,14 +198,29 @@ export class SearchModal extends SuggestModal<Item> {
     if (!api || !q.words.length && !q.phrases.length) return null;
     try {
       const results = await api.search(text);
+      // Nothing yet (it indexes in the background after startup): use
+      // Plainsight's own ranking rather than claim Omnisearch's.
+      if (!results.length) return null;
       const rank = new Map(results.map((r, i) => [r.path, i]));
-      const excerpts = new Map(results.map((r) => [r.path, r.excerpt]));
+      const found = new Map(results.map((r) => [r.path, r]));
       return {
         rank,
+        // Its excerpt is HTML; show it as text, highlighting the words it matched.
         excerpt: (path) => {
-          const raw = excerpts.get(path);
-          const plain = raw ? raw.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim() : "";
-          return plain ? { text: plain, highlights: [] } : null;
+          const result = found.get(path);
+          const plain = result?.excerpt
+            ? result.excerpt.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim()
+            : "";
+          if (!plain) return null;
+          const lower = plain.toLowerCase();
+          const highlights: Array<[number, number]> = [];
+          for (const word of result!.foundWords ?? []) {
+            const w = word.toLowerCase();
+            if (!w) continue;
+            for (let i = lower.indexOf(w); i !== -1; i = lower.indexOf(w, i + w.length)) highlights.push([i, i + w.length]);
+          }
+          highlights.sort((a, b) => a[0] - b[0]);
+          return { text: plain, highlights: highlights.filter((h, i) => i === 0 || h[0] >= highlights[i - 1][1]) };
         },
       };
     } catch {
