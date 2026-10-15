@@ -235,6 +235,18 @@
   border-color: var(--background-modifier-border-focus);
   color: var(--text-normal);
 }
+/* Search: tinted with the accent, standing out from the other round buttons
+   but quieter than the filled Note pill. */
+.ps-round-button.is-accent {
+  background: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.14);
+  border-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.45);
+  color: var(--text-accent);
+}
+.ps-round-button.is-accent:hover {
+  background: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.24);
+  border-color: var(--interactive-accent);
+  color: var(--text-accent-hover);
+}
 .ps-new-note {
   flex: 1 1 auto;
   min-width: 0;

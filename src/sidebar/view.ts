@@ -410,7 +410,7 @@ export class SidebarView extends ItemView {
     setIcon(newNote.createSpan("ps-nav-icon"), "file-plus-2");
     newNote.createSpan({ text: "Note" });
     newNote.addEventListener("click", () => void createNote(this.app, this.currentFolder()));
-    this.roundButton(actions, "search", "Search everywhere", () => this.openSearch());
+    this.roundButton(actions, "search", "Search everywhere", () => this.openSearch()).addClass("is-accent");
     this.roundButton(actions, "folder-plus", "New folder", () => this.newNotebook(isAttachmentFolder));
     this.roundButton(actions, "list-checks", "New task", () => void this.newTask());
     this.roundButton(actions, "more-horizontal", "More", (evt) =>
@@ -486,10 +486,11 @@ export class SidebarView extends ItemView {
     icon: string,
     label: string,
     onClick: (evt: MouseEvent) => void
-  ): void {
+  ): HTMLElement {
     const button = parent.createDiv({ cls: "ps-round-button", attr: { "aria-label": label } });
     setIcon(button, icon);
     button.addEventListener("click", onClick);
+    return button;
   }
 
   /**
