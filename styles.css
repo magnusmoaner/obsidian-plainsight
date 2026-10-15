@@ -1149,8 +1149,9 @@
 }
 
 /* ---------- Search everywhere ---------- */
-/* On a phone, set in code to the room above the keyboard. */
-.ps-search-modal .prompt-results {
+/* On a phone, set in code to the room above the keyboard. Desktop keeps
+   Obsidian's own limit. */
+.is-mobile .ps-search-modal .prompt-results {
   max-height: var(--ps-search-room, none);
   overflow-y: auto;
 }
