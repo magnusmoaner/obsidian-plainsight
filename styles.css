@@ -265,6 +265,10 @@
 .ps-new-note .ps-nav-icon {
   color: inherit;
 }
+/* The same hover as the Search button beside it. */
+.ps-new-note:hover {
+  background: var(--interactive-accent-hover);
+}
 .ps-nav-heading,
 .ps-nav-item {
   display: flex;
