@@ -4,6 +4,7 @@ import {
   MarkdownView,
   Menu,
   Notice,
+  PaneType,
   Platform,
   SearchComponent,
   setIcon,
@@ -48,6 +49,7 @@ import { PRIORITIES } from "./core/task-line";
 import { taskTextColumn } from "./core/tasks";
 import { holdsCards, isClosed, NoteSummary, renamedPath } from "./core/types";
 import { NAV_WIDTH } from "./core/view-state";
+import { SearchModal, SearchSource } from "./search-modal";
 import {
   addTagToNote,
   addTaskLine,
@@ -123,6 +125,7 @@ export class SidebarView extends ItemView {
   private mobilePane: "nav" | "list" = "nav";
 
   private navEl!: HTMLElement;
+  private filterInput!: SearchComponent;
   private headerEl!: HTMLElement;
   private filtersEl!: HTMLElement;
   private bodyEl!: HTMLElement;
@@ -174,8 +177,8 @@ export class SidebarView extends ItemView {
     // Obsidian's own SearchComponent: the same pill, magnifier and clear
     // button as its other search fields. Built once — re-creating it on
     // every render would steal focus mid-typing.
-    new SearchComponent(list.createDiv("ps-search"))
-      .setPlaceholder("Search")
+    this.filterInput = new SearchComponent(list.createDiv("ps-search"))
+      .setPlaceholder("Filter")
       .onChange((value) => {
         this.search = value;
         this.resetScroll();
@@ -398,8 +401,21 @@ export class SidebarView extends ItemView {
     const templates = templateOptions(this.app).folder;
     const unfiltered = this.queryOptions("");
 
-    // Evernote-style action row: the Note pill, then round icon buttons.
+    // Evernote-style top: Search, then the Note pill and round icon buttons.
     const actions = nav.createDiv("ps-nav-actions");
+    // Looks like a search field, opens Search everywhere.
+    const search = actions.createDiv({
+      cls: "ps-nav-search",
+      attr: { role: "button", tabindex: "0", "aria-label": "Search notes, tasks, attachments, folders and tags" },
+    });
+    setIcon(search.createSpan("ps-nav-search-icon"), "search");
+    search.createSpan({ text: "Search" });
+    search.addEventListener("click", () => this.openSearch());
+    search.addEventListener("keydown", (evt) => {
+      if (evt.key !== "Enter" && evt.key !== " ") return;
+      evt.preventDefault();
+      this.openSearch();
+    });
     const newNote = actions.createDiv("ps-new-note");
     setIcon(newNote.createSpan("ps-nav-icon"), "file-plus-2");
     newNote.createSpan({ text: "Note" });
@@ -535,7 +551,7 @@ export class SidebarView extends ItemView {
     menu.addSeparator();
     menu.addItem((i) =>
       i
-        .setTitle("Search all notes")
+        .setTitle("Open Obsidian search")
         .setIcon("search")
         .onClick(() => {
           if (!openGlobalSearch(this.app, "")) new Notice("The core Search plugin is turned off.");
@@ -855,7 +871,68 @@ export class SidebarView extends ItemView {
 
   // ---------- list column ----------
 
+  // ---------- search everywhere ----------
+
+  /** Search everywhere (the search window); `initial` pre-fills the query. */
+  openSearch(initial = ""): void {
+    new SearchModal(this.app, this.searchSource(), initial).open();
+  }
+
+  /** A snapshot of what to search, taken when the window opens. */
+  private searchSource(): SearchSource {
+    const { notes, companions, isAttachmentFolder } = this.partition();
+    const templates = templateOptions(this.app).folder;
+    const boards = this.plugin.settings.boardCardsInTasks;
+    const today = localISODate();
+    const open = (path: string, newTab: boolean) => {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (file instanceof TFile) void openFile(this.app, file, newTab ? "tab" : false);
+    };
+    const show = (place: Place) => {
+      this.setPlace(place);
+      void this.app.workspace.revealLeaf(this.leaf);
+    };
+    const tags = new Map<string, string>();
+    for (const note of notes) for (const tag of note.tags) if (!tags.has(tag.toLowerCase())) tags.set(tag.toLowerCase(), tag);
+    return {
+      notes: () => notes,
+      taskRows: () => [
+        ...taskRows(notes, "open", today, templates, boards),
+        ...taskRows(notes, "done", today, templates, boards),
+      ],
+      attachments: () =>
+        this.attachmentFiles().map((file) => {
+          const extracted = companions.get(file.path) ?? [];
+          return { file, extracted: extracted.map((n) => n.searchText).join(" "), companion: extracted[0]?.path ?? null };
+        }),
+      folders: () =>
+        this.plugin.indexer
+          .folders()
+          .filter((f) => !isAttachmentFolder(f) && !(templates && (f === templates || f.startsWith(`${templates}/`))))
+          .sort(compareNames),
+      tags: () => [...tags.values()].sort(compareNames),
+      openNote: open,
+      openAttachment: open,
+      openTask: (row, newTab) => void this.openTaskIn(row.note.path, row.task.line, newTab ? "tab" : false),
+      openFolder: (path) => show({ kind: "notebook", folder: path }),
+      openTag: (tag) => show({ kind: "tag", tag }),
+      showInList: (list, filter) => {
+        show({ kind: list });
+        this.filterInput.setValue(filter);
+        this.search = filter;
+        this.resetScroll();
+        this.renderList();
+      },
+      obsidianSearch: (query) => {
+        if (!openGlobalSearch(this.app, query)) new Notice("The core Search plugin is turned off.");
+      },
+    };
+  }
+
   private renderList(): void {
+    this.filterInput.setPlaceholder(
+      this.place.kind === "tasks" ? "Filter tasks" : this.place.kind === "attachments" ? "Filter attachments" : "Filter notes"
+    );
     this.disconnectObservers();
     this.taskRowEls.clear();
     this.activeTaskEl = null;
@@ -1468,10 +1545,15 @@ export class SidebarView extends ItemView {
    * the start of the line before "- [ ]". Obsidian's line state puts it at
    * column 0, so the column is set once the note is open.
    */
-  private async openTask(path: string, line: number, evt: MouseEvent): Promise<void> {
+  private openTask(path: string, line: number, evt: MouseEvent): Promise<void> {
+    return this.openTaskIn(path, line, Keymap.isModEvent(evt));
+  }
+
+  /** Open a note with the caret on a task's text, not before its "- [ ]". */
+  private async openTaskIn(path: string, line: number, mode: PaneType | boolean): Promise<void> {
     const file = this.app.vault.getAbstractFileByPath(path);
     if (!(file instanceof TFile)) return;
-    const leaf = await openFile(this.app, file, Keymap.isModEvent(evt), line);
+    const leaf = await openFile(this.app, file, mode, line);
     const view = leaf.view;
     if (!(view instanceof MarkdownView)) return;
     const editor = view.editor;

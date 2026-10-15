@@ -1,3 +1,5 @@
+import { localISODate } from "./format";
+import { matchNote, matchTask, parseQuery } from "./search";
 import { recurrenceDays, recurrenceLabel, taskDetails } from "./task-details";
 import { PRIORITIES } from "./task-line";
 import { holdsCards, inFolder, isClosed, NoteKind, NoteSummary, TaskItem } from "./types";
@@ -18,6 +20,8 @@ export interface QueryOptions {
   templatesFolder: string | null;
   /** Only this kind (note / board / canvas); undefined or null = all. */
   kind?: NoteKind | null;
+  /** YYYY-MM-DD for date filters (due:today…); defaults to the local date. */
+  today?: string;
 }
 
 export interface NoteGroup<T = NoteSummary> {
@@ -55,10 +59,6 @@ function inPlace(note: NoteSummary, place: Place, templates: string | null): boo
   }
 }
 
-function matchesSearch(note: NoteSummary, search: string): boolean {
-  const terms = search.toLowerCase().split(/\s+/).filter(Boolean);
-  return terms.every((term) => note.searchText.includes(term));
-}
 
 /**
  * Name order: "Note 2" before "Note 10", case and accents ignored. One shared
@@ -82,9 +82,12 @@ function comparator(sort: SortKey) {
 }
 
 export function notesFor(notes: NoteSummary[], place: Place, opts: QueryOptions): NoteSummary[] {
+  // The Filter: see core/search.ts for the query language.
+  const query = parseQuery(opts.search);
+  const today = opts.today ?? localISODate();
   return notes
     .filter((n) => !opts.kind || n.kind === opts.kind)
-    .filter((n) => inPlace(n, place, opts.templatesFolder) && matchesSearch(n, opts.search))
+    .filter((n) => inPlace(n, place, opts.templatesFolder) && matchNote(n, query, today))
     .sort(comparator(opts.sort));
 }
 
@@ -277,14 +280,14 @@ export function visibleRows(rows: TreeRow[], collapsed: ReadonlySet<string>): Vi
  * Narrow task rows by search text (every word must appear in the task text
  * or its note's title) and, optionally, to one note.
  */
-export function filterTaskRows(rows: TaskRow[], search: string, notePath: string | null): TaskRow[] {
-  const terms = search.toLowerCase().split(/\s+/).filter(Boolean);
-  return rows.filter(({ note, task }) => {
-    if (notePath !== null && note.path !== notePath) return false;
-    if (!terms.length) return true;
-    const text = `${task.text} ${note.title}`.toLowerCase();
-    return terms.every((term) => text.includes(term));
-  });
+export function filterTaskRows(
+  rows: TaskRow[],
+  search: string,
+  notePath: string | null,
+  today: string = localISODate()
+): TaskRow[] {
+  const query = parseQuery(search);
+  return rows.filter((row) => (notePath === null || row.note.path === notePath) && matchTask(row, query, today));
 }
 
 /** The notes behind a set of task rows, with how many rows each has, most first. */

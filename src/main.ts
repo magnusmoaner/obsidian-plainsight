@@ -182,6 +182,11 @@ export default class WysiwygPlugin extends Plugin {
       name: "Open notes sidebar",
       callback: () => void this.openSidebar(),
     });
+    this.addCommand({
+      id: "search-everywhere",
+      name: "Search everywhere",
+      callback: () => void this.openSearch(),
+    });
     this.app.workspace.onLayoutReady(() => {
       // Listen first, then fill: the fill never overwrites what an event
       // wrote meanwhile. The sidebar opens at once and fills in as notes are
@@ -445,6 +450,23 @@ export default class WysiwygPlugin extends Plugin {
       leaf = left;
     }
     await workspace.revealLeaf(leaf);
+  }
+
+  /** Search everywhere. It searches what the sidebar indexes, so it needs
+   * the sidebar; opening the window doesn't reveal it. */
+  async openSearch(): Promise<void> {
+    if (!this.settings.sidebar) {
+      new Notice("Search everywhere is part of the notes sidebar. Turn it on in Plainsight's settings.");
+      return;
+    }
+    let leaf = this.app.workspace.getLeavesOfType(SIDEBAR_VIEW)[0];
+    if (!leaf) {
+      await this.openSidebar();
+      leaf = this.app.workspace.getLeavesOfType(SIDEBAR_VIEW)[0];
+    }
+    // Obsidian 1.7+ creates a background tab's view only when it's needed.
+    await (leaf as WorkspaceLeaf & { loadIfDeferred?(): Promise<void> })?.loadIfDeferred?.();
+    if (leaf?.view instanceof SidebarView) leaf.view.openSearch();
   }
 
   /** Act only when the sidebar setting itself changed: re-opening on every

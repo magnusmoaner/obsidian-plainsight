@@ -206,8 +206,9 @@
   top: -10px;
   z-index: 2;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 10px 6px;
   margin: -10px -6px 0;
   padding: 10px 10px 12px;
   background: var(--background-secondary);
@@ -1129,4 +1130,84 @@
 .ps-task.is-active:hover {
   background: var(--background-modifier-active-hover);
   outline: none;
+}
+
+/* ---------- Search everywhere ---------- */
+/* The nav's Search field: looks like a search box, opens the search window. */
+.ps-nav-search {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 16px;
+  border: 1px solid var(--background-modifier-border-hover);
+  background: var(--background-primary);
+  color: var(--text-faint);
+  font-size: var(--font-ui-small);
+  cursor: text;
+}
+.ps-nav-search:hover,
+.ps-nav-search:focus-visible {
+  border-color: var(--background-modifier-border-focus);
+  color: var(--text-muted);
+}
+.ps-nav-search-icon {
+  display: inline-flex;
+}
+.ps-nav-search-icon svg {
+  width: 16px;
+  height: 16px;
+}
+/* A group label sits at the top of its first item, over the item's padding,
+   so the selection highlight covers only the row. */
+.ps-search-modal .ps-search-group {
+  margin: calc(-1 * var(--size-4-2)) calc(-1 * var(--size-4-3)) var(--size-4-2);
+  padding: var(--size-4-3) var(--size-4-3) var(--size-4-1);
+  background: var(--modal-background, var(--background-primary));
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-semibold);
+}
+.ps-search-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.ps-search-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+.ps-search-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.ps-search-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ps-search-title,
+.ps-search-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ps-search-meta {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+.ps-search-excerpt {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ps-search-more .ps-search-title {
+  color: var(--text-muted);
 }
