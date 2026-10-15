@@ -296,9 +296,9 @@ export class SearchModal extends SuggestModal<Item> {
         title(`#${item.tag}`);
         break;
       case "more":
-        el.addClass("ps-search-more");
-        setIcon(icon, "arrow-right");
-        body.createDiv({ cls: "ps-search-title", text: `Show all ${item.count} ${item.list} in the list` });
+        // A compact link under its group, lined up with the titles above.
+        el.addClass("ps-search-more", "is-compact");
+        body.createDiv({ cls: "ps-search-title", text: `Show all ${item.count} ${item.list} in the list →` });
         break;
       case "obsidian":
         el.addClass("ps-search-more");
