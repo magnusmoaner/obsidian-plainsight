@@ -1145,21 +1145,17 @@
 }
 
 /* ---------- Search everywhere ---------- */
-/* A group label sits at the top of its first item, over the item's padding,
-   so the selection highlight covers only the row. */
+/* Group headings: their own lines between the results, not selectable. */
 .ps-search-modal .ps-search-group {
-  margin: calc(-1 * var(--size-4-2)) calc(-1 * var(--size-4-3)) var(--size-4-2);
   padding: var(--size-4-3) var(--size-4-3) var(--size-4-1);
-  background: var(--modal-background, var(--background-primary));
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
   font-weight: var(--font-semibold);
 }
-/* The hand-off to Obsidian's search, set apart from the results by a rule. */
+/* The hand-offs elsewhere, set apart from the results by a rule. */
 .ps-search-modal .ps-search-group.is-elsewhere {
   margin-top: var(--size-4-2);
   border-top: 1px solid var(--background-modifier-border);
-  padding-top: var(--size-4-3);
 }
 .ps-search-row {
   display: flex;

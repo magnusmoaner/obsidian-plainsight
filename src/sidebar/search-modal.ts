@@ -242,7 +242,16 @@ export class SearchModal extends SuggestModal<Item> {
   renderSuggestion(item: Item, el: HTMLElement): void {
     el.addClass("ps-search-item");
     if (item.group) {
-      el.createDiv({ cls: `ps-search-group${item.kind === "obsidian" ? " is-elsewhere" : ""}`, text: item.group });
+      // The heading goes before the item, not in it, so the item's highlight
+      // covers only the item. The list is emptied on every update, headings
+      // included; selection and clicks only follow .suggestion-item elements.
+      const heading = createDiv({
+        cls: `ps-search-group${item.kind === "obsidian" || item.kind === "tasks-query" ? " is-elsewhere" : ""}`,
+        text: item.group,
+      });
+      const place = () => el.parentElement?.insertBefore(heading, el);
+      if (el.parentElement) place();
+      else window.requestAnimationFrame(place);
     }
     const row = el.createDiv("ps-search-row");
     const icon = row.createSpan("ps-search-icon");
