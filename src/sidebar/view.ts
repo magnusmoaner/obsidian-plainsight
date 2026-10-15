@@ -411,10 +411,13 @@ export class SidebarView extends ItemView {
     newNote.createSpan({ text: "Note" });
     newNote.addEventListener("click", () => void createNote(this.app, this.currentFolder()));
     this.roundButton(actions, "search", "Search everywhere", () => this.openSearch()).addClass("is-accent");
-    this.roundButton(actions, "folder-plus", "New folder", () => this.newNotebook(isAttachmentFolder));
-    this.roundButton(actions, "list-checks", "New task", () => void this.newTask());
+    // Optional: on a narrow column these give way, and the ⋯ menu offers them.
+    const newFolder = this.roundButton(actions, "folder-plus", "New folder", () => this.newNotebook(isAttachmentFolder));
+    const newTask = this.roundButton(actions, "list-checks", "New task", () => void this.newTask());
+    newFolder.addClass("is-optional");
+    newTask.addClass("is-optional");
     this.roundButton(actions, "more-horizontal", "More", (evt) =>
-      this.moreMenu(evt, tagRows(notes).map((t) => t.path))
+      this.moreMenu(evt, tagRows(notes).map((t) => t.path), newFolder.offsetParent === null, isAttachmentFolder)
     );
 
     const bookmarks = readBookmarks(this.app);
@@ -515,9 +518,19 @@ export class SidebarView extends ItemView {
     return makers;
   }
 
-  private moreMenu(evt: MouseEvent, tags: string[]): void {
+  private moreMenu(
+    evt: MouseEvent,
+    tags: string[],
+    narrow: boolean,
+    isAttachmentFolder: (folder: string) => boolean
+  ): void {
     const menu = new Menu();
     const folder = this.currentFolder();
+    // The row's New folder and New task buttons are hidden on a narrow column.
+    if (narrow) {
+      menu.addItem((i) => i.setTitle("New folder…").setIcon("folder-plus").onClick(() => this.newNotebook(isAttachmentFolder)));
+      menu.addItem((i) => i.setTitle("New task…").setIcon("list-checks").onClick(() => void this.newTask()));
+    }
 
     // Create
     menu.addItem((i) => i.setTitle("New tag…").setIcon("tag").onClick(() => this.newTag(tags)));
@@ -998,9 +1011,8 @@ export class SidebarView extends ItemView {
   }
 
   private renderList(): void {
-    this.filterInput.setPlaceholder(
-      this.place.kind === "tasks" ? "Filter tasks" : this.place.kind === "attachments" ? "Filter attachments" : "Filter notes"
-    );
+    const what = { tasks: "tasks", attachments: "attachments", templates: "templates" } as Record<string, string>;
+    this.filterInput.setPlaceholder(`Search ${what[this.place.kind] ?? "notes"}`);
     this.disconnectObservers();
     this.taskRowEls.clear();
     this.activeTaskEl = null;
