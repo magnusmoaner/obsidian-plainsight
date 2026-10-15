@@ -43,7 +43,9 @@ import {
   attachmentsFor,
   formatSize,
 } from "./core/attachments";
-import { taskDisplayText, taskTextColumn } from "./core/tasks";
+import { taskDetails } from "./core/task-details";
+import { PRIORITIES } from "./core/task-line";
+import { taskTextColumn } from "./core/tasks";
 import { holdsCards, isClosed, NoteSummary, renamedPath } from "./core/types";
 import { NAV_WIDTH } from "./core/view-state";
 import {
@@ -424,7 +426,7 @@ export class SidebarView extends ItemView {
     const templateCount = templates
       ? notesFor(notes, { kind: "templates" }, unfiltered).length
       : null;
-    this.placeRow(nav, "Notes", "file-text", { kind: "notes" }, 0, noteCount);
+    this.placeRow(nav, "Notes", "file-text", { kind: "notes" }, 0, noteCount, () => void createNote(this.app, null));
     this.placeRow(nav, "Tasks", "check-circle-2", { kind: "tasks" }, 0, openTasks, () => void this.newTask());
     this.placeRow(nav, "Attachments", "paperclip", { kind: "attachments" }, 0, this.attachmentFiles().length);
     this.placeRow(nav, "Templates", "layout-template", { kind: "templates" }, 0, templateCount);
@@ -1382,6 +1384,10 @@ export class SidebarView extends ItemView {
     const menu = new Menu();
     const options: Array<[TaskGrouping, string, string]> = [
       ["due", "Due date", "calendar"],
+      ["scheduled", "Scheduled date", "calendar-clock"],
+      ["priority", "Priority", "flag"],
+      ["recurrence", "Recurrence", "repeat"],
+      ["tag", "Tag", "tag"],
       ["folder", "Folder", "folder"],
       ["note", "Note", "file-text"],
       ["board", "Kanban board", "kanban"],
@@ -1582,8 +1588,10 @@ export class SidebarView extends ItemView {
         if (!written) box.checked = isClosed(task);
       });
 
+      const details = taskDetails(task.text);
+      const closed = isClosed(task);
       const body = row.createDiv("ps-task-body");
-      body.createDiv({ cls: "ps-task-text", text: taskDisplayText(task.text) || task.text });
+      body.createDiv({ cls: "ps-task-text", text: details.description || task.text });
       const meta = body.createDiv("ps-task-meta");
       const noteLink = meta.createSpan({
         cls: "ps-task-note",
@@ -1594,14 +1602,35 @@ export class SidebarView extends ItemView {
         evt.stopPropagation();
         this.filterTasksTo(note.path);
       });
-      if (task.due) {
-        const due = meta.createSpan({
-          cls: "ps-task-due",
-          text: dueDateLabel(task.due, today),
-          attr: { "aria-label": `Due ${task.due}` },
-        });
-        due.toggleClass("is-overdue", !isClosed(task) && task.due < today);
+      // Details as badges: priority, dates (relative), recurrence, tags.
+      const badge = (icon: string | null, text: string, label: string | null, cls = "") => {
+        const el = meta.createSpan({ cls: `ps-badge ${cls}`.trim() });
+        if (label) el.setAttr("aria-label", label);
+        if (icon) setIcon(el.createSpan("ps-badge-icon"), icon);
+        el.createSpan({ text });
+        return el;
+      };
+      const priority = PRIORITIES.find((p) => p.value === details.priority);
+      if (priority) badge("flag", priority.label, `${priority.label} priority`, `is-priority-${priority.value}`);
+      const due = details.due ?? task.due;
+      if (due && !closed) {
+        const el = badge("calendar", dueDateLabel(due, today), `Due ${due}`);
+        el.toggleClass("is-overdue", due < today);
+        el.toggleClass("is-today", due === today);
       }
+      if (details.scheduled && !closed) {
+        const el = badge("calendar-clock", dueDateLabel(details.scheduled, today), `Scheduled ${details.scheduled}`);
+        el.toggleClass("is-today", details.scheduled === today);
+      }
+      // A start date matters only until it's reached.
+      if (details.start && !closed && details.start > today) {
+        badge("calendar-plus", dueDateLabel(details.start, today), `Starts ${details.start}`);
+      }
+      if (details.recurrence) badge("repeat", details.recurrence, `Repeats ${details.recurrence}`);
+      const done = details.done ?? task.done;
+      if (closed && done) badge("check", dueDateLabel(done, today), `Done ${done}`, "is-quiet");
+      if (details.cancelled) badge("x", dueDateLabel(details.cancelled, today), `Cancelled ${details.cancelled}`, "is-quiet");
+      for (const tag of details.badgeTags) badge(null, `#${tag}`, null, "ps-badge-tag");
 
       row.addEventListener("click", (evt) => void this.openTask(note.path, task.line, evt));
     });

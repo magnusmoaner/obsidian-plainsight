@@ -336,6 +336,66 @@ describe("groupTaskRows", () => {
     expect(labels(groupTaskRows(rows, "board", today))).toEqual(["A › Todo:1", "B › X:1"]);
   });
 
+  const withText = (path: string, text: string, status = " ") => ({
+    note: note(path),
+    task: { line: 0, status, text, due: null, section: null, done: null },
+  });
+
+  test("priority in the Tasks plugin's order, normal between medium and low", () => {
+    const rows = [
+      withText("a.md", "a 🔽"),
+      withText("b.md", "b"),
+      withText("c.md", "c ⏫"),
+      withText("d.md", "d 🔺"),
+      withText("e.md", "e ⏬"),
+      withText("f.md", "f 🔼"),
+    ];
+    expect(labels(groupTaskRows(rows, "priority", today))).toEqual([
+      "Highest priority:1",
+      "High priority:1",
+      "Medium priority:1",
+      "Normal priority:1",
+      "Low priority:1",
+      "Lowest priority:1",
+    ]);
+  });
+
+  test("scheduled date in buckets, unscheduled last", () => {
+    const rows = [
+      withText("a.md", "a"),
+      withText("b.md", "b ⏳ 2026-10-01"),
+      withText("c.md", "c ⏳ 2026-10-08"),
+      withText("d.md", "d ⏳ 2026-12-24"),
+    ];
+    expect(labels(groupTaskRows(rows, "scheduled", today))).toEqual([
+      "Earlier:1",
+      "Today:1",
+      "Later:1",
+      "Not scheduled:1",
+    ]);
+  });
+
+  test("recurrence from most to least frequent, 'when done' merged, one-off tasks last", () => {
+    const rows = [
+      withText("a.md", "a"),
+      withText("b.md", "b 🔁 every month 📅 2026-10-09"),
+      withText("c.md", "c 🔁 every week when done 📅 2026-10-09"),
+      withText("d.md", "d 🔁 every week 📅 2026-10-09"),
+      withText("e.md", "e 🔁 every day 📅 2026-10-09"),
+    ];
+    expect(labels(groupTaskRows(rows, "recurrence", today))).toEqual([
+      "Every day:1",
+      "Every week:2",
+      "Every month:1",
+      "Not recurring:1",
+    ]);
+  });
+
+  test("tag groups by each task's first tag, alphabetically, untagged last", () => {
+    const rows = [withText("a.md", "a"), withText("b.md", "b #work"), withText("c.md", "#home c"), withText("d.md", "d #work #x")];
+    expect(labels(groupTaskRows(rows, "tag", today))).toEqual(["#home:1", "#work:2", "No tag:1"]);
+  });
+
   test("same-named notes in different folders stay separate, labelled by folder", () => {
     const rows = [row("Work/Roadmap.md", null), row("Home/Roadmap.md", null), row("Work/Roadmap.md", null)];
     expect(labels(groupTaskRows(rows, "note", today))).toEqual(["Roadmap (Work):2", "Roadmap (Home):1"]);
