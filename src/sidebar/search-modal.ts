@@ -50,7 +50,7 @@ type Item = { group?: string } & (
 const SHOWN = { notes: 8, tasks: 5, attachments: 5, places: 3 };
 
 /**
- * Search everywhere: notes, tasks, attachments (by name and extracted text),
+ * Search everywhere: tasks, notes, attachments (by name and extracted text),
  * folders and tags, in groups, with the same query language as the list's
  * Filter (core/search.ts). Each group links to its full list; anything
  * Obsidian's own search can express is one item away.
@@ -105,6 +105,9 @@ export class SearchModal extends SuggestModal<Item> {
       if (fullList && total > list.length) items.push({ kind: "more", list: fullList, count: total });
     };
 
+    const rankedTasks = rankTasks(this.source.taskRows(), q, today);
+    group("Tasks", rankedTasks.slice(0, SHOWN.tasks).map((row) => ({ kind: "task" as const, row })), rankedTasks.length, "tasks");
+
     const rankedNotes = rankNotes(notes, q, today);
     const noteItems = await Promise.all(
       rankedNotes.slice(0, SHOWN.notes).map(async (note) => ({
@@ -114,9 +117,6 @@ export class SearchModal extends SuggestModal<Item> {
       }))
     );
     group("Notes", noteItems, rankedNotes.length, "notes");
-
-    const rankedTasks = rankTasks(this.source.taskRows(), q, today);
-    group("Tasks", rankedTasks.slice(0, SHOWN.tasks).map((row) => ({ kind: "task" as const, row })), rankedTasks.length, "tasks");
 
     const files = this.source
       .attachments()
@@ -151,7 +151,7 @@ export class SearchModal extends SuggestModal<Item> {
     group("Folders and tags", places.slice(0, SHOWN.places), places.length);
 
     const obsidian = toObsidianQuery(q);
-    if (obsidian) items.push({ kind: "obsidian", query: obsidian });
+    if (obsidian) items.push({ kind: "obsidian", query: obsidian, group: "Elsewhere" });
     return items;
   }
 
@@ -168,7 +168,9 @@ export class SearchModal extends SuggestModal<Item> {
 
   renderSuggestion(item: Item, el: HTMLElement): void {
     el.addClass("ps-search-item");
-    if (item.group) el.createDiv({ cls: "ps-search-group", text: item.group });
+    if (item.group) {
+      el.createDiv({ cls: `ps-search-group${item.kind === "obsidian" ? " is-elsewhere" : ""}`, text: item.group });
+    }
     const row = el.createDiv("ps-search-row");
     const icon = row.createSpan("ps-search-icon");
     const body = row.createDiv("ps-search-body");

@@ -1133,33 +1133,6 @@
 }
 
 /* ---------- Search everywhere ---------- */
-/* The nav's Search field: looks like a search box, opens the search window. */
-.ps-nav-search {
-  flex: 1 0 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 16px;
-  border: 1px solid var(--background-modifier-border-hover);
-  background: var(--background-primary);
-  color: var(--text-faint);
-  font-size: var(--font-ui-small);
-  cursor: text;
-}
-.ps-nav-search:hover,
-.ps-nav-search:focus-visible {
-  border-color: var(--background-modifier-border-focus);
-  color: var(--text-muted);
-}
-.ps-nav-search-icon {
-  display: inline-flex;
-}
-.ps-nav-search-icon svg {
-  width: 16px;
-  height: 16px;
-}
 /* A group label sits at the top of its first item, over the item's padding,
    so the selection highlight covers only the row. */
 .ps-search-modal .ps-search-group {
@@ -1169,6 +1142,12 @@
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
   font-weight: var(--font-semibold);
+}
+/* The hand-off to Obsidian's search, set apart from the results by a rule. */
+.ps-search-modal .ps-search-group.is-elsewhere {
+  margin-top: var(--size-4-2);
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: var(--size-4-3);
 }
 .ps-search-row {
   display: flex;
