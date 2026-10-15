@@ -1210,20 +1210,18 @@
   font-size: var(--font-ui-small);
 }
 
-/* The action row as the places column narrows (its width less 12px padding):
-   smaller buttons, then New folder and New task move into the ⋯ menu (the +
-   on Folders and Tasks does both too), and last the pill drops its label. */
-@container ps-nav (max-width: 287px) {
-  .ps-nav-actions {
-    --ps-button: 36px;
-  }
-}
-@container ps-nav (max-width: 267px) {
+/* The action row as the places column narrows (its width less 12px padding).
+   Buttons stay 40px: first New folder and New task move into the ⋯ menu (the
+   + on Folders and Tasks does both too), then the pill drops its label. */
+@container ps-nav (max-width: 283px) {
   .ps-nav-actions .is-optional {
     display: none;
   }
+  .ps-new-note {
+    padding: 8px 12px;
+  }
 }
-@container ps-nav (max-width: 183px) {
+@container ps-nav (max-width: 185px) {
   .ps-new-note {
     flex: 0 0 var(--ps-button);
     padding: 0;

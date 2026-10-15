@@ -25,8 +25,9 @@ export interface ViewState {
   noteGroupBy: NoteGrouping;
 }
 
-/** What the column divider allows. */
-export const NAV_WIDTH = { min: 140, max: 360 };
+/** What the column divider allows. At the minimum, the action row's three
+ * 40px buttons (Note, Search, ⋯) still fit. */
+export const NAV_WIDTH = { min: 152, max: 360 };
 
 export const DEFAULT_VIEW_STATE: ViewState = {
   navWidth: 200,
