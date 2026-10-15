@@ -746,10 +746,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ps-task-due {
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
 .ps-task-note:hover {
   color: var(--text-normal);
   text-decoration: underline;
@@ -919,16 +915,66 @@
   min-width: 0;
 }
 .ps-task-meta {
-  margin-top: 3px;
+  margin-top: 4px;
   min-width: 0;
-  align-items: baseline;
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
   color: var(--text-faint);
   font-size: var(--font-ui-smaller);
 }
-.ps-task-due.is-overdue {
+
+/* Task details as badges; on a narrow list they wrap as whole badges. */
+.ps-badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.ps-badge-icon {
+  display: inline-flex;
+}
+.ps-badge-icon svg {
+  width: 12px;
+  height: 12px;
+}
+.ps-badge.is-overdue {
+  background: rgba(var(--color-red-rgb), 0.12);
   color: var(--color-red);
+}
+.ps-badge.is-today {
+  background: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.14);
+  color: var(--text-accent);
+}
+/* Priority: the urgent ones stand out; low ones (most imported tasks) stay quiet. */
+.ps-badge.is-priority-highest {
+  background: rgba(var(--color-red-rgb), 0.12);
+  color: var(--color-red);
+}
+.ps-badge.is-priority-high {
+  background: rgba(var(--color-orange-rgb), 0.14);
+  color: var(--color-orange);
+}
+.ps-badge.is-priority-medium .ps-badge-icon {
+  color: var(--color-yellow);
+}
+.ps-badge.is-priority-low,
+.ps-badge.is-priority-lowest {
+  background: transparent;
+  padding-left: 0;
+  color: var(--text-faint);
+}
+.ps-badge.is-quiet {
+  background: transparent;
+  padding-left: 0;
+  color: var(--text-faint);
 }
 
 /* Mobile: one column at a time */

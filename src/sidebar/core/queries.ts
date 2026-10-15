@@ -1,3 +1,5 @@
+import { recurrenceDays, recurrenceLabel, taskDetails } from "./task-details";
+import { PRIORITIES } from "./task-line";
 import { holdsCards, inFolder, isClosed, NoteKind, NoteSummary, TaskItem } from "./types";
 
 export type Place =
@@ -298,7 +300,16 @@ export function notesOfTaskRows(rows: TaskRow[]): Array<{ note: NoteSummary; cou
   );
 }
 
-export type TaskGrouping = "due" | "folder" | "note" | "board" | "none";
+export type TaskGrouping =
+  | "due"
+  | "scheduled"
+  | "priority"
+  | "recurrence"
+  | "tag"
+  | "folder"
+  | "note"
+  | "board"
+  | "none";
 
 export interface TaskGroup {
   label: string;
@@ -323,6 +334,20 @@ function dueLabel(due: string | null, today: string): string {
   if (due <= addDays(today, 7)) return "Next 7 days";
   return "Later";
 }
+
+const SCHEDULED_ORDER = ["Earlier", "Today", "Tomorrow", "Next 7 days", "Later", "Not scheduled"];
+
+function scheduledLabel(scheduled: string | null, today: string): string {
+  if (!scheduled) return "Not scheduled";
+  if (scheduled < today) return "Earlier";
+  if (scheduled === today) return "Today";
+  if (scheduled === addDays(today, 1)) return "Tomorrow";
+  if (scheduled <= addDays(today, 7)) return "Next 7 days";
+  return "Later";
+}
+
+/** The Tasks plugin's order: normal (no priority) sits between medium and low. */
+const PRIORITY_ORDER = ["highest", "high", "medium", "normal", "low", "lowest"];
 
 /** Finished work groups by when it was finished; "Overdue" would be wrong. */
 function doneLabel(done: string | null, today: string): string {
@@ -358,6 +383,12 @@ const byKeys = (a: Bucket, b: Bucket): number => {
  * the folder.
  * - due: Overdue … No due date for open tasks; completed tasks group by
  *   their ✅ date instead (Done today … Done earlier)
+ * - scheduled: Earlier … Not scheduled, by the ⏳ date; completed tasks by
+ *   their ✅ date, as for due
+ * - priority: the Tasks plugin's order, Highest … Lowest
+ * - recurrence: by the 🔁 rule, most frequent first ("when done" merged),
+ *   tasks that don't repeat last
+ * - tag: by each task's first tag, alphabetically, untagged last
  * - folder: alphabetical ("Vault root" for the top level)
  * - note: one group per note, in first-appearance order
  * - board: "Board › List" for Kanban cards, boards alphabetically and lists
@@ -375,12 +406,31 @@ export function groupTaskRows(rows: TaskRow[], by: TaskGrouping, today: string):
   let seen = 0;
   for (const row of rows) {
     const { note, task } = row;
-    if (by === "due") {
+    if (by === "due" || by === "scheduled") {
       const closed = isClosed(task);
-      const label = closed ? doneLabel(task.done, today) : dueLabel(task.due, today);
+      const order = by === "due" ? DUE_ORDER : SCHEDULED_ORDER;
+      const label = closed
+        ? doneLabel(task.done, today)
+        : by === "due"
+          ? dueLabel(task.due, today)
+          : scheduledLabel(taskDetails(task.text).scheduled, today);
       // Open buckets before done buckets (only one kind shows per tab anyway).
-      const order = closed ? DUE_ORDER.length + DONE_ORDER.indexOf(label) : DUE_ORDER.indexOf(label);
-      add(label, label, [order], row);
+      add(label, label, [closed ? order.length + DONE_ORDER.indexOf(label) : order.indexOf(label)], row);
+    } else if (by === "priority") {
+      const priority = taskDetails(task.text).priority ?? "normal";
+      const label = `${PRIORITIES.find((p) => p.value === priority)?.label ?? "Normal"} priority`;
+      add(priority, label, [PRIORITY_ORDER.indexOf(priority)], row);
+    } else if (by === "recurrence") {
+      const rule = taskDetails(task.text).recurrence;
+      if (!rule) add("", "Not recurring", [Number.POSITIVE_INFINITY, 1, ""], row);
+      else {
+        const label = recurrenceLabel(rule);
+        add(label.toLowerCase(), label, [recurrenceDays(rule), 0, label], row);
+      }
+    } else if (by === "tag") {
+      const tag = taskDetails(task.text).tags[0];
+      if (tag) add(tag.toLowerCase(), `#${tag}`, [0, tag], row);
+      else add("", "No tag", [1, ""], row);
     } else if (by === "folder") {
       const label = note.folder || "Vault root";
       add(note.folder, label, [note.folder === "" ? 0 : 1, label], row);
@@ -403,7 +453,17 @@ export function groupTaskRows(rows: TaskRow[], by: TaskGrouping, today: string):
   });
 }
 
-export const TASK_GROUPINGS: TaskGrouping[] = ["due", "folder", "note", "board", "none"];
+export const TASK_GROUPINGS: TaskGrouping[] = [
+  "due",
+  "scheduled",
+  "priority",
+  "recurrence",
+  "tag",
+  "folder",
+  "note",
+  "board",
+  "none",
+];
 
 export type NoteGrouping = "date" | "folder" | "kind" | "none";
 export const NOTE_GROUPINGS: NoteGrouping[] = ["date", "folder", "kind", "none"];

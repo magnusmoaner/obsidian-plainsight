@@ -25,7 +25,7 @@ describe("parseViewState", () => {
       parseViewState({
         navWidth: "wide",
         collapsed: ["section:tags", 7, null, "section:tags"],
-        taskGroupBy: "priority",
+        taskGroupBy: "colour",
         taskFilter: "someday",
         noteKindFilter: "pdf",
         noteGroupBy: "kind",
