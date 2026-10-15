@@ -1,5 +1,6 @@
 import { inFolder, NoteSummary } from "./types";
 import { compareNames } from "./queries";
+import { matchAttachment, parseQuery } from "./search";
 import type { SortKey } from "./queries";
 
 /** A non-note file, as the Attachments place shows it. */
@@ -45,13 +46,11 @@ export function attachmentsFor(
   search: string,
   sort: SortKey
 ): AttachmentFile[] {
-  const terms = search.toLowerCase().split(/\s+/).filter(Boolean);
-  const matches = files.filter((file) => {
-    if (!terms.length) return true;
-    const extracted = (companions.get(file.path) ?? []).map((n) => n.searchText).join(" ");
-    const text = `${file.name.toLowerCase()} ${extracted}`;
-    return terms.every((term) => text.includes(term));
-  });
+  // The Filter: see core/search.ts for the query language.
+  const query = parseQuery(search);
+  const matches = files.filter((file) =>
+    matchAttachment(file, (companions.get(file.path) ?? []).map((n) => n.searchText).join(" "), query)
+  );
   const byName = (a: AttachmentFile, b: AttachmentFile) =>
     compareNames(a.name, b.name);
   return matches.sort((a, b) => {

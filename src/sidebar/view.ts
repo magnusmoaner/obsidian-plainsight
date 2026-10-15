@@ -4,6 +4,7 @@ import {
   MarkdownView,
   Menu,
   Notice,
+  PaneType,
   Platform,
   SearchComponent,
   setIcon,
@@ -46,8 +47,9 @@ import {
 import { taskDetails } from "./core/task-details";
 import { PRIORITIES } from "./core/task-line";
 import { taskTextColumn } from "./core/tasks";
-import { holdsCards, isClosed, NoteSummary, renamedPath } from "./core/types";
+import { holdsCards, inFolder, isClosed, NoteSummary, renamedPath } from "./core/types";
 import { NAV_WIDTH } from "./core/view-state";
+import { SearchModal, SearchSource } from "./search-modal";
 import {
   addTagToNote,
   addTaskLine,
@@ -75,6 +77,7 @@ import {
   openGlobalSearch,
   openSettingsTab,
   hasCommand,
+  hasTasksPlugin,
   KANBAN_NEW_BOARD,
   newKanbanBoard,
   readBookmarks,
@@ -123,6 +126,7 @@ export class SidebarView extends ItemView {
   private mobilePane: "nav" | "list" = "nav";
 
   private navEl!: HTMLElement;
+  private filterInput!: SearchComponent;
   private headerEl!: HTMLElement;
   private filtersEl!: HTMLElement;
   private bodyEl!: HTMLElement;
@@ -131,6 +135,8 @@ export class SidebarView extends ItemView {
   /** Items rendered so far; re-renders restore at least this many so the
    * saved scroll position still has content to land on. */
   private renderedCount = 0;
+  /** Renders the list's next batch, while there is one (renderIncrementally). */
+  private renderNext: (() => boolean) | null = null;
   /** Rendered task rows by "path\0line", for O(1) highlight changes. */
   private taskRowEls = new Map<string, HTMLElement>();
   private activeTaskEl: HTMLElement | null = null;
@@ -174,8 +180,8 @@ export class SidebarView extends ItemView {
     // Obsidian's own SearchComponent: the same pill, magnifier and clear
     // button as its other search fields. Built once — re-creating it on
     // every render would steal focus mid-typing.
-    new SearchComponent(list.createDiv("ps-search"))
-      .setPlaceholder("Search")
+    this.filterInput = new SearchComponent(list.createDiv("ps-search"))
+      .setPlaceholder("Filter")
       .onChange((value) => {
         this.search = value;
         this.resetScroll();
@@ -404,10 +410,14 @@ export class SidebarView extends ItemView {
     setIcon(newNote.createSpan("ps-nav-icon"), "file-plus-2");
     newNote.createSpan({ text: "Note" });
     newNote.addEventListener("click", () => void createNote(this.app, this.currentFolder()));
-    this.roundButton(actions, "folder-plus", "New folder", () => this.newNotebook(isAttachmentFolder));
-    this.roundButton(actions, "list-checks", "New task", () => void this.newTask());
+    this.roundButton(actions, "search", "Search everywhere", () => this.openSearch()).addClass("is-accent");
+    // Optional: on a narrow column these give way, and the ⋯ menu offers them.
+    const newFolder = this.roundButton(actions, "folder-plus", "New folder", () => this.newNotebook(isAttachmentFolder));
+    const newTask = this.roundButton(actions, "list-checks", "New task", () => void this.newTask());
+    newFolder.addClass("is-optional");
+    newTask.addClass("is-optional");
     this.roundButton(actions, "more-horizontal", "More", (evt) =>
-      this.moreMenu(evt, tagRows(notes).map((t) => t.path))
+      this.moreMenu(evt, tagRows(notes).map((t) => t.path), newFolder.offsetParent === null, isAttachmentFolder)
     );
 
     const bookmarks = readBookmarks(this.app);
@@ -479,10 +489,11 @@ export class SidebarView extends ItemView {
     icon: string,
     label: string,
     onClick: (evt: MouseEvent) => void
-  ): void {
+  ): HTMLElement {
     const button = parent.createDiv({ cls: "ps-round-button", attr: { "aria-label": label } });
     setIcon(button, icon);
     button.addEventListener("click", onClick);
+    return button;
   }
 
   /**
@@ -507,9 +518,19 @@ export class SidebarView extends ItemView {
     return makers;
   }
 
-  private moreMenu(evt: MouseEvent, tags: string[]): void {
+  private moreMenu(
+    evt: MouseEvent,
+    tags: string[],
+    narrow: boolean,
+    isAttachmentFolder: (folder: string) => boolean
+  ): void {
     const menu = new Menu();
     const folder = this.currentFolder();
+    // The row's New folder and New task buttons are hidden on a narrow column.
+    if (narrow) {
+      menu.addItem((i) => i.setTitle("New folder…").setIcon("folder-plus").onClick(() => this.newNotebook(isAttachmentFolder)));
+      menu.addItem((i) => i.setTitle("New task…").setIcon("list-checks").onClick(() => void this.newTask()));
+    }
 
     // Create
     menu.addItem((i) => i.setTitle("New tag…").setIcon("tag").onClick(() => this.newTag(tags)));
@@ -535,7 +556,7 @@ export class SidebarView extends ItemView {
     menu.addSeparator();
     menu.addItem((i) =>
       i
-        .setTitle("Search all notes")
+        .setTitle("Open Obsidian search")
         .setIcon("search")
         .onClick(() => {
           if (!openGlobalSearch(this.app, "")) new Notice("The core Search plugin is turned off.");
@@ -855,7 +876,143 @@ export class SidebarView extends ItemView {
 
   // ---------- list column ----------
 
+  // ---------- search everywhere ----------
+
+  /** Search everywhere (the search window); `initial` pre-fills the query. */
+  openSearch(initial = ""): void {
+    new SearchModal(this.app, this.searchSource(), initial).open();
+  }
+
+  /**
+   * Show a place with nothing narrowing its list (no Filter text or note
+   * filter), its nav row unfolded, selected and scrolled into view, and the
+   * sidebar revealed.
+   */
+  private showPlace(place: Place): void {
+    const parentOf = (path: string) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
+    const unfold: string[] = [];
+    if (place.kind === "notebook") {
+      unfold.push("section:notebooks");
+      for (let p = parentOf(place.folder); p; p = parentOf(p)) unfold.push(`notebook:${p}`);
+    } else if (place.kind === "tag") {
+      unfold.push("section:tags");
+      for (let p = parentOf(place.tag); p; p = parentOf(p)) unfold.push(`tag:${p}`);
+    }
+    const collapsed = this.plugin.viewState.state.collapsed;
+    if (unfold.some((key) => collapsed.includes(key))) {
+      this.plugin.viewState.update({ collapsed: collapsed.filter((key) => !unfold.includes(key)) });
+    }
+    this.filterInput.setValue("");
+    this.search = "";
+    this.setPlace(place);
+    void this.app.workspace.revealLeaf(this.leaf);
+    this.navEl.querySelector(".ps-nav-item.is-active")?.scrollIntoView({ block: "nearest" });
+  }
+
+  /** A snapshot of what to search, taken when the window opens. */
+  private searchSource(): SearchSource {
+    const { notes, companions, isAttachmentFolder } = this.partition();
+    const templates = templateOptions(this.app).folder;
+    const boards = this.plugin.settings.boardCardsInTasks;
+    const today = localISODate();
+    const open = (path: string, newTab: boolean) => {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (file instanceof TFile) void openFile(this.app, file, newTab ? "tab" : false);
+    };
+    const card = (path: string) => () =>
+      Array.from(this.bodyEl.querySelectorAll<HTMLElement>(".ps-card")).find((el) => el.dataset.path === path);
+    const tags = new Map<string, string>();
+    for (const note of notes) for (const tag of note.tags) if (!tags.has(tag.toLowerCase())) tags.set(tag.toLowerCase(), tag);
+    return {
+      notes: () => notes,
+      taskRows: () => [
+        ...taskRows(notes, "open", today, templates, boards),
+        ...taskRows(notes, "done", today, templates, boards),
+      ],
+      attachments: () =>
+        this.attachmentFiles().map((file) => {
+          const extracted = companions.get(file.path) ?? [];
+          return { file, extracted: extracted.map((n) => n.searchText).join(" "), companion: extracted[0]?.path ?? null };
+        }),
+      folders: () =>
+        this.plugin.indexer
+          .folders()
+          .filter((f) => !isAttachmentFolder(f) && !(templates && (f === templates || f.startsWith(`${templates}/`))))
+          .sort(compareNames),
+      tags: () => [...tags.values()].sort(compareNames),
+      // A note: its folder in the nav (Notes for the vault root, Templates for
+      // a template), with the note's card selected, and the note open.
+      openNote: (path, newTab) => {
+        const note = this.plugin.index.get(path);
+        let place: Place = { kind: "notes" };
+        if (note && templates && inFolder(note.folder, templates)) place = { kind: "templates" };
+        else if (note?.folder) place = { kind: "notebook", folder: note.folder };
+        // A remembered kind filter that leaves this note out would hide it here too.
+        const kind = this.plugin.viewState.state.noteKindFilter;
+        if (note && kind !== "all" && kind !== note.kind) this.plugin.viewState.update({ noteKindFilter: "all" });
+        this.showPlace(place);
+        this.revealInList(card(path))?.addClass("is-active");
+        open(path, newTab);
+      },
+      // A task: the Tasks list on the tab that holds it, the task selected,
+      // and its note open with the caret on it.
+      openTask: (row, newTab) => {
+        const closed = isClosed(row.task);
+        const tab = this.plugin.viewState.state.taskFilter;
+        if (closed ? tab !== "done" : tab === "done") this.plugin.viewState.update({ taskFilter: closed ? "done" : "open" });
+        this.plugin.activeTask = { path: row.note.path, line: row.task.line };
+        this.showPlace({ kind: "tasks" });
+        this.revealInList(() => this.taskRowEls.get(`${row.note.path}\u0000${row.task.line}`));
+        this.markActiveTask();
+        void this.openTaskIn(row.note.path, row.task.line, newTab ? "tab" : false);
+      },
+      openAttachment: (path, newTab) => {
+        this.showPlace({ kind: "attachments" });
+        this.revealInList(card(path))?.addClass("is-active");
+        open(path, newTab);
+      },
+      openFolder: (path) => this.showPlace({ kind: "notebook", folder: path }),
+      // Tag places are keyed by the lower-cased tag path, like the nav's rows.
+      openTag: (tag) => this.showPlace({ kind: "tag", tag: tag.toLowerCase() }),
+      showInList: (list, filter) => {
+        this.showPlace({ kind: list });
+        this.filterInput.setValue(filter);
+        this.search = filter;
+        this.resetScroll();
+        this.renderList();
+      },
+      obsidianSearch: (query) => {
+        if (!openGlobalSearch(this.app, query)) new Notice("The core Search plugin is turned off.");
+      },
+      tasksAvailable: () => hasTasksPlugin(this.app),
+      // Into the note last edited, on lines of its own at the caret; with no
+      // note open, onto the clipboard instead.
+      insertTasksQuery: (block) => {
+        const leaf = this.app.workspace.getMostRecentLeaf();
+        const view = leaf?.view;
+        if (!(view instanceof MarkdownView)) {
+          void navigator.clipboard.writeText(block).then(
+            () => new Notice("No note is open, so the Tasks query was copied instead."),
+            () => new Notice("Open a note to insert the Tasks query into.")
+          );
+          return;
+        }
+        this.app.workspace.setActiveLeaf(view.leaf, { focus: true });
+        // After the caret's line if it has text, else on it; with a blank line
+        // between the block and any text above. One edit, so one undo.
+        const editor = view.editor;
+        const { line } = editor.getCursor();
+        const text = editor.getLine(line);
+        const above = text.trim() !== "" || (line > 0 && editor.getLine(line - 1).trim() !== "");
+        const at = { line, ch: text.trim() ? text.length : 0 };
+        editor.replaceRange(`${text.trim() ? "\n" : ""}${above ? "\n" : ""}${block}\n`, at);
+      },
+    };
+  }
+
   private renderList(): void {
+    const what = { tasks: "tasks", attachments: "attachments", templates: "templates" } as Record<string, string>;
+    this.filterInput.setPlaceholder(`Search ${what[this.place.kind] ?? "notes"}`);
     this.disconnectObservers();
     this.taskRowEls.clear();
     this.activeTaskEl = null;
@@ -936,26 +1093,42 @@ export class SidebarView extends ItemView {
   private renderIncrementally(count: number, renderAt: (i: number) => void): void {
     let next = 0;
     let size = Math.max(BATCH, this.renderedCount);
-    const step = () => {
+    let sentinel: HTMLElement | null = null;
+    let observer: IntersectionObserver | null = null;
+    // Renders the next batch; true while more remain. Run by scrolling (the
+    // sentinel), or directly to reach an item further down (revealInList).
+    const step = (): boolean => {
+      observer?.disconnect();
+      sentinel?.remove();
       const end = Math.min(next + size, count);
       for (; next < end; next++) renderAt(next);
       this.renderedCount = next;
       size = BATCH;
-      if (next >= count) return;
-      const sentinel = this.bodyEl.createDiv("ps-sentinel");
-      const observer = new IntersectionObserver(
+      if (next >= count) {
+        this.renderNext = null;
+        return false;
+      }
+      const mark = (sentinel = this.bodyEl.createDiv("ps-sentinel"));
+      const watcher = (observer = new IntersectionObserver(
         (entries) => {
-          if (!entries.some((e) => e.isIntersecting)) return;
-          observer.disconnect();
-          sentinel.remove();
-          step();
+          if (entries.some((e) => e.isIntersecting) && mark.isConnected) step();
         },
         { root: this.bodyEl }
-      );
-      observer.observe(sentinel);
-      this.observers.push(observer);
+      ));
+      watcher.observe(mark);
+      this.observers.push(watcher);
+      return true;
     };
+    this.renderNext = step;
     step();
+  }
+
+  /** Render batches until `find` turns up an element, then scroll to it. */
+  private revealInList(find: () => HTMLElement | null | undefined): HTMLElement | null {
+    let el = find() ?? null;
+    while (!el && this.renderNext?.()) el = find() ?? null;
+    el?.scrollIntoView({ block: "center" });
+    return el;
   }
 
   private fitFrame: number | null = null;
@@ -1036,6 +1209,7 @@ export class SidebarView extends ItemView {
   private disconnectObservers(): void {
     for (const o of this.observers) o.disconnect();
     this.observers = [];
+    this.renderNext = null;
   }
 
   private renderHeader(title: string, count: number | null): void {
@@ -1468,10 +1642,15 @@ export class SidebarView extends ItemView {
    * the start of the line before "- [ ]". Obsidian's line state puts it at
    * column 0, so the column is set once the note is open.
    */
-  private async openTask(path: string, line: number, evt: MouseEvent): Promise<void> {
+  private openTask(path: string, line: number, evt: MouseEvent): Promise<void> {
+    return this.openTaskIn(path, line, Keymap.isModEvent(evt));
+  }
+
+  /** Open a note with the caret on a task's text, not before its "- [ ]". */
+  private async openTaskIn(path: string, line: number, mode: PaneType | boolean): Promise<void> {
     const file = this.app.vault.getAbstractFileByPath(path);
     if (!(file instanceof TFile)) return;
-    const leaf = await openFile(this.app, file, Keymap.isModEvent(evt), line);
+    const leaf = await openFile(this.app, file, mode, line);
     const view = leaf.view;
     if (!(view instanceof MarkdownView)) return;
     const editor = view.editor;

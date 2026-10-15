@@ -181,6 +181,11 @@ export async function tasksLineOptions(
   }
 }
 
+/** Whether the Tasks plugin is enabled (its API is there). */
+export function hasTasksPlugin(app: App): boolean {
+  return !!tasksApi(app);
+}
+
 /**
  * Open the Tasks plugin's own "Create task" dialog (due, scheduled, priority,
  * recurrence…). Resolves to the finished task line, or "" if cancelled.
@@ -225,3 +230,25 @@ export async function newKanbanBoard(app: App, folder: string | null): Promise<v
     runCommand(app, KANBAN_NEW_BOARD);
   }
 }
+
+/** One result from Omnisearch's public API. */
+export interface OmnisearchResult {
+  score: number;
+  path: string;
+  basename: string;
+  foundWords: string[];
+  excerpt: string;
+}
+
+/**
+ * Omnisearch's public API (`window.omnisearch`, documented by that plugin),
+ * when it's installed and enabled: ranked full-text results, including PDFs
+ * and images if its Text Extractor companion is set up.
+ */
+export function omnisearch(): { search(query: string): Promise<OmnisearchResult[]> } | null {
+  const api = (window as unknown as { omnisearch?: { search?: unknown } }).omnisearch;
+  return api && typeof api.search === "function"
+    ? (api as { search(query: string): Promise<OmnisearchResult[]> })
+    : null;
+}
+

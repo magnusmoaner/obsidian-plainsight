@@ -38,7 +38,7 @@ describe("parseViewState", () => {
   });
 
   test("clamps the column width to what the divider allows", () => {
-    expect(parseViewState({ navWidth: 20 }).navWidth).toBe(140);
+    expect(parseViewState({ navWidth: 20 }).navWidth).toBe(152);
     expect(parseViewState({ navWidth: 9999 }).navWidth).toBe(360);
     expect(parseViewState({ navWidth: 212.6 }).navWidth).toBe(213);
     expect(parseViewState({ navWidth: Number.NaN }).navWidth).toBe(DEFAULT_VIEW_STATE.navWidth);

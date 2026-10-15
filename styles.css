@@ -166,6 +166,7 @@
   overflow-y: auto;
   padding: 10px 6px;
   background: var(--background-secondary);
+  container: ps-nav / inline-size;
 }
 /* A 5px grab area that shows only a 1px line until hovered. */
 .ps-divider {
@@ -202,6 +203,7 @@
  * items scrolling underneath; top matches the padding so it pins flush.
  */
 .ps-nav-actions {
+  --ps-button: 40px;
   position: sticky;
   top: -10px;
   z-index: 2;
@@ -217,8 +219,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: var(--ps-button);
+  height: var(--ps-button);
   border-radius: 50%;
   /* The plain border colour vanishes on the grey sidebar; this one shows. */
   border: 1px solid var(--background-modifier-border-hover);
@@ -234,10 +236,21 @@
   border-color: var(--background-modifier-border-focus);
   color: var(--text-normal);
 }
+/* Search: filled with the accent, like the Note pill beside it. */
+.ps-round-button.is-accent {
+  background: var(--interactive-accent);
+  border-color: transparent;
+  color: var(--text-on-accent);
+}
+.ps-round-button.is-accent:hover {
+  background: var(--interactive-accent-hover);
+  border-color: transparent;
+  color: var(--text-on-accent);
+}
 .ps-new-note {
   flex: 1 1 auto;
   min-width: 0;
-  min-height: 40px;
+  min-height: var(--ps-button);
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -351,20 +364,13 @@
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
-/* Touch screens have no hover: keep the chevron and "+" visible there. */
+/* Touch screens have no hover: keep the fold chevron visible there. */
 @media (hover: none) {
   .ps-fold-slot .ps-fold-icon {
     opacity: 0;
   }
   .ps-fold-slot .ps-nav-chevron {
     opacity: 1;
-  }
-  .ps-nav-add {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  .ps-nav-count:has(~ .ps-nav-add) {
-    opacity: 0;
   }
 }
 /* The count fades out where the "+" fades in, keeping its width. */
@@ -373,6 +379,17 @@
 }
 .ps-nav-item:hover .ps-nav-count:has(~ .ps-nav-add) {
   opacity: 0;
+}
+/* …and leave the hover "+" out, so counts always show: the Note pill, the ⋯
+   menu and the list header create things there. (After the rule above, as
+   a tap can leave :hover stuck on.) */
+@media (hover: none) {
+  .ps-nav-add {
+    display: none;
+  }
+  .ps-nav-item:hover .ps-nav-count:has(~ .ps-nav-add) {
+    opacity: 1;
+  }
 }
 /* While the notes index fills in at startup: a thin bar under the list header. */
 .ps-loading {
@@ -1130,3 +1147,102 @@
   background: var(--background-modifier-active-hover);
   outline: none;
 }
+
+/* ---------- Search everywhere ---------- */
+/* Phones and tablets: Obsidian draws the on-screen keyboard over the app
+   and reports its height as --keyboard-height (0 when it's closed). Shrink
+   the search window to end above it, so the input (at the bottom on phones)
+   and every result can be seen. */
+.is-phone .prompt.ps-search-modal {
+  height: calc(100vh - var(--prompt-top) - var(--keyboard-height, 0px));
+}
+.is-mobile .prompt.ps-search-modal {
+  max-height: calc(100vh - var(--prompt-top, var(--size-4-8)) - var(--keyboard-height, 0px));
+}
+/* Group headings: their own lines between the results, not selectable. */
+.ps-search-modal .ps-search-group {
+  padding: var(--size-4-3) var(--size-4-3) var(--size-4-1);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-semibold);
+}
+/* The hand-offs elsewhere, set apart from the results by a rule. */
+.ps-search-modal .ps-search-group.is-elsewhere {
+  margin-top: var(--size-4-2);
+  border-top: 1px solid var(--background-modifier-border);
+}
+.ps-search-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+/* Icons sit centred on the first line of their item's text. */
+.ps-search-icon {
+  flex: 0 0 16px;
+  display: inline-flex;
+  align-items: center;
+  height: 1lh;
+  color: var(--text-muted);
+}
+.ps-search-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.ps-search-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ps-search-title,
+.ps-search-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ps-search-meta {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+.ps-search-excerpt {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ps-search-more .ps-search-title {
+  color: var(--text-muted);
+}
+/* "Show all N …": a small accent link, not another result row. */
+.ps-search-modal .suggestion-item.is-compact {
+  padding-top: var(--size-4-1);
+  padding-bottom: var(--size-4-2);
+}
+.ps-search-modal .is-compact .ps-search-title {
+  color: var(--text-accent);
+  font-size: var(--font-ui-small);
+}
+
+/* The action row as the places column narrows (its width less 12px padding).
+   Buttons stay 40px: first New folder and New task move into the ⋯ menu (the
+   + on Folders and Tasks does both too), then the pill drops its label. */
+@container ps-nav (max-width: 283px) {
+  .ps-nav-actions .is-optional {
+    display: none;
+  }
+  .ps-new-note {
+    padding: 8px 12px;
+  }
+}
+@container ps-nav (max-width: 185px) {
+  .ps-new-note {
+    flex: 0 0 var(--ps-button);
+    padding: 0;
+    justify-content: center;
+  }
+  .ps-new-note > span:last-child {
+    display: none;
+  }
+}
+
