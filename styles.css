@@ -1,0 +1,1277 @@
+/* Heading lines. Values come from the active Obsidian theme's own heading
+   variables so headings match Reading view; the fallbacks only matter outside
+   Obsidian (tests, standalone CM). */
+.cm-wys-heading {
+  font-weight: var(--heading-formatting, 600);
+  line-height: var(--line-height-tight, 1.3);
+}
+.cm-wys-h1 {
+  font-size: var(--h1-size, 1.802em);
+  font-weight: var(--h1-weight, 700);
+  color: var(--h1-color, inherit);
+}
+.cm-wys-h2 {
+  font-size: var(--h2-size, 1.602em);
+  font-weight: var(--h2-weight, 600);
+  color: var(--h2-color, inherit);
+}
+.cm-wys-h3 {
+  font-size: var(--h3-size, 1.424em);
+  font-weight: var(--h3-weight, 600);
+  color: var(--h3-color, inherit);
+}
+.cm-wys-h4 {
+  font-size: var(--h4-size, 1.266em);
+  font-weight: var(--h4-weight, 600);
+  color: var(--h4-color, inherit);
+}
+.cm-wys-h5 {
+  font-size: var(--h5-size, 1.125em);
+  font-weight: var(--h5-weight, 600);
+  color: var(--h5-color, inherit);
+}
+.cm-wys-h6 {
+  font-size: var(--h6-size, 1em);
+  font-weight: var(--h6-weight, 600);
+  color: var(--h6-color, inherit);
+}
+
+.cm-wys-strong { font-weight: 700; }
+.cm-wys-em { font-style: italic; }
+.cm-wys-highlight {
+  background-color: var(--text-highlight-bg);
+  border-radius: 2px;
+}
+/* Obsidian also colours ==highlights== itself (cm-highlight); where the two
+   nest, keep a single layer of colour. */
+.cm-highlight .cm-wys-highlight,
+.cm-wys-highlight .cm-highlight {
+  background-color: transparent;
+}
+.cm-wys-strike { text-decoration: line-through; }
+.cm-wys-code {
+  font-family: var(--font-monospace, monospace);
+  background-color: var(--code-background, rgba(0, 0, 0, 0.06));
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+/* Stands in for the hidden `[!type]` token and opens the type picker. */
+.cm-wys-callout-icon {
+  position: absolute;
+  top: 0.35em;
+  right: 0.5em;
+  cursor: pointer;
+  padding: 0 0.4em;
+  border-radius: 4px;
+  font-size: 0.9em;
+  line-height: 1.4;
+  user-select: none;
+  background-color: var(--background-secondary, rgba(0, 0, 0, 0.06));
+  opacity: 0.65;
+}
+.cm-wys-callout-icon:hover {
+  opacity: 1;
+}
+
+/* Same control on the rendered box, where Obsidian puts "Edit this block". */
+.callout {
+  position: relative;
+}
+.cm-wys-callout-menu {
+  position: absolute;
+  top: 0.4em;
+  right: 0.5em;
+  cursor: pointer;
+  padding: 0 0.4em;
+  border-radius: 4px;
+  line-height: 1.4;
+  background-color: var(--background-secondary, rgba(0, 0, 0, 0.06));
+  opacity: 0;
+  transition: opacity 0.1s ease-in-out;
+}
+.callout:hover .cm-wys-callout-menu {
+  opacity: 0.65;
+}
+.cm-wys-callout-menu:hover {
+  opacity: 1;
+}
+
+/* Callout box for the editing state.
+   Obsidian renders a callout as a replacing block widget (cm-embed-block) and
+   hands the source lines back only while you are editing them. These rules
+   apply exactly in that window, so the box no longer vanishes mid-edit.
+
+   Every colour carries a literal RGB fallback: Obsidian's --callout-* vars are
+   not reliably in scope on a .cm-line, and without a fallback the whole
+   rgba() is invalid and the box silently does not render at all. */
+.cm-wys-callout {
+  --cw: 158, 158, 158;
+  background-color: rgba(var(--cw), 0.1);
+  border-left: 1px solid rgba(var(--cw), 0.35);
+  border-right: 1px solid rgba(var(--cw), 0.35);
+  padding-left: 0.9em;
+  padding-right: 0.9em;
+}
+/* Each line is its own block, so only the end lines close the box. */
+.cm-wys-callout-first {
+  position: relative;
+  border-top: 1px solid rgba(var(--cw), 0.35);
+  border-top-left-radius: var(--callout-radius, 8px);
+  border-top-right-radius: var(--callout-radius, 8px);
+  padding-top: 0.6em;
+  font-weight: 600;
+  color: rgb(var(--cw));
+}
+.cm-wys-callout-last {
+  border-bottom: 1px solid rgba(var(--cw), 0.35);
+  border-bottom-left-radius: var(--callout-radius, 8px);
+  border-bottom-right-radius: var(--callout-radius, 8px);
+  padding-bottom: 0.6em;
+}
+.cm-wys-callout .cm-wys-callout-icon {
+  color: rgb(var(--cw));
+}
+
+/* Literal RGB triples, not Obsidian's --callout-* vars: those do not resolve
+   to an "r, g, b" triple here, which makes every rgba() using them invalid and
+   silently drops the whole box. Values match Obsidian's default palette. */
+.cm-wys-callout-quote,
+.cm-wys-callout-cite { --cw: 158, 158, 158; }
+.cm-wys-callout-note { --cw: 8, 109, 221; }
+.cm-wys-callout-info { --cw: 2, 122, 255; }
+.cm-wys-callout-todo { --cw: 2, 122, 255; }
+.cm-wys-callout-tip,
+.cm-wys-callout-hint { --cw: 0, 191, 188; }
+.cm-wys-callout-important { --cw: 8, 109, 221; }
+.cm-wys-callout-check,
+.cm-wys-callout-success,
+.cm-wys-callout-done { --cw: 8, 185, 78; }
+.cm-wys-callout-question,
+.cm-wys-callout-help,
+.cm-wys-callout-faq { --cw: 236, 117, 0; }
+.cm-wys-callout-warning,
+.cm-wys-callout-caution,
+.cm-wys-callout-attention { --cw: 236, 117, 0; }
+.cm-wys-callout-failure,
+.cm-wys-callout-fail,
+.cm-wys-callout-missing { --cw: 233, 49, 71; }
+.cm-wys-callout-danger,
+.cm-wys-callout-error { --cw: 233, 49, 71; }
+.cm-wys-callout-bug { --cw: 233, 49, 71; }
+.cm-wys-callout-example { --cw: 120, 82, 238; }
+.cm-wys-callout-abstract,
+.cm-wys-callout-summary,
+.cm-wys-callout-tldr { --cw: 0, 191, 188; }
+
+/* ---------- Plainsight notes sidebar ---------- */
+.ps-sidebar {
+  display: flex;
+  height: 100%;
+  padding: 0 !important;
+  /* See-through, so whatever the theme paints behind the sidebar shows, as it
+   * does behind the ribbon and title bar (Velocity: a window-wide gradient). */
+  background: transparent;
+  overflow: hidden;
+  font-size: var(--font-ui-small);
+}
+.ps-nav {
+  flex: 0 0 var(--ps-nav-width, 200px);
+  overflow-y: auto;
+  padding: 10px 6px;
+  background: transparent;
+  container: ps-nav / inline-size;
+}
+/* A 5px grab area, invisible until hovered. */
+.ps-divider {
+  flex: 0 0 5px;
+  cursor: col-resize;
+  background: transparent;
+}
+.ps-divider:hover {
+  background: var(--interactive-accent);
+}
+.ps-list {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  /* Lets the filter chips respond to this column's width, not the window's. */
+  container-type: inline-size;
+  container-name: ps-list;
+  /* Same grey as the nav column: the sidebar reads as one surface. */
+  background: var(--background-secondary);
+}
+
+/* Nav */
+/*
+ * Action row: the Note pill grows, the round icon buttons keep their size.
+ * Sticky at the top of the scrolling nav column. The negative margins cancel
+ * .ps-nav's padding so the row's background spans the full width and covers
+ * items scrolling underneath; top matches the padding so it pins flush.
+ */
+.ps-nav-actions {
+  --ps-button: 40px;
+  position: sticky;
+  top: -10px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -10px -6px 0;
+  padding: 10px 10px 12px;
+  /* Opaque, to cover the list scrolling under it: a copy of what's painted
+   * behind the sidebar (set by the view), pinned to the window so a
+   * gradient lines up with the one behind. */
+  background-color: var(--ps-surface-color, var(--background-secondary));
+  background-image: var(--ps-surface-image, none);
+  background-attachment: fixed;
+}
+.ps-round-button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ps-button);
+  height: var(--ps-button);
+  border-radius: 50%;
+  /* The plain border colour vanishes on the grey sidebar; this one shows. */
+  border: 1px solid var(--background-modifier-border-hover);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.ps-round-button svg {
+  width: 20px;
+  height: 20px;
+}
+.ps-round-button:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-focus);
+  color: var(--text-normal);
+}
+/* Search: filled with the accent, like the Note pill beside it. */
+.ps-round-button.is-accent {
+  background: var(--interactive-accent);
+  border-color: transparent;
+  color: var(--text-on-accent);
+}
+.ps-round-button.is-accent:hover {
+  background: var(--interactive-accent-hover);
+  border-color: transparent;
+  color: var(--text-on-accent);
+}
+.ps-new-note {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--ps-button);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-weight: 600;
+  cursor: pointer;
+}
+.ps-new-note .ps-nav-icon {
+  color: inherit;
+}
+/* The same hover as the Search button beside it. */
+.ps-new-note:hover {
+  background: var(--interactive-accent-hover);
+}
+.ps-nav-heading,
+.ps-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  margin-bottom: 2px;
+  border-radius: 6px;
+}
+.ps-nav-heading {
+  margin-top: 16px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+/* With the action row turned off, the first heading starts at the top. */
+.ps-nav > .ps-nav-heading:first-child {
+  margin-top: 0;
+}
+.ps-nav-heading:hover {
+  background: var(--background-modifier-hover);
+}
+/* Fold chevrons: point down when open, right when collapsed. */
+.ps-nav-chevron {
+  display: inline-flex;
+  color: var(--text-faint);
+  transition: transform 0.1s ease-in-out;
+}
+.ps-nav-chevron svg {
+  width: 16px;
+  height: 16px;
+}
+.ps-nav-chevron.is-collapsed {
+  transform: rotate(-90deg);
+}
+/*
+ * Hover affordances must not reflow the row: the fold chevron and the icon
+ * share one fixed 16px box (stacked, swapped by opacity), and the "+" sits
+ * absolutely at the right edge over the count, also swapped by opacity.
+ * Nothing toggles display, so the row's size never changes on hover.
+ */
+.ps-nav-heading,
+.ps-nav-item {
+  position: relative;
+  min-height: 32px;
+  box-sizing: border-box;
+}
+.ps-fold-slot {
+  position: relative;
+  width: 16px;
+  height: 16px;
+}
+.ps-fold-slot > span {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.1s ease-in-out, transform 0.1s ease-in-out;
+}
+.ps-fold-slot svg {
+  width: 16px;
+  height: 16px;
+}
+.ps-fold-slot .ps-nav-chevron {
+  opacity: 0;
+}
+.is-foldable:hover .ps-fold-slot .ps-fold-icon {
+  opacity: 0;
+}
+.is-foldable:hover .ps-fold-slot .ps-nav-chevron {
+  opacity: 1;
+}
+/* "+" at the right of Tasks, Folders and Tags, shown on hover. */
+.ps-nav-add {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s ease-in-out;
+}
+.ps-nav-add svg {
+  width: 16px;
+  height: 16px;
+}
+.ps-nav-heading:hover .ps-nav-add,
+.ps-nav-item:hover .ps-nav-add {
+  opacity: 1;
+  pointer-events: auto;
+}
+.ps-nav-add:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+/* Touch screens have no hover: keep the fold chevron visible there. */
+@media (hover: none) {
+  .ps-fold-slot .ps-fold-icon {
+    opacity: 0;
+  }
+  .ps-fold-slot .ps-nav-chevron {
+    opacity: 1;
+  }
+}
+/* The count fades out where the "+" fades in, keeping its width. */
+.ps-nav-count {
+  transition: opacity 0.1s ease-in-out;
+}
+.ps-nav-item:hover .ps-nav-count:has(~ .ps-nav-add) {
+  opacity: 0;
+}
+/* …and leave the hover "+" out, so counts always show: the Note pill, the ⋯
+   menu and the list header create things there. (After the rule above, as
+   a tap can leave :hover stuck on.) */
+@media (hover: none) {
+  .ps-nav-add {
+    display: none;
+  }
+  .ps-nav-item:hover .ps-nav-count:has(~ .ps-nav-add) {
+    opacity: 1;
+  }
+}
+/* While the notes index fills in at startup: a thin bar under the list header. */
+.ps-loading {
+  height: 2px;
+  margin-top: 8px;
+  border-radius: 1px;
+  background: var(--background-modifier-border);
+  overflow: hidden;
+}
+.ps-loading::after {
+  content: "";
+  display: block;
+  height: 100%;
+  width: var(--ps-progress, 0%);
+  background: var(--interactive-accent);
+}
+.ps-modal-error {
+  min-height: 1.2em;
+  color: var(--text-error);
+  font-size: var(--font-ui-smaller);
+}
+
+/* ---------- Dialogs: one input, chips, and a right-aligned button bar ---------- */
+.ps-dialog {
+  width: min(480px, calc(100vw - 32px));
+}
+/* Title and close button on one line. */
+.ps-dialog .modal-title {
+  margin-bottom: var(--size-4-3);
+  padding-right: 32px;
+  line-height: var(--line-height-tight);
+}
+.ps-dialog .modal-close-button {
+  top: var(--size-4-4);
+}
+.ps-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2);
+}
+.ps-dialog-subtitle {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  margin-top: calc(-1 * var(--size-4-2));
+}
+.ps-dialog .ps-dialog-input {
+  width: 100%;
+  height: 40px;
+  font-size: var(--font-ui-medium);
+}
+.ps-dialog-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--size-4-2);
+}
+.ps-dialog-chips.is-end {
+  justify-content: flex-end;
+}
+.ps-dialog-chips-label {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+.ps-dialog .ps-dialog-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  max-width: 100%;
+  padding: 0 10px;
+  border-radius: 14px;
+  border: 1px solid var(--background-modifier-border-hover);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+.ps-dialog .ps-dialog-chip:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.ps-dialog .ps-dialog-chip.is-set {
+  color: var(--text-normal);
+}
+.ps-dialog-chip-icon {
+  display: inline-flex;
+}
+.ps-dialog-chip-icon svg {
+  width: 14px;
+  height: 14px;
+}
+.ps-dialog-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Only shown if the browser can't open the date picker directly. Specific
+   enough to beat Obsidian's own input[type=date] padding and width, which
+   otherwise leave an invisible gap in the chip row. */
+.ps-dialog input.ps-dialog-date {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.ps-dialog input.ps-dialog-date.is-shown {
+  position: static;
+  width: auto;
+  height: 28px;
+  opacity: 1;
+  pointer-events: auto;
+}
+/* Labelled fields: label on the left, a dropdown-styled button on the right. */
+.ps-dialog-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2);
+}
+.ps-dialog-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-3);
+}
+/* The hidden date input sits under the value button, so the calendar opens there. */
+.ps-dialog-field input.ps-dialog-date {
+  left: calc(84px + var(--size-4-3));
+  bottom: 0;
+}
+.ps-dialog-field-label {
+  flex: 0 0 84px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+.ps-dialog .ps-dialog-field-value {
+  /* Obsidian's buttons are inline-flex, where text-overflow does nothing. */
+  display: block;
+  /* As a block the text no longer centres itself vertically. */
+  line-height: calc(var(--input-height) - 2px);
+  padding-top: 0;
+  padding-bottom: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-start;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ps-dialog .ps-dialog-field-value.is-empty {
+  color: var(--text-faint);
+}
+/* "More details": the dialog grows and shrinks instead of being replaced. */
+.ps-dialog .ps-dialog-disclosure {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: auto;
+  padding: 2px 4px 2px 0;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+.ps-dialog .ps-dialog-disclosure:hover {
+  background: transparent;
+  color: var(--text-normal);
+}
+.ps-dialog-disclosure-summary {
+  color: var(--text-normal);
+}
+.ps-dialog-disclosure-icon {
+  display: inline-flex;
+  transition: transform 0.15s ease-in-out;
+}
+.ps-dialog-disclosure-icon svg {
+  width: 14px;
+  height: 14px;
+}
+.ps-dialog-disclosure.is-open .ps-dialog-disclosure-icon {
+  transform: rotate(90deg);
+}
+.ps-dialog-details {
+  display: grid;
+  grid-template-rows: 0fr;
+  margin-top: calc(-1 * var(--size-4-2));
+  transition: grid-template-rows 0.2s ease-in-out, margin-top 0.2s ease-in-out;
+}
+.ps-dialog-details.is-open {
+  grid-template-rows: 1fr;
+  margin-top: 0;
+}
+.ps-dialog-details-inner {
+  min-height: 0;
+  overflow: hidden;
+  /* Room for the buttons' focus rings, which overflow: hidden would clip. */
+  padding: 3px;
+  margin: -3px;
+}
+.ps-dialog .modal-button-container {
+  margin-top: var(--size-4-2);
+  align-items: center;
+}
+/* Natural-width buttons on the right, not stretched across the dialog. */
+.ps-dialog .modal-button-container {
+  justify-content: flex-end;
+}
+.ps-dialog .modal-button-container button {
+  flex: 0 0 auto;
+}
+.ps-nav-item .ps-nav-chevron {
+  cursor: pointer;
+  border-radius: 3px;
+}
+.ps-nav-item .ps-nav-chevron:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+/* A bookmark whose note was deleted: still listed, visibly dead. */
+.ps-nav-item.is-missing {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+.ps-nav-item {
+  padding-left: calc(10px + var(--ps-depth, 0) * 16px);
+  cursor: pointer;
+  color: var(--text-normal);
+}
+.ps-nav-item:hover {
+  background: var(--background-modifier-hover);
+}
+.ps-nav-item.is-active {
+  background: var(--background-modifier-active-hover);
+  font-weight: 600;
+}
+.ps-nav-icon {
+  display: inline-flex;
+  flex: 0 0 16px;
+  color: var(--text-muted);
+}
+.ps-nav-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.ps-nav-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ps-nav-count {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+
+/* List header */
+.ps-list-header {
+  flex: 0 0 auto;
+  padding: 14px 14px 6px;
+}
+.ps-header-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.ps-title {
+  font-size: 1.5em;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ps-count {
+  color: var(--text-faint);
+}
+.ps-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+.ps-action,
+.ps-back {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.ps-action:hover,
+.ps-back:hover {
+  background: var(--background-modifier-hover);
+}
+/* Wraps Obsidian's SearchComponent, which brings its own pill styling. */
+.ps-search {
+  flex: 0 0 auto;
+  margin: 0 14px 8px;
+}
+/*
+ * Filter chips: one row that scrolls sideways when it doesn't fit (no
+ * wrapping onto a second line), compact chips, and counts dropped when the
+ * column is narrow.
+ */
+.ps-filters {
+  /* A scroll container in a flex column gets min-height 0 and is squashed
+     flat by the list below it; it must not shrink. */
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 5px;
+  padding: 0 14px 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.ps-filters::-webkit-scrollbar {
+  display: none;
+}
+.ps-filters:empty {
+  display: none;
+}
+.ps-filter {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border);
+  cursor: pointer;
+}
+/* The note chip truncates its title at a fixed maximum width, so its ✕
+   always shows; the chip row scrolls sideways when it doesn't fit. */
+.ps-filter-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 180px;
+}
+.ps-filter-caret,
+.ps-filter-clear {
+  flex: 0 0 auto;
+}
+.ps-filter-note > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ps-filter-caret,
+.ps-filter-clear {
+  display: inline-flex;
+}
+.ps-filter-caret svg,
+.ps-filter-clear svg {
+  width: 14px;
+  height: 14px;
+}
+.ps-filter-clear {
+  border-radius: 50%;
+}
+.ps-filter-clear:hover {
+  background: var(--background-modifier-hover);
+}
+/* The note name gives way (one line, "…") so the due date never wraps. */
+.ps-task-note {
+  cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ps-task-note:hover {
+  color: var(--text-normal);
+  text-decoration: underline;
+}
+.ps-filter-count {
+  margin-left: 5px;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+.ps-filter.is-active {
+  background: var(--background-modifier-active-hover);
+  font-weight: 600;
+}
+
+/* List body */
+.ps-list-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0 8px 16px;
+}
+.ps-group-label {
+  padding: 14px 8px 6px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+}
+.ps-empty {
+  padding: 24px 8px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.ps-empty button {
+  margin-top: 10px;
+}
+.ps-sentinel {
+  height: 1px;
+}
+.ps-card {
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.ps-card:hover {
+  background: var(--background-modifier-hover);
+}
+/* The selected note lifts off the grey as a white card (the editor's own
+   background, so dark themes get their dark equivalent). */
+.ps-card.is-active,
+.ps-card.is-active:hover {
+  background: var(--background-primary);
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+.ps-card-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ps-card-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ps-card-kind {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+.ps-card-kind svg {
+  width: 15px;
+  height: 15px;
+}
+.ps-card-items {
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+}
+.ps-card-pin {
+  display: inline-flex;
+  color: var(--color-orange);
+}
+.ps-card-pin svg {
+  width: 14px;
+  height: 14px;
+}
+.ps-card-snippet {
+  margin-top: 4px;
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ps-card-tasks {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(var(--color-purple-rgb), 0.12);
+  color: var(--color-purple);
+}
+.ps-card-tasks svg {
+  width: 14px;
+  height: 14px;
+}
+/* One line: date · badge · tags (overflow folded into "+N" in code). */
+.ps-card-meta {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  white-space: nowrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+.ps-card-date {
+  flex: 0 0 auto;
+}
+.ps-card-tag,
+.ps-card-more {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+}
+.ps-card-thumb {
+  flex: 0 0 64px;
+}
+.ps-card-thumb img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+/* Task rows */
+.ps-task {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.ps-task:hover {
+  background: var(--background-modifier-hover);
+}
+/* The task under the cursor in a note, like the open note's card. */
+.ps-task.is-active,
+.ps-task.is-active:hover {
+  background: var(--background-primary);
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+.ps-task-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ps-task-meta {
+  margin-top: 4px;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+
+/* Task details as badges; on a narrow list they wrap as whole badges. */
+.ps-badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.ps-badge-icon {
+  display: inline-flex;
+}
+.ps-badge-icon svg {
+  width: 12px;
+  height: 12px;
+}
+.ps-badge.is-overdue {
+  background: rgba(var(--color-red-rgb), 0.12);
+  color: var(--color-red);
+}
+.ps-badge.is-today {
+  background: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.14);
+  color: var(--text-accent);
+}
+/* Priority: the urgent ones stand out; low ones (most imported tasks) stay quiet. */
+.ps-badge.is-priority-highest {
+  background: rgba(var(--color-red-rgb), 0.12);
+  color: var(--color-red);
+}
+.ps-badge.is-priority-high {
+  background: rgba(var(--color-orange-rgb), 0.14);
+  color: var(--color-orange);
+}
+.ps-badge.is-priority-medium .ps-badge-icon {
+  color: var(--color-yellow);
+}
+.ps-badge.is-priority-low,
+.ps-badge.is-priority-lowest {
+  background: transparent;
+  padding-left: 0;
+  color: var(--text-faint);
+}
+.ps-badge.is-quiet {
+  background: transparent;
+  padding-left: 0;
+  color: var(--text-faint);
+}
+
+/* Mobile: one column at a time */
+.ps-sidebar.is-mobile .ps-divider {
+  display: none;
+}
+.ps-sidebar.is-mobile .ps-nav {
+  flex: 1 1 auto;
+}
+.ps-sidebar.is-mobile .ps-list {
+  display: none;
+}
+.ps-sidebar.is-mobile.show-list .ps-nav {
+  display: none;
+}
+.ps-sidebar.is-mobile.show-list .ps-list {
+  display: flex;
+}
+/* Non-image attachments get a file icon where an image would show. */
+.ps-card-fileicon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 64px;
+  border-radius: 4px;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+}
+.ps-card-fileicon svg {
+  width: 28px;
+  height: 28px;
+}
+/* At narrow nav widths the pill shrinks; its label truncates, never wraps. */
+.ps-new-note > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@container ps-list (max-width: 340px) {
+  .ps-filter-count {
+    display: none;
+  }
+  .ps-filter {
+    padding: 2px 8px;
+  }
+  .ps-filter-note {
+    max-width: 130px;
+  }
+}
+
+/* ---------- Links ---------- */
+.cm-wys-link {
+  color: var(--link-color);
+  text-decoration: underline;
+  text-decoration-color: var(--link-color);
+  text-underline-offset: 2px;
+  cursor: text;
+}
+.cm-wys-link.is-external {
+  color: var(--link-external-color, var(--link-color));
+  text-decoration-color: var(--link-external-color, var(--link-color));
+}
+/* A link to a note that doesn't exist (yet). */
+.cm-wys-link.is-unresolved {
+  text-decoration-style: dashed;
+  opacity: 0.8;
+}
+/* Imported evernote:/// links can't open in Obsidian. */
+.cm-wys-link.is-evernote {
+  color: var(--text-muted);
+  text-decoration-color: var(--text-faint);
+  text-decoration-style: dotted;
+}
+
+/* The "+N" chip stays out of the way until fitTagRows gives it a number. */
+.ps-card-more:empty {
+  display: none;
+}
+/* Badge icon and text centred on the same line, not on the text baseline. */
+.ps-card-tasks {
+  line-height: 1;
+  padding: 3px 7px;
+}
+.ps-card-tasks > span {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+.ps-card-tasks svg {
+  display: block;
+  width: 13px;
+  height: 13px;
+}
+
+/* Mobile back button: a full 44px touch target in the title row. */
+.ps-back {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: 0 2px 0 -12px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-normal);
+}
+.ps-back svg {
+  width: 28px;
+  height: 28px;
+}
+/* Transparent in every state: Obsidian's button styling and a hover that
+   sticks after a tap on touch screens would otherwise grey it. */
+.ps-sidebar .ps-back,
+.ps-sidebar .ps-back:hover,
+.ps-sidebar .ps-back:active,
+.ps-sidebar .ps-back:focus {
+  background: transparent;
+  box-shadow: none;
+}
+.ps-sidebar.is-mobile .ps-header-row {
+  align-items: center;
+}
+
+/* A bookmark's group name, in the count's place; long names truncate. */
+.ps-nav-group {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Experiment: the list column as a rounded white card ---------- */
+.ps-list {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+/* Gaps around the panel, per side (settings); a corner rounds when either of
+ * its sides has a gap. */
+.ps-inset-top .ps-list { margin-top: 8px; }
+.ps-inset-bottom .ps-list { margin-bottom: 8px; }
+.ps-inset-left .ps-list { margin-left: 4px; }
+.ps-inset-right .ps-list { margin-right: 8px; }
+.ps-sidebar:is(.ps-inset-top, .ps-inset-left) .ps-list { border-top-left-radius: 12px; }
+.ps-sidebar:is(.ps-inset-top, .ps-inset-right) .ps-list { border-top-right-radius: 12px; }
+.ps-sidebar:is(.ps-inset-bottom, .ps-inset-left) .ps-list { border-bottom-left-radius: 12px; }
+.ps-sidebar:is(.ps-inset-bottom, .ps-inset-right) .ps-list { border-bottom-right-radius: 12px; }
+/* The selected entry looks like a selected nav item: same tint, no border. */
+.ps-card.is-active,
+.ps-card.is-active:hover,
+.ps-task.is-active,
+.ps-task.is-active:hover {
+  background: var(--background-modifier-active-hover);
+  outline: none;
+}
+
+/* ---------- Search everywhere ---------- */
+/* Phones and tablets: Obsidian draws the on-screen keyboard over the app
+   and reports its height as --keyboard-height (0 when it's closed). Shrink
+   the search window to end above it, so the input (at the bottom on phones)
+   and every result can be seen. */
+.is-phone .prompt.ps-search-modal {
+  height: calc(100vh - var(--prompt-top) - var(--keyboard-height, 0px));
+}
+.is-mobile .prompt.ps-search-modal {
+  max-height: calc(100vh - var(--prompt-top, var(--size-4-8)) - var(--keyboard-height, 0px));
+}
+/* Group headings: their own lines between the results, not selectable. */
+.ps-search-modal .ps-search-group {
+  padding: var(--size-4-3) var(--size-4-3) var(--size-4-1);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-semibold);
+}
+/* The hand-offs elsewhere, set apart from the results by a rule. */
+.ps-search-modal .ps-search-group.is-elsewhere {
+  margin-top: var(--size-4-2);
+  border-top: 1px solid var(--background-modifier-border);
+}
+.ps-search-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+/* Icons sit centred on the first line of their item's text. */
+.ps-search-icon {
+  flex: 0 0 16px;
+  display: inline-flex;
+  align-items: center;
+  height: 1lh;
+  color: var(--text-muted);
+}
+.ps-search-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.ps-search-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ps-search-title,
+.ps-search-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ps-search-meta {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+.ps-search-excerpt {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ps-search-more .ps-search-title {
+  color: var(--text-muted);
+}
+/* "Show all N …": a small accent link, not another result row. */
+.ps-search-modal .suggestion-item.is-compact {
+  padding-top: var(--size-4-1);
+  padding-bottom: var(--size-4-2);
+}
+.ps-search-modal .is-compact .ps-search-title {
+  color: var(--text-accent);
+  font-size: var(--font-ui-small);
+}
+
+/* The action row as the places column narrows (its width less 12px padding).
+   Buttons stay 40px: first New folder and New task move into the ⋯ menu (the
+   + on Folders and Tasks does both too), then the pill drops its label. */
+@container ps-nav (max-width: 283px) {
+  .ps-nav-actions .is-optional {
+    display: none;
+  }
+  .ps-new-note {
+    padding: 8px 12px;
+  }
+}
+@container ps-nav (max-width: 185px) {
+  .ps-new-note {
+    flex: 0 0 var(--ps-button);
+    padding: 0;
+    justify-content: center;
+  }
+  .ps-new-note > span:last-child {
+    display: none;
+  }
+}
+

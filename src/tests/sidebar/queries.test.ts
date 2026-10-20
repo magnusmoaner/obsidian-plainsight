@@ -1,0 +1,465 @@
+import { describe, expect, test } from "vitest";
+import {
+  folderRows,
+  groupNotes,
+  groupNotesBy,
+  kindCounts,
+  notesFor,
+  tagRows,
+  taskProgress,
+  addDays,
+  filterTaskRows,
+  groupTaskRows,
+  notesOfTaskRows,
+  taskRows,
+  visibleRows,
+} from "../../sidebar/core/queries";
+import { note } from "./fixtures";
+
+const OCT = Date.UTC(2026, 9, 15);
+const SEP = Date.UTC(2026, 8, 15);
+const opts = { sort: "modified" as const, search: "", templatesFolder: "Templates" };
+
+const notes = [
+  note("Inbox/a.md", { mtime: SEP, tags: ["Work"] }),
+  note("Inbox/Sub/b.md", { mtime: OCT, tags: ["work/client"] }),
+  note("Other/c.md", { mtime: OCT - 1, pinned: true }),
+  note("Templates/t.md", { mtime: OCT + 1 }),
+];
+const paths = (list: { path: string }[]) => list.map((n) => n.path);
+
+describe("notesFor", () => {
+  test("Notes = everything except templates; pinned first, then newest", () => {
+    expect(paths(notesFor(notes, { kind: "notes" }, opts))).toEqual([
+      "Other/c.md",
+      "Inbox/Sub/b.md",
+      "Inbox/a.md",
+    ]);
+  });
+
+  test("a notebook includes its subfolders", () => {
+    expect(paths(notesFor(notes, { kind: "notebook", folder: "Inbox" }, opts))).toEqual([
+      "Inbox/Sub/b.md",
+      "Inbox/a.md",
+    ]);
+  });
+
+  test("a tag matches nested tags, case-insensitively", () => {
+    expect(paths(notesFor(notes, { kind: "tag", tag: "work" }, opts))).toEqual([
+      "Inbox/Sub/b.md",
+      "Inbox/a.md",
+    ]);
+  });
+
+  test("templates place lists only the templates folder", () => {
+    expect(paths(notesFor(notes, { kind: "templates" }, opts))).toEqual(["Templates/t.md"]);
+    expect(notesFor(notes, { kind: "templates" }, { ...opts, templatesFolder: null })).toEqual([]);
+  });
+
+  test("search requires every term", () => {
+    const list = [
+      note("x.md", { searchText: "budget plan 2026" }),
+      note("y.md", { searchText: "budget only" }),
+    ];
+    expect(paths(notesFor(list, { kind: "notes" }, { ...opts, search: "Plan budget" }))).toEqual([
+      "x.md",
+    ]);
+  });
+
+  test("title sort is alphabetical with numbers in order", () => {
+    const list = [note("n10.md"), note("n2.md"), note("a.md")];
+    expect(paths(notesFor(list, { kind: "notes" }, { ...opts, sort: "title" }))).toEqual([
+      "a.md",
+      "n2.md",
+      "n10.md",
+    ]);
+  });
+});
+
+describe("groupNotes", () => {
+  test("pinned group first, then months", () => {
+    const sorted = notesFor(notes, { kind: "notes" }, opts);
+    expect(groupNotes(sorted, "modified").map((g) => [g.label, g.notes.length])).toEqual([
+      ["Pinned Notes", 1],
+      ["October 2026", 1],
+      ["September 2026", 1],
+    ]);
+  });
+
+  test("title sort has no month groups", () => {
+    expect(groupNotes([note("a.md"), note("b.md")], "title").map((g) => g.label)).toEqual([""]);
+  });
+
+  test("no notes, no groups", () => {
+    expect(groupNotes([], "modified")).toEqual([]);
+  });
+});
+
+describe("folderRows", () => {
+  const list = [note("A/x.md"), note("A/B/y.md"), note("A B/z.md"), note("root.md")];
+
+  test("indented tree, parents before children, counts include descendants", () => {
+    expect(folderRows(["A", "A/B", "A B"], list, null)).toEqual([
+      { path: "A", name: "A", depth: 0, count: 2 },
+      { path: "A/B", name: "B", depth: 1, count: 1 },
+      { path: "A B", name: "A B", depth: 0, count: 1 },
+    ]);
+  });
+
+  test("empty folders are notebooks too (a new one has no notes yet)", () => {
+    expect(folderRows(["Empty"], [], null)).toEqual([
+      { path: "Empty", name: "Empty", depth: 0, count: 0 },
+    ]);
+  });
+
+  test("excludes folders the predicate rejects, e.g. attachment folders", () => {
+    const withAtt = [note("A/x.md"), note("A/Attachments/c.md")];
+    expect(
+      folderRows(["A", "A/Attachments"], withAtt, null, (f) => f.endsWith("/Attachments")).map(
+        (r) => [r.path, r.count]
+      )
+    ).toEqual([["A", 2]]);
+  });
+
+  test("excludes the templates folder", () => {
+    expect(folderRows(["Templates"], [note("Templates/t.md")], "Templates")).toEqual([]);
+  });
+});
+
+describe("tagRows", () => {
+  test("nested tags with ancestor counts, each note counted once", () => {
+    const list = [
+      note("1.md", { tags: ["work/client", "work"] }),
+      note("2.md", { tags: ["Work/internal"] }),
+      note("3.md", { tags: ["home"] }),
+    ];
+    expect(tagRows(list)).toEqual([
+      { path: "home", name: "home", depth: 0, count: 1 },
+      { path: "work", name: "work", depth: 0, count: 2 },
+      { path: "work/client", name: "client", depth: 1, count: 1 },
+      { path: "work/internal", name: "internal", depth: 1, count: 1 },
+    ]);
+  });
+});
+
+describe("taskRows", () => {
+  const t = (line: number, status: string, due: string | null = null) => ({
+    line,
+    status,
+    text: `task ${line}`,
+    due,
+    section: null,
+    done: null,
+  });
+  const list = [
+    note("a.md", { mtime: 1, tasks: [t(0, " ", "2026-10-20"), t(1, "x"), t(2, " ")] }),
+    note("b.md", { mtime: 2, tasks: [t(0, " ", "2026-10-01"), t(1, "-")] }),
+  ];
+  const keys = (rows: { note: { path: string }; task: { line: number } }[]) =>
+    rows.map((r) => `${r.note.path}:${r.task.line}`);
+
+  test("open: earliest due first, undated last", () => {
+    expect(keys(taskRows(list, "open", "2026-10-07"))).toEqual(["b.md:0", "a.md:0", "a.md:2"]);
+  });
+
+  test("overdue: open with a due date before today", () => {
+    expect(keys(taskRows(list, "overdue", "2026-10-07"))).toEqual(["b.md:0"]);
+  });
+
+  test("done includes cancelled, newest note first", () => {
+    expect(keys(taskRows(list, "done", "2026-10-07"))).toEqual(["b.md:1", "a.md:1"]);
+  });
+
+  test("Kanban board cards are left out unless asked for", () => {
+    const board = note("Board.md", { kind: "board", tasks: [t(0, " ")] });
+    expect(keys(taskRows([...list, board], "open", "2026-10-07"))).not.toContain("Board.md:0");
+    expect(keys(taskRows([...list, board], "open", "2026-10-07", null, true))).toContain("Board.md:0");
+  });
+
+  test("tasks written in a Task List Kanban board's own file are ordinary tasks", () => {
+    const board = note("Tasks board.md", { kind: "board", taskListBoard: true, tasks: [t(0, " ")] });
+    expect(keys(taskRows([...list, board], "open", "2026-10-07"))).toContain("Tasks board.md:0");
+  });
+
+  test("tasks inside the templates folder are excluded", () => {
+    const withTemplate = [...list, note("Templates/t.md", { tasks: [t(0, " ")] })];
+    expect(keys(taskRows(withTemplate, "open", "2026-10-07", "Templates"))).toEqual([
+      "b.md:0",
+      "a.md:0",
+      "a.md:2",
+    ]);
+  });
+
+  test("taskProgress counts done and cancelled as closed", () => {
+    expect(taskProgress(list[1])).toEqual({ closed: 1, total: 2 });
+  });
+});
+
+describe("visibleRows", () => {
+  const rows = [
+    { path: "A", name: "A", depth: 0, count: 3 },
+    { path: "A/B", name: "B", depth: 1, count: 2 },
+    { path: "A/B/C", name: "C", depth: 2, count: 1 },
+    { path: "A/D", name: "D", depth: 1, count: 1 },
+    { path: "E", name: "E", depth: 0, count: 1 },
+  ];
+  const shown = (collapsed: string[]) =>
+    visibleRows(rows, new Set(collapsed)).map((r) => `${r.path}${r.collapsed ? "+" : ""}`);
+
+  test("nothing collapsed shows everything, marking parents", () => {
+    expect(visibleRows(rows, new Set()).map((r) => r.hasChildren)).toEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+    ]);
+  });
+
+  test("collapsing a parent hides all its descendants, not its siblings", () => {
+    expect(shown(["A/B"])).toEqual(["A", "A/B+", "A/D", "E"]);
+    expect(shown(["A"])).toEqual(["A+", "E"]);
+  });
+
+  test("a collapsed leaf is ignored", () => {
+    expect(shown(["E"])).toEqual(["A", "A/B", "A/B/C", "A/D", "E"]);
+  });
+
+  test("a collapsed row inside a collapsed parent stays hidden", () => {
+    expect(shown(["A", "A/B"])).toEqual(["A+", "E"]);
+  });
+});
+
+describe("filterTaskRows", () => {
+  const t = (line: number, text: string) => ({ line, status: " ", text, due: null, section: null, done: null });
+  const rows = [
+    { note: note("Home.md"), task: t(0, "Buy milk 📅 2026-10-09") },
+    { note: note("Home.md"), task: t(1, "Call plumber") },
+    { note: note("Work/Plan.md"), task: t(0, "Send budget") },
+  ];
+  const texts = (r: { task: { text: string } }[]) => r.map((x) => x.task.text.split(" ")[0]);
+
+  test("search matches task text, every word, case-insensitively", () => {
+    expect(texts(filterTaskRows(rows, "MILK buy", null))).toEqual(["Buy"]);
+  });
+
+  test("search also matches the note's title", () => {
+    expect(texts(filterTaskRows(rows, "plan", null))).toEqual(["Send"]);
+  });
+
+  test("filters to one note, combined with search", () => {
+    expect(texts(filterTaskRows(rows, "", "Home.md"))).toEqual(["Buy", "Call"]);
+    expect(texts(filterTaskRows(rows, "call", "Home.md"))).toEqual(["Call"]);
+    expect(filterTaskRows(rows, "budget", "Home.md")).toEqual([]);
+  });
+
+  test("notesOfTaskRows counts rows per note, most first", () => {
+    expect(notesOfTaskRows(rows).map((e) => [e.note.path, e.count])).toEqual([
+      ["Home.md", 2],
+      ["Work/Plan.md", 1],
+    ]);
+  });
+});
+
+describe("groupTaskRows", () => {
+  const today = "2026-10-08";
+  const row = (
+    path: string,
+    due: string | null,
+    section: string | null = null,
+    kind: "note" | "board" = "note",
+    extra: { status?: string; done?: string | null; columns?: string[] } = {}
+  ) => ({
+    note: note(path, { kind, columns: extra.columns ?? [] }),
+    task: { line: 0, status: extra.status ?? " ", text: path, due, section, done: extra.done ?? null },
+  });
+  const labels = (groups: { label: string; rows: unknown[] }[]) => groups.map((g) => `${g.label}:${g.rows.length}`);
+
+  test("addDays crosses month and year ends", () => {
+    expect(addDays("2026-10-31", 1)).toBe("2026-11-01");
+    expect(addDays("2026-12-31", 1)).toBe("2027-01-01");
+  });
+
+  test("due buckets in a fixed order, regardless of row order", () => {
+    const rows = [
+      row("a.md", null),
+      row("b.md", "2026-10-30"),
+      row("c.md", "2026-10-12"),
+      row("d.md", "2026-10-09"),
+      row("e.md", "2026-10-08"),
+      row("f.md", "2026-10-01"),
+    ];
+    expect(labels(groupTaskRows(rows, "due", today))).toEqual([
+      "Overdue:1",
+      "Today:1",
+      "Tomorrow:1",
+      "Next 7 days:1",
+      "Later:1",
+      "No due date:1",
+    ]);
+  });
+
+  test("folder groups alphabetically, root labelled", () => {
+    const rows = [row("Work/x.md", null), row("y.md", null), row("Home/z.md", null)];
+    expect(labels(groupTaskRows(rows, "folder", today))).toEqual(["Vault root:1", "Home:1", "Work:1"]);
+  });
+
+  test("note groups keep first-appearance order", () => {
+    const rows = [row("B.md", null), row("A.md", null), row("B.md", null)];
+    expect(labels(groupTaskRows(rows, "note", today))).toEqual(["B:2", "A:1"]);
+  });
+
+  test("board groups by board and list in the board's own order, dropping ordinary notes", () => {
+    const cols = { columns: ["Todo", "Doing", "Done"] };
+    const rows = [
+      row("Proj.md", "2026-10-08", "Doing", "board", cols),
+      row("Proj.md", null, "Todo", "board", cols),
+      row("Proj.md", null, "Todo", "board", cols),
+      row("Note.md", null, "Todo"),
+    ];
+    expect(labels(groupTaskRows(rows, "board", today))).toEqual(["Proj › Todo:2", "Proj › Doing:1"]);
+  });
+
+  test("a Task List Kanban board has no lanes of its own, so its tasks aren't board cards", () => {
+    const rows = [
+      { ...row("Tasks board.md", null, "Later", "board"), note: note("Tasks board.md", { kind: "board", taskListBoard: true }) },
+      row("Proj.md", null, "Todo", "board", { columns: ["Todo"] }),
+    ];
+    expect(labels(groupTaskRows(rows, "board", today))).toEqual(["Proj › Todo:1"]);
+  });
+
+  test("boards come alphabetically, whatever the due-date order of their cards", () => {
+    const rows = [
+      row("B.md", "2026-10-08", "X", "board", { columns: ["X"] }),
+      row("A.md", null, "Todo", "board", { columns: ["Todo"] }),
+    ];
+    expect(labels(groupTaskRows(rows, "board", today))).toEqual(["A › Todo:1", "B › X:1"]);
+  });
+
+  const withText = (path: string, text: string, status = " ") => ({
+    note: note(path),
+    task: { line: 0, status, text, due: null, section: null, done: null },
+  });
+
+  test("priority in the Tasks plugin's order, normal between medium and low", () => {
+    const rows = [
+      withText("a.md", "a 🔽"),
+      withText("b.md", "b"),
+      withText("c.md", "c ⏫"),
+      withText("d.md", "d 🔺"),
+      withText("e.md", "e ⏬"),
+      withText("f.md", "f 🔼"),
+    ];
+    expect(labels(groupTaskRows(rows, "priority", today))).toEqual([
+      "Highest priority:1",
+      "High priority:1",
+      "Medium priority:1",
+      "Normal priority:1",
+      "Low priority:1",
+      "Lowest priority:1",
+    ]);
+  });
+
+  test("scheduled date in buckets, unscheduled last", () => {
+    const rows = [
+      withText("a.md", "a"),
+      withText("b.md", "b ⏳ 2026-10-01"),
+      withText("c.md", "c ⏳ 2026-10-08"),
+      withText("d.md", "d ⏳ 2026-12-24"),
+    ];
+    expect(labels(groupTaskRows(rows, "scheduled", today))).toEqual([
+      "Earlier:1",
+      "Today:1",
+      "Later:1",
+      "Not scheduled:1",
+    ]);
+  });
+
+  test("recurrence from most to least frequent, 'when done' merged, one-off tasks last", () => {
+    const rows = [
+      withText("a.md", "a"),
+      withText("b.md", "b 🔁 every month 📅 2026-10-09"),
+      withText("c.md", "c 🔁 every week when done 📅 2026-10-09"),
+      withText("d.md", "d 🔁 every week 📅 2026-10-09"),
+      withText("e.md", "e 🔁 every day 📅 2026-10-09"),
+    ];
+    expect(labels(groupTaskRows(rows, "recurrence", today))).toEqual([
+      "Every day:1",
+      "Every week:2",
+      "Every month:1",
+      "Not recurring:1",
+    ]);
+  });
+
+  test("tag groups by each task's first tag, alphabetically, untagged last", () => {
+    const rows = [withText("a.md", "a"), withText("b.md", "b #work"), withText("c.md", "#home c"), withText("d.md", "d #work #x")];
+    expect(labels(groupTaskRows(rows, "tag", today))).toEqual(["#home:1", "#work:2", "No tag:1"]);
+  });
+
+  test("same-named notes in different folders stay separate, labelled by folder", () => {
+    const rows = [row("Work/Roadmap.md", null), row("Home/Roadmap.md", null), row("Work/Roadmap.md", null)];
+    expect(labels(groupTaskRows(rows, "note", today))).toEqual(["Roadmap (Work):2", "Roadmap (Home):1"]);
+  });
+
+  test("completed tasks group by completion date, never as Overdue", () => {
+    const done = (d: string | null) => row("x.md", "2026-09-01", null, "note", { status: "x", done: d });
+    const rows = [done("2026-10-08"), done("2026-10-07"), done("2026-10-03"), done("2026-08-01"), done(null)];
+    expect(labels(groupTaskRows(rows, "due", today))).toEqual([
+      "Done today:1",
+      "Done yesterday:1",
+      "Done in the last 7 days:1",
+      "Done earlier:1",
+      "No completion date:1",
+    ]);
+  });
+
+  test("none is one unlabelled group, or nothing", () => {
+    expect(labels(groupTaskRows([row("a.md", null)], "none", today))).toEqual([":1"]);
+    expect(groupTaskRows([], "none", today)).toEqual([]);
+  });
+});
+
+describe("note kinds and grouping", () => {
+  const list = [
+    note("Work/a.md", { mtime: 3 }),
+    note("Work/Board.md", { mtime: 2, kind: "board" }),
+    note("Map.canvas", { mtime: 1, kind: "canvas" }),
+    note("Home/p.md", { mtime: 4, pinned: true }),
+  ];
+  const sorted = notesFor(list, { kind: "notes" }, { sort: "modified", search: "", templatesFolder: null });
+  const labels = (groups: { label: string; notes: unknown[] }[]) => groups.map((g) => `${g.label}:${g.notes.length}`);
+
+  test("the kind filter narrows the list", () => {
+    const boards = notesFor(list, { kind: "notes" }, { sort: "modified", search: "", templatesFolder: null, kind: "board" });
+    expect(boards.map((n) => n.path)).toEqual(["Work/Board.md"]);
+  });
+
+  test("kindCounts counts each kind", () => {
+    expect(kindCounts(list)).toEqual({ note: 2, board: 1, canvas: 1 });
+  });
+
+  test("group by folder: pinned first, root first, then alphabetical", () => {
+    expect(labels(groupNotesBy(sorted, "modified", "folder"))).toEqual([
+      "Pinned Notes:1",
+      "Vault root:1",
+      "Work:2",
+    ]);
+  });
+
+  test("group by kind: notes, boards, canvases", () => {
+    expect(labels(groupNotesBy(sorted, "modified", "kind"))).toEqual([
+      "Pinned Notes:1",
+      "Notes:1",
+      "Kanban boards:1",
+      "Canvases:1",
+    ]);
+  });
+
+  test("no grouping keeps pinned on top", () => {
+    expect(labels(groupNotesBy(sorted, "modified", "none"))).toEqual(["Pinned Notes:1", ":3"]);
+  });
+
+  test("date grouping is the month grouping", () => {
+    expect(groupNotesBy(sorted, "modified", "date")).toEqual(groupNotes(sorted, "modified"));
+  });
+});

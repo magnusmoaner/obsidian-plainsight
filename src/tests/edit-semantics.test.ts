@@ -1,0 +1,110 @@
+import { describe, expect, test } from "vitest";
+import { EditorState, EditorSelection } from "@codemirror/state";
+import { markdownTree } from "../editor/parser";
+import { backspaceSpec } from "../editor/edit-semantics";
+
+function mkState(doc: string, cursor: number): EditorState {
+  return EditorState.create({
+    doc,
+    selection: EditorSelection.single(cursor),
+    extensions: [markdownTree],
+  });
+}
+
+function apply(doc: string, cursor: number): string | null {
+  const s = mkState(doc, cursor);
+  const spec = backspaceSpec(s);
+  if (!spec) return null;
+  return s.update(spec).state.doc.toString();
+}
+
+describe("backspaceSpec", () => {
+  test("backspace right after a strong span unformats it", () => {
+    // "hi **bold**" cursor at end (11)
+    expect(apply("hi **bold**", 11)).toBe("hi bold");
+  });
+
+  test("backspace right after inline code unformats it", () => {
+    expect(apply("x `code`", 8)).toBe("x code");
+  });
+
+  test("backspace right after nested strong unformats only the strong", () => {
+    // "*a **b** c*" cursor at 8 (right after strong's closing **)
+    expect(apply("*a **b** c*", 8)).toBe("*a b c*");
+  });
+
+  test("backspace on last content char removes whole construct", () => {
+    // "**b**" cursor after b (3)
+    expect(apply("**b**", 3)).toBe("");
+  });
+
+  test("ordinary backspace inside content falls through", () => {
+    expect(apply("**bold**", 5)).toBeNull();
+  });
+
+  test("plain text falls through", () => {
+    expect(apply("hello", 5)).toBeNull();
+  });
+
+  test("start of document falls through", () => {
+    expect(apply("**a**", 0)).toBeNull();
+  });
+
+  test("unformats a multi-line construct (line-scoping regression)", () => {
+    // "**a\nb**" — closing delim on a different line than the opener
+    expect(apply("**a\nb**", 7)).toBe("a\nb");
+  });
+
+  test("backspace at content start deletes the char before the construct", () => {
+    // cursor right after the hidden opening ** — visually after the space
+    expect(apply("hi **bold**", 5)).toBe("hi**bold**");
+  });
+
+  test("backspace at content start of a doc-leading construct unformats", () => {
+    expect(apply("**bold**", 2)).toBe("bold");
+  });
+
+  test("deleting sole content cascades through enclosing constructs", () => {
+    // ***a*** = em(strong(a)); deleting the strong must not orphan the em's *
+    expect(apply("***a***", 4)).toBe("");
+  });
+
+  test("non-empty selection falls through", () => {
+    const s = EditorState.create({
+      doc: "hi **bold**",
+      selection: EditorSelection.single(3, 11),
+      extensions: [markdownTree],
+    });
+    expect(backspaceSpec(s)).toBeNull();
+  });
+});
+
+describe("backspaceSpec on headings", () => {
+  test("backspace at the start of heading text unformats it", () => {
+    expect(apply("## Title", 3)).toBe("Title");
+  });
+
+  test("goes straight to a paragraph, not down one level", () => {
+    expect(apply("#### Deep", 5)).toBe("Deep");
+  });
+
+  test("takes the closing sequence with it", () => {
+    expect(apply("## Title ##", 3)).toBe("Title");
+  });
+
+  test("empties a heading that has no text left", () => {
+    expect(apply("# ", 2)).toBe("");
+  });
+
+  test("works on a heading below the first line", () => {
+    expect(apply("para\n\n# Later", 8)).toBe("para\n\nLater");
+  });
+
+  test("backspace inside heading text falls through", () => {
+    expect(apply("## Title", 6)).toBeNull();
+  });
+
+  test("inline marks inside a heading still unformat", () => {
+    expect(apply("# a **b**", 9)).toBe("# a b");
+  });
+});

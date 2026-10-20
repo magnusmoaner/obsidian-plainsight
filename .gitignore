@@ -1,0 +1,7 @@
+node_modules/
+main.js
+*.map
+.DS_Store
+.env.local
+# Design docs and plans are kept locally, not published.
+docs/plans/
