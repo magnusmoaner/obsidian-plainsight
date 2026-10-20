@@ -16,9 +16,9 @@ export class WysiwygSettingTab extends PluginSettingTab {
     const { settings } = this.plugin;
 
     new Setting(this.containerEl)
-      .setName("Editor (beta)")
+      .setName("Editor (beta, work in progress)")
       .setDesc(
-        "The editor is in beta: some Markdown isn't drawn yet, and you may meet rough edges. " +
+        "The editor is in beta and still being built: some Markdown isn't drawn yet, and you may meet rough edges. " +
           "It changes how notes look and how keys behave, never what's in your files, " +
           "so turning it off gives you plain Obsidian back at once."
       )

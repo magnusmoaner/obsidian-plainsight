@@ -4,11 +4,11 @@ An Obsidian plugin for a calm, document-like note experience: Markdown that read
 
 Your files stay ordinary Markdown. Plainsight hides syntax and adds browsing on top; it never converts your notes into another format.
 
-> **Status:** early and in active development. Not yet in the Community Plugins directory, and only tested on desktop (macOS). The editor is in beta; the notes sidebar is in daily use.
+> **Status:** early and in active development. Not yet in the Community Plugins directory, and only tested on desktop (macOS). The editor is in beta and a work in progress; the notes sidebar is in daily use.
 
-## The editor (beta)
+## The editor (beta, work in progress)
 
-> **Beta.** The editor draws only part of Markdown so far (see below), and you may meet rough edges. It changes how notes look and how keys behave, never what's in your files, so switching it off (**Enable WYSIWYG editing** in settings, or the *Toggle WYSIWYG editing* command) gives you plain Obsidian back at once. The sidebar works the same either way.
+> **Beta, work in progress.** The editor draws only part of Markdown so far, more is being added (see below), and you may meet rough edges. It changes how notes look and how keys behave, never what's in your files, so switching it off (**Enable WYSIWYG editing** in settings, or the *Toggle WYSIWYG editing* command) gives you plain Obsidian back at once. The sidebar works the same either way.
 
 Formatting renders as you type, and the syntax never comes back: there's no "reveal the markup when the cursor gets close". Typing Markdown still works, because a construct converts the moment it's complete.
 
@@ -28,23 +28,55 @@ The editor's keyboard shortcuts are listed under [Commands and hotkeys](#command
 
 ## The notes sidebar
 
-It sits alongside Obsidian's File explorer, as its own tab in the left sidebar, with two columns: places on the left, and the selected place's contents on the right.
+Evernote-style browsing for your vault. The sidebar is its own tab in Obsidian's left sidebar, with two columns: **places** on the left, and what's in the selected place on the right, as cards that show what a note holds before you open it. Obsidian's File explorer keeps working next to it, so use either, or both.
 
-**Places**
-- **Bookmarks:** Obsidian's own bookmarks, each showing its bookmark group (if any) on the right. Bookmarks to deleted notes are shown crossed out; click one to remove it.
-- **Notes:** every note, with pinned notes first. Group by month, folder or type, or not at all; when a place holds more than plain notes, chips filter to Notes, Boards or Canvases. Boards are [Kanban](https://github.com/mgmeyers/obsidian-kanban) boards and [Task List Kanban](https://github.com/erikars/task-list-kanban) boards.
-- **Tasks:** tasks from all your notes. Filter by Open, Overdue or Done, or by a single note. Each task shows its note, and its priority, due and scheduled dates (relative, such as "Tomorrow"; overdue in red), recurrence and tags as badges. Group by due date or scheduled date (completed tasks by the date they were done), priority, recurrence, tag, folder, note, or Kanban board (as "Board › List", in the board's own list order). The task under your cursor in a note is highlighted in the list, like the open note's card. Ticking a task goes through the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) plugin when it's installed, so done dates and recurring tasks behave exactly as they do inside a note.
-- **Attachments:** PDFs, images and other files, with thumbnails. A file's extracted text shows as its card's preview and makes it searchable by what it says. That text comes from [OCR Extractor](https://github.com/jritzi/ocr-extractor)'s *Extracted text* boxes under the file's embeds (right-click the card and choose **Open extracted text** to go to the box), or from extracted-text notes (frontmatter `type: extracted-text` with a link to the file), which are listed with the file and kept out of your note lists. Right-click a file's card for **Open containing note**, which opens each note that embeds or links the file at that spot (greyed out when no note does).
-- **Templates:** the core Templates folder. Clicking a template creates a new note from it.
-- **Folders** and **Tags:** collapsible trees with counts. Folders that Obsidian uses for attachments are hidden.
+### Places
 
-**Note cards** show the title, the first useful line of text, task progress (`3/6`), the date, tags and a thumbnail. Canvases and boards appear with their own icons. A Kanban board shows how many cards it holds (archived cards aren't counted); a Task List Kanban board is labelled as one instead, since its cards are tasks from your other notes. Right-click a card to open it in a new tab or to the right, pin or unpin it, rename or delete it, plus the items other plugins add (such as Move file to…). Right-click a folder for New note, New folder, Rename and Delete. Rest the mouse on a card to preview the note (or file) to the right of the list, and on a task to preview its note, scrolled to the task and highlighted. This is Obsidian's Page Preview, so it needs that core plugin on; to show previews only while Cmd/Ctrl is held, turn on **Plainsight** in Page Preview's settings. To turn previews off altogether, switch off **Preview on hover** in Plainsight's settings. Files with `#` in their name get no preview, since Page Preview reads the `#` as the start of a heading.
+| Place | What you get |
+| --- | --- |
+| **Bookmarks** | Obsidian's own bookmarks, with their bookmark group on the right. Bookmarks to deleted notes are crossed out; click one to remove it. |
+| **Notes** | Every note, pinned notes first. Group by month, folder or type, or not at all. Chips filter to Notes, Boards ([Kanban](https://github.com/mgmeyers/obsidian-kanban) and [Task List Kanban](https://github.com/erikars/task-list-kanban)) or Canvases. |
+| **Tasks** | Tasks from all your notes. See below. |
+| **Attachments** | PDFs, images and other files, with thumbnails, searchable by the text inside them. See below. |
+| **Templates** | The core Templates folder. Click a template to create a note from it. |
+| **Folders** and **Tags** | Collapsible trees with counts. Folders Obsidian uses for attachments are left out. |
 
-**Creating things:** the **Note** button, the round **New folder** and **New task** buttons (on a narrow column, or when turned off in settings, they move into the **⋯** menu), and the `+` that appears when you hover Notes, Tasks, Folders or Tags (not on touch screens, which have no hover). New tasks open a quick-add dialog: type the task, then optionally set a due date (Today, Tomorrow, Next week or any date), a priority, a repeat (daily, weekdays, weekly, monthly, yearly, optionally counted from when it's done) and which note it goes into; **More details** expands the dialog with scheduled and start dates. The task is written in the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) plugin's format (including its global filter and created date, if you use them) and added to the end of a note you choose once (changeable in settings, or per task in the dialog). New tags are added to the note you have open. The list header's first button creates a note, or a task on the Tasks page. Its board button creates a [Kanban](https://github.com/mgmeyers/obsidian-kanban) or [Task List Kanban](https://github.com/erikars/task-list-kanban) board in the folder you're viewing; with both plugins enabled, it asks which. The **⋯** menu creates tags, canvases and boards, inserts a template into the open note, opens Obsidian's search, the quick switcher, the graph view and the Importer, and has expand/collapse all, bookmark cleanup and settings. Buttons and items for plugins that aren't enabled (Kanban, Task List Kanban, Importer) are hidden. Settings can hide the whole button row, or any button in it.
+**Tasks.** Filter by Open, Overdue or Done, or by a single note. Each task shows its note, plus badges for priority, due and scheduled dates ("Tomorrow"; overdue in red), recurrence and tags. Group by due date, scheduled date (done tasks by the day they were done), priority, recurrence, tag, folder, note or Kanban board ("Board › List", in the board's order). The task under your cursor in a note is highlighted in the list. Ticking a task goes through the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) plugin when it's installed, so done dates and recurring tasks behave exactly as inside a note.
 
-**Search and filter:**
-- **Search**, the round button next to the **Note** pill (or the **⋯** menu when that button is turned off in settings, or the *Search everywhere* command, which you can give a hotkey), looks through tasks, notes, attachments (by name and by their extracted text), folders and tags at once. The best matches come first, with excerpts, grouped by kind; each group links to its full list, and **Show in Obsidian search** hands the query to Obsidian's own search. Choosing a result shows it in the sidebar too: a task selected in the Tasks list, a note selected in its folder, an attachment selected under Attachments, a folder or tag selected in the left column. With [Omnisearch](https://github.com/scambier/obsidian-omnisearch) installed, its ranking orders the notes and attachments it finds (typo-tolerant). With the Tasks plugin installed, **Insert as Tasks query** puts the search into the note you're editing as a ` ```tasks ` block, worded the way Tasks documents its filters; anything Tasks can't express is noted in a comment line.
-- The **search field above the list** narrows the list you're looking at and keeps its sort order and grouping.
+**Attachments.** A file's extracted text is its card's preview and makes it findable by what it says. The text comes from [OCR Extractor](https://github.com/jritzi/ocr-extractor)'s *Extracted text* boxes under the file's embeds, or from extracted-text notes (frontmatter `type: extracted-text` with a link to the file), which are listed with the file and kept out of your note lists. Right-click a file for:
+- **Open extracted text**, which jumps to the box or note holding its text;
+- **Open containing note**, which opens each note that embeds or links the file, at that spot (greyed out when no note does).
+
+### Note cards
+
+Each card shows the title, the first useful line of text, task progress (`3/6`), the date, tags and a thumbnail. Canvases and boards get their own icons; a Kanban board shows how many cards it holds (archived ones aren't counted), and a Task List Kanban board is labelled as one, since its cards are tasks from your other notes.
+
+Right-click a card to open it in a new tab or to the right, pin or unpin it, rename or delete it, plus whatever other plugins add (such as *Move file to…*). Right-click a folder for New note, New folder, Rename and Delete.
+
+### Previews
+
+Rest the mouse on a card to preview the note or file beside the list; rest it on a task to preview its note, scrolled to the task. This is Obsidian's core Page preview:
+- To preview only while Cmd/Ctrl is held, turn on **Plainsight** in Page preview's settings.
+- To turn previews off, switch off **Preview on hover** in Plainsight's settings.
+- Files with `#` in their name get no preview, since Page preview reads `#` as the start of a heading.
+
+### Creating things
+
+- **The button row** at the top of the left column: the **Note** pill, then round buttons for **Search**, **New folder**, **New task** and **⋯**. Settings can hide the row or any button in it; a hidden round button (and, on a narrow column, New folder and New task) moves into the **⋯** menu.
+- **A `+`** appears when you hover Notes, Tasks, Folders or Tags (not on touch screens).
+- **The list header** has a button for a new note (a new task on the Tasks page), and one for a new [Kanban](https://github.com/mgmeyers/obsidian-kanban) or [Task List Kanban](https://github.com/erikars/task-list-kanban) board in the folder you're viewing (with both plugins enabled, it asks which).
+- **The ⋯ menu** creates tags, canvases and boards, inserts a template into the open note, opens Obsidian's search, quick switcher, graph view and the Importer, and has expand/collapse all, bookmark cleanup and settings.
+
+Buttons and menu items for plugins that aren't enabled are hidden.
+
+**New tasks** open a quick-add dialog. Type the task, then optionally pick a due date (Today, Tomorrow, Next week or any date), a priority, a repeat (daily, weekdays, weekly, monthly or yearly, optionally counted from when it's done) and which note it goes into. **More details** adds scheduled and start dates. The task is written in the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) plugin's format, including its global filter and created date if you use them, at the end of a note you choose once (changeable in settings, or per task).
+
+**New tags** are added to the note you have open.
+
+### Search
+
+- **Search everywhere** (the round **Search** button, or the command, which is worth a hotkey) looks through tasks, notes, attachments (by name and by their text), folders and tags at once. The best matches come first, with excerpts, grouped by kind. Choosing a result shows it in the sidebar too. **Show in Obsidian search** hands the query to Obsidian's own search. With [Omnisearch](https://github.com/scambier/obsidian-omnisearch) installed, its typo-tolerant ranking orders the notes and attachments. With Tasks installed, **Insert as Tasks query** puts the search into your note as a ` ```tasks ` block.
+- **The search field above the list** narrows the list you're looking at, keeping its order and grouping.
 
 Both understand the same queries:
 
@@ -64,11 +96,10 @@ Both understand the same queries:
 
 In a list of notes, a task query keeps the notes that have a matching task.
 
-**Starting up:** the sidebar opens straight away. Notes are read most recently changed first, so your latest notes show almost at once; a thin progress bar under the list header runs until the rest are read, and then the full list and the counts appear.
+### Good to know
 
-**Per device:** folded sections, the column width, how lists are grouped, and the Notes/Boards/Canvases and Open/Overdue/Done filters are remembered on each device and don't sync, so your phone and your computer can each keep their own. (This needs Obsidian 1.8.7 or later; older versions forget them on restart.)
-
-Obsidian's own **File explorer** keeps working next to it; use either, or both.
+- **Fast start.** The sidebar opens at once and reads your most recently changed notes first, so they show almost straight away. A thin bar under the list header runs until the rest are read.
+- **Per device.** Folded sections, column width, grouping and the filter chips are remembered on each device and don't sync, so your phone and computer can each keep their own (Obsidian 1.8.7 or later).
 
 ## Commands and hotkeys
 
@@ -109,7 +140,7 @@ The settings are grouped under five headings.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| ***Editor (beta)*** | | |
+| ***Editor (beta, work in progress)*** | | |
 | Enable WYSIWYG editing | On | Hides syntax and enables the editor shortcuts |
 | Take over rendering (Source mode) | Off | Turns Live Preview off so Plainsight is the only renderer. Greyed out while the editor is off |
 | ***Sidebar: left column*** | | |
