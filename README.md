@@ -137,6 +137,30 @@ When you run one, Plainsight picks the menu item for you, just as if you'd click
 
 **Check** next to *Permissions* in Plainsight's settings asks macOS for what's missing and opens the right page of System Settings. If a menu command can't run, a message says why: a missing permission, a greyed-out item (Writing Tools needs selected text) or a name that isn't in the menu. Names must match the menu exactly, in your Mac's language; the Writing Tools commands use the English names. Menu commands exist only on a Mac.
 
+<details>
+<summary>What runs when you use a menu command</summary>
+
+Plainsight starts macOS's `osascript` with this AppleScript, passing the menu path as arguments (`Edit`, `Writing Tools`, `Summarize`). It finds Obsidian by its app ID (`md.obsidian`), walks down the menus by name, reports a greyed-out item instead of clicking it, and clicks the item:
+
+```applescript
+on run argv
+  tell application "System Events"
+    tell (first application process whose bundle identifier is "md.obsidian")
+      set target to menu bar item (item 1 of argv) of menu bar 1
+      repeat with i from 2 to count of argv
+        set target to menu item (item i of argv) of menu 1 of target
+      end repeat
+      if not (enabled of target) then error "Greyed out" number 7001
+      click target
+    end tell
+  end tell
+end run
+```
+
+**Check** runs a script that only reads the name of the first menu in Obsidian's menu bar, which needs the same two permissions but clicks nothing. Neither script touches any other app or reads your notes. Both are in [`src/menu-items.ts`](src/menu-items.ts).
+
+</details>
+
 ## How Plainsight treats your notes
 
 - **Markdown stays the source of truth.** No database and no separate copy. Everything shown comes from your files.
