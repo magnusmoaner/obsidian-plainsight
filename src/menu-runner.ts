@@ -10,9 +10,18 @@ export interface MenuResult {
   detail: string;
 }
 
+/** Once more if System Events was still starting (it quits when idle, and
+ * the first call after that can come too early). */
+async function osascript(script: string, args: string[]): Promise<MenuResult> {
+  const result = await runOsascript(script, args);
+  if (result.failure !== "starting") return result;
+  await sleep(500);
+  return runOsascript(script, args);
+}
+
 /** Loaded on use: child_process doesn't exist on mobile. A permission
  * prompt keeps osascript waiting, hence the long timeout. */
-function osascript(script: string, args: string[]): Promise<MenuResult> {
+function runOsascript(script: string, args: string[]): Promise<MenuResult> {
   const { execFile } = window.require("child_process") as typeof import("child_process");
   return new Promise((resolve) => {
     execFile("osascript", ["-e", script, ...args], { timeout: 120_000 }, (error: ExecFileException | null, _out, err) => {

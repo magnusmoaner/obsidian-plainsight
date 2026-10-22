@@ -85,6 +85,7 @@ describe("classifyMenuError", () => {
     );
     expect(classifyMenuError("execution error: Greyed out (7001)")).toBe("disabled");
     expect(classifyMenuError("System Events got an error: Can’t get menu item \"Sumarize\". (-1728)")).toBe("missing");
+    expect(classifyMenuError("System Events got an error: Application isn’t running. (-600)")).toBe("starting");
     expect(classifyMenuError("spawn osascript ENOENT")).toBe("other");
   });
 });

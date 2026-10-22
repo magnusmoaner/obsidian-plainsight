@@ -106,10 +106,12 @@ export const PROBE_SCRIPT = `tell application "System Events"
   end tell
 end tell`;
 
-export type MenuFailure = "automation" | "accessibility" | "missing" | "disabled" | "other";
+export type MenuFailure = "automation" | "accessibility" | "missing" | "disabled" | "starting" | "other";
 
-/** What went wrong, from osascript's error text. */
+/** What went wrong, from osascript's error text. "starting": System Events,
+ * which macOS quits when idle, was still starting up; trying again works. */
 export function classifyMenuError(message: string): MenuFailure {
+  if (/-600\b/.test(message)) return "starting";
   if (/-1743\b/.test(message)) return "automation";
   if (/-25211\b|-1719\b|assistive access/i.test(message)) return "accessibility";
   if (/\(7001\)/.test(message)) return "disabled";
@@ -140,6 +142,8 @@ export function explainMenuFailure(failure: MenuFailure, path: MenuPath | null, 
         ? `There's no ${item} in the menu bar. Writing Tools needs Apple Intelligence turned on, ` +
             `and shows only while you're typing in a note.`
         : `There's no ${item} in the menu bar. Names must match the menu exactly, in your Mac's language.`;
+    case "starting":
+      return `macOS's System Events didn't start in time for ${item}. Try again.`;
     case "other":
       return `Couldn't use ${item}${detail ? `: ${detail}` : "."}`;
   }
