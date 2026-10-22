@@ -140,18 +140,25 @@ When you run one, Plainsight picks the menu item for you, just as if you'd click
 <details>
 <summary>What runs when you use a menu command</summary>
 
-Plainsight starts macOS's `osascript` with this AppleScript, passing the menu path as arguments (`Edit`, `Writing Tools`, `Summarize`). It finds Obsidian by its app ID (`md.obsidian`), walks down the menus by name, reports a greyed-out item instead of clicking it, and clicks the item:
+Plainsight starts macOS's `osascript` with this AppleScript, passing the menu path as arguments (`Edit`, `Writing Tools`, `Summarize`). It finds Obsidian by its app ID (`md.obsidian`) and opens each menu on the way by name, as a mouse would (macOS checks what's selected as a menu opens, which Writing Tools relies on). It reports a greyed-out item instead of clicking it, and otherwise clicks the item. If anything goes wrong partway, it presses Escape to close the menus:
 
 ```applescript
 on run argv
   tell application "System Events"
     tell (first application process whose bundle identifier is "md.obsidian")
       set target to menu bar item (item 1 of argv) of menu bar 1
-      repeat with i from 2 to count of argv
-        set target to menu item (item i of argv) of menu 1 of target
-      end repeat
-      if not (enabled of target) then error "Greyed out" number 7001
-      click target
+      try
+        click target
+        repeat with i from 2 to count of argv
+          set target to menu item (item i of argv) of menu 1 of target
+          if i < (count of argv) then click target
+        end repeat
+        if not (enabled of target) then error "Greyed out" number 7001
+        click target
+      on error message number code
+        key code 53
+        error message number code
+      end try
     end tell
   end tell
 end run

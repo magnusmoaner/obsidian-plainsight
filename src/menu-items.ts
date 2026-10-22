@@ -82,18 +82,28 @@ export function menuPaths(settings: MenuSettings): MenuPath[] {
 
 /**
  * Clicks the item given as arguments (menu bar item first). Arguments rather
- * than text pasted into the script, so no menu name needs escaping. A greyed
- * out item is reported instead of clicked, since clicking it does nothing.
+ * than text pasted into the script, so no menu name needs escaping. Each menu
+ * on the way is opened as a mouse would: macOS asks the app what's selected
+ * as a menu opens, and Writing Tools pressed in a closed menu can act on a
+ * stale answer. A greyed-out item is reported instead of clicked, and on any
+ * error Escape closes the menus again.
  */
 export const CLICK_SCRIPT = `on run argv
   tell application "System Events"
     tell (first application process whose bundle identifier is "md.obsidian")
       set target to menu bar item (item 1 of argv) of menu bar 1
-      repeat with i from 2 to count of argv
-        set target to menu item (item i of argv) of menu 1 of target
-      end repeat
-      if not (enabled of target) then error "Greyed out" number 7001
-      click target
+      try
+        click target
+        repeat with i from 2 to count of argv
+          set target to menu item (item i of argv) of menu 1 of target
+          if i < (count of argv) then click target
+        end repeat
+        if not (enabled of target) then error "Greyed out" number 7001
+        click target
+      on error message number code
+        key code 53
+        error message number code
+      end try
     end tell
   end tell
 end run`;

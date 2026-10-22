@@ -390,6 +390,9 @@ export default class WysiwygPlugin extends Plugin {
   }
 
   private async runMenuItem(path: MenuPath): Promise<void> {
+    // Back in the note first: the command palette may have taken the focus,
+    // and Writing Tools acts on the selection in whatever has it.
+    this.app.workspace.activeEditor?.editor?.focus();
     const { failure, detail } = await clickMenu(path);
     if (failure) new Notice(explainMenuFailure(failure, path, detail), 8000);
   }
