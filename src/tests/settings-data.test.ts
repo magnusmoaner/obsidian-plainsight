@@ -24,6 +24,9 @@ describe("parseSettings", () => {
       showNewFolderButton: false,
       showNewTaskButton: true,
       showMoreButton: false,
+      writingToolsCommands: true,
+      writingTools: ["Summarize"],
+      menuCommands: "Window > Minimize",
     };
     expect(parseSettings(stored).settings).toEqual(stored);
   });
@@ -31,6 +34,12 @@ describe("parseSettings", () => {
   test("a value of the wrong type falls back to its default", () => {
     const { settings } = parseSettings({ enabled: "yes", boardCardsInTasks: 0, defaultTaskNote: 42 });
     expect(settings).toEqual(DEFAULT_SETTINGS);
+  });
+
+  test("a list must be a list of names", () => {
+    expect(parseSettings({ writingTools: "Summarize" }).settings.writingTools).toEqual(DEFAULT_SETTINGS.writingTools);
+    expect(parseSettings({ writingTools: [1] }).settings.writingTools).toEqual(DEFAULT_SETTINGS.writingTools);
+    expect(parseSettings({ writingTools: [] }).settings.writingTools).toEqual([]);
   });
 
   test("unknown keys are kept aside, so a save never drops them", () => {

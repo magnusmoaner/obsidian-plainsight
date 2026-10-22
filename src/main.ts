@@ -22,6 +22,8 @@ import {
 } from "./editor/commands";
 import { wysiwyg } from "./editor/extension";
 import { treeOf } from "./editor/parser";
+import { explainMenuFailure, menuCommandId, menuCommandName, menuPaths, MenuPath } from "./menu-items";
+import { canUseMenus, clickMenu } from "./menu-runner";
 import { parseSettings, serializeSettings } from "./settings-data";
 import { NoteIndex } from "./sidebar/core/note-index";
 import { legacyViewState } from "./sidebar/core/view-state";
@@ -78,6 +80,8 @@ export default class WysiwygPlugin extends Plugin {
   /** The task under the cursor in a note, if the cursor is on one. */
   activeTask: { path: string; line: number } | null = null;
   private cursorTimer: number | null = null;
+  /** Commands made from menu items, as registered now. */
+  private menuCommandIds: string[] = [];
 
   async onload(): Promise<void> {
     this.viewState = new ViewStateStore(this.app);
@@ -186,6 +190,7 @@ export default class WysiwygPlugin extends Plugin {
       name: "Search everywhere",
       callback: () => void this.openSearch(),
     });
+    this.refreshMenuCommands();
     this.app.workspace.onLayoutReady(() => {
       // Listen first, then fill: the fill never overwrites what an event
       // wrote meanwhile. The sidebar opens at once and fills in as notes are
@@ -359,12 +364,35 @@ export default class WysiwygPlugin extends Plugin {
     ) {
       this.refreshSidebar();
     }
+    const menus = ["writingToolsCommands", "writingTools", "menuCommands"] as const;
+    if (menus.some((key) => before[key] !== now[key])) this.refreshMenuCommands();
     const insets = ["listInsetTop", "listInsetBottom", "listInsetLeft", "listInsetRight"] as const;
     if (insets.some((key) => before[key] !== now[key])) {
       for (const leaf of this.app.workspace.getLeavesOfType(SIDEBAR_VIEW)) {
         if (leaf.view instanceof SidebarView) leaf.view.applyListInset();
       }
     }
+  }
+
+  /**
+   * One command per menu item the settings name, registered again when they
+   * change. removeCommand came in Obsidian 1.7.2; before that, a removed
+   * item's command stays until Obsidian restarts.
+   */
+  private refreshMenuCommands(): void {
+    if (!canUseMenus()) return;
+    for (const id of this.menuCommandIds) this.removeCommand?.(id);
+    this.menuCommandIds = [];
+    for (const path of menuPaths(this.settings)) {
+      const id = menuCommandId(path);
+      this.addCommand({ id, name: menuCommandName(path), callback: () => void this.runMenuItem(path) });
+      this.menuCommandIds.push(id);
+    }
+  }
+
+  private async runMenuItem(path: MenuPath): Promise<void> {
+    const { failure, detail } = await clickMenu(path);
+    if (failure) new Notice(explainMenuFailure(failure, path, detail), 8000);
   }
 
   /**

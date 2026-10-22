@@ -126,6 +126,17 @@ Heading shortcuts use `Opt/Alt` because Obsidian already binds `Cmd + 1…8` to 
 
 To set one, open **Settings → Hotkeys** and search for *Plainsight*, or click **Set hotkeys** at the bottom of Plainsight's settings, which opens that list for you. Click the `+` next to a command and press the keys. Obsidian warns you if they're already in use. The editor shortcuts above can be changed there too.
 
+### Menu commands (Mac)
+
+Plainsight can turn items in Obsidian's menu bar into commands, so they can have an Obsidian hotkey, sit in the command palette or go on an Editing Toolbar button. The main use is Apple Intelligence's **Edit → Writing Tools**: turn on **Writing Tools** under *Menu commands* in Plainsight's settings, and you get *Plainsight: Writing Tools: Summarize*, *…: Proofread* and the rest, each of which can be switched off on its own. Select text in a note and run one. Any other menu item can be added under **Other menu items**, one per line, such as `Window > Minimize`.
+
+When you run one, Plainsight picks the menu item for you, just as if you'd clicked it. macOS allows that only once Obsidian has two permissions, both in **System Settings → Privacy & Security**:
+
+- **Automation**: Obsidian may control *System Events*. macOS asks the first time.
+- **Accessibility**: Obsidian is turned on. If it isn't listed, add it with `+`.
+
+**Check** next to *Permissions* in Plainsight's settings asks macOS for what's missing and opens the right page of System Settings. If a menu command can't run, a message says why: a missing permission, a greyed-out item (Writing Tools needs selected text) or a name that isn't in the menu. Names must match the menu exactly, in your Mac's language; the Writing Tools commands use the English names. Menu commands exist only on a Mac.
+
 ## How Plainsight treats your notes
 
 - **Markdown stays the source of truth.** No database and no separate copy. Everything shown comes from your files.
@@ -136,7 +147,7 @@ To set one, open **Settings → Hotkeys** and search for *Plainsight*, or click 
 
 ## Settings
 
-The settings are grouped under five headings.
+The settings are grouped under six headings (*Menu commands* shows only on a Mac).
 
 | Setting | Default | What it does |
 | --- | --- | --- |
@@ -152,6 +163,11 @@ The settings are grouped under five headings.
 | ***Tasks*** | | |
 | Default note for new tasks | (asked the first time) | Where the sidebar's "New task" adds tasks (any note except a Kanban board) |
 | List Kanban cards as tasks | Off | The Kanban plugin saves cards as checkbox lines. Off: they show on the Tasks page only when grouped by Kanban board. On: every card is listed among your tasks |
+| ***Menu commands*** (Mac) | | |
+| Permissions | — | **Check** asks macOS for the two permissions menu commands need and opens System Settings where one is missing |
+| Writing Tools | Off | A command for each item in Edit → Writing Tools (Apple Intelligence) |
+| Show Writing Tools, Proofread, Rewrite, … Compose | On | Each Writing Tools command (greyed out while Writing Tools is off) |
+| Other menu items | (none) | More menu items to make commands of, one per line, e.g. `Window > Minimize` |
 | ***Hotkeys*** | | |
 | Set hotkeys | — | Opens Settings → Hotkeys, showing only Plainsight's commands |
 
