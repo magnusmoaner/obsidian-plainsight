@@ -22,10 +22,9 @@ export interface WysiwygSettings {
   listInsetBottom: boolean;
   listInsetLeft: boolean;
   listInsetRight: boolean;
-  /** The sidebar's action row as a whole, then each of its buttons. */
+  /** The sidebar's action row (the Note button always shows with it), then
+   * its round buttons; one that's off moves into the ⋯ menu. */
   showActionRow: boolean;
-  showNoteButton: boolean;
-  /** Round buttons; one that's off moves into the ⋯ menu. */
   showSearchButton: boolean;
   showNewFolderButton: boolean;
   showNewTaskButton: boolean;
@@ -48,7 +47,6 @@ export const DEFAULT_SETTINGS: WysiwygSettings = {
   listInsetLeft: false,
   listInsetRight: false,
   showActionRow: true,
-  showNoteButton: true,
   showSearchButton: true,
   showNewFolderButton: true,
   showNewTaskButton: true,
@@ -60,8 +58,9 @@ export const DEFAULT_SETTINGS: WysiwygSettings = {
 
 const KNOWN = new Set<string>(Object.keys(DEFAULT_SETTINGS));
 
-/** Settings that no longer exist: `sidebar` (the sidebar is always on). */
-const RETIRED = ["sidebar"];
+/** Settings that no longer exist: `sidebar` (the sidebar is always on) and
+ * `showNoteButton` (the Note button shows whenever the action row does). */
+const RETIRED = ["sidebar", "showNoteButton"];
 
 /**
  * A stored data.json, field by field: a value of the wrong type falls back

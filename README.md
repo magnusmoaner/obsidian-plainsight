@@ -22,7 +22,7 @@ Anything Plainsight doesn't render yet (lists, tables, embeds and more) stays vi
 
 ### Live Preview vs Source mode
 
-Obsidian's Live Preview draws some blocks, such as callouts, itself, and turns them back into Markdown when you click in. To make Plainsight the only renderer, turn on **Take over rendering (Source mode)**. Your previous editor mode is restored when you turn it off. The trade-off is that in Source mode anything Plainsight doesn't render yet shows as Markdown.
+Obsidian's Live Preview draws some blocks, such as callouts, itself, and turns them back into Markdown when you click in. To make Plainsight the only renderer, turn on **Let Plainsight draw everything (Source mode)**. Your previous editor mode is restored when you turn it off. The trade-off is that in Source mode anything Plainsight doesn't render yet shows as Markdown.
 
 The editor's keyboard shortcuts are listed under [Commands and hotkeys](#commands-and-hotkeys).
 
@@ -62,7 +62,7 @@ Rest the mouse on a card to preview the note or file beside the list; rest it on
 
 ### Creating things
 
-- **The button row** at the top of the left column: the **Note** pill, then round buttons for **Search**, **New folder**, **New task** and **⋯**. Settings can hide the row or any button in it; a hidden round button (and, on a narrow column, New folder and New task) moves into the **⋯** menu.
+- **The button row** at the top of the left column: the **Note** pill, then round buttons for **Search**, **New folder**, **New task** and **⋯**. Settings can hide the whole row, or any of the round buttons; a hidden Search, New folder or New task button (and, on a narrow column, New folder and New task) moves into the **⋯** menu.
 - **A `+`** appears when you hover Notes, Tasks, Folders or Tags (not on touch screens).
 - **The list header** has a button for a new note (a new task on the Tasks page), and one for a new [Kanban](https://github.com/mgmeyers/obsidian-kanban) or [Task List Kanban](https://github.com/erikars/task-list-kanban) board in the folder you're viewing (with both plugins enabled, it asks which).
 - **The ⋯ menu** creates tags, canvases and boards, inserts a template into the open note, opens Obsidian's search, quick switcher, graph view and the Importer, and has expand/collapse all, bookmark cleanup and settings.
@@ -153,15 +153,15 @@ The settings are grouped under six headings (*Menu commands* shows only on a Mac
 | --- | --- | --- |
 | ***Editor (beta, work in progress)*** | | |
 | Enable WYSIWYG editing | On | Hides syntax and enables the editor shortcuts |
-| Take over rendering (Source mode) | Off | Turns Live Preview off so Plainsight is the only renderer. Greyed out while the editor is off |
-| ***Sidebar: left column*** | | |
-| Show the action buttons | On | The row of buttons at the top of the left column. Everything they do stays reachable without it, through the `+` on Notes, Tasks, Folders and Tags and through the commands |
-| Note, Search, New folder, New task and ⋯ buttons | On | Each button in that row (greyed out while the row is off). A round button that's off moves into the **⋯** menu |
-| ***Sidebar: right column*** | | |
+| Let Plainsight draw everything (Source mode) | Off | Switches notes from Live Preview to Source mode, so Plainsight alone draws them. Greyed out while the editor is off |
+| ***Notes sidebar: left column*** | | |
+| Action buttons | On | The Note button and the round buttons beside it, at the top of the left column. Everything they do stays reachable without it, through the `+` on Notes, Tasks, Folders and Tags and through the commands |
+| Search, New folder, New task and ⋯ buttons | On | Each round button (greyed out while the action buttons are off). Search, New folder or New task turned off moves into the **⋯** menu |
+| ***Notes sidebar: right column*** | | |
 | Preview on hover | On | Resting the mouse on a note card or a task previews the note (needs the core Page preview plugin) |
 | Gap at the top, bottom, left, right | Bottom only | A gap between the white list panel and the window edge on each chosen side; corners round on sides with a gap |
 | ***Tasks*** | | |
-| Default note for new tasks | (asked the first time) | Where the sidebar's "New task" adds tasks (any note except a Kanban board) |
+| Default note for new tasks | (asked the first time) | Where the sidebar's New task button and the `+` on Tasks add tasks (any note except a Kanban board) |
 | List Kanban cards as tasks | Off | The Kanban plugin saves cards as checkbox lines. Off: they show on the Tasks page only when grouped by Kanban board. On: every card is listed among your tasks |
 | ***Menu commands*** (Mac) | | |
 | Permissions | — | **Check** asks macOS for the two permissions menu commands need and opens System Settings where one is missing |

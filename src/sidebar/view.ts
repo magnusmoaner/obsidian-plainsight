@@ -503,17 +503,15 @@ export class SidebarView extends ItemView implements HoverParent {
     const unfiltered = this.queryOptions("");
 
     // Evernote-style action row: the Note pill, then round icon buttons. The
-    // row and each button can be turned off in settings; a round button
-    // that's off moves into the ⋯ menu.
+    // row and each round button can be turned off in settings; a round
+    // button that's off moves into the ⋯ menu.
     const s = this.plugin.settings;
     const show = (on: boolean) => s.showActionRow && on;
     const showSearchButton = show(s.showSearchButton);
     const showNewFolderButton = show(s.showNewFolderButton);
     const showNewTaskButton = show(s.showNewTaskButton);
-    const anyButton =
-      show(s.showNoteButton) || showSearchButton || showNewFolderButton || showNewTaskButton || show(s.showMoreButton);
-    const actions = anyButton ? nav.createDiv("ps-nav-actions") : createDiv();
-    if (show(s.showNoteButton)) {
+    const actions = s.showActionRow ? nav.createDiv("ps-nav-actions") : createDiv();
+    if (s.showActionRow) {
       const newNote = actions.createDiv("ps-new-note");
       setIcon(newNote.createSpan("ps-nav-icon"), "file-plus-2");
       newNote.createSpan({ text: "Note" });

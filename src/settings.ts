@@ -40,12 +40,12 @@ export class WysiwygSettingTab extends PluginSettingTab {
       );
 
     new Setting(this.containerEl)
-      .setName("Take over rendering (Source mode)")
+      .setName("Let Plainsight draw everything (Source mode)")
       .setDesc(
-        "Turns off Live Preview so Plainsight is the only renderer: callouts then stay " +
-          "boxed while you edit them instead of turning back into Markdown. Anything " +
-          "Plainsight doesn't draw yet (lists, tables, embeds, properties) shows as plain " +
-          "Markdown until it does. Your previous editor mode comes back when this is turned off."
+        "Switches notes from Live Preview to Source mode, so Plainsight alone draws them. " +
+          "Callouts then stay boxed while you edit them instead of turning back into Markdown. " +
+          "What Plainsight doesn't draw yet (lists, tables, embeds, properties) shows as plain " +
+          "Markdown until it does. Turning this off brings back the mode you had."
       )
       .setDisabled(!settings.enabled)
       .addToggle((toggle) =>
@@ -57,13 +57,13 @@ export class WysiwygSettingTab extends PluginSettingTab {
           })
       );
 
-    new Setting(this.containerEl).setName("Sidebar: left column").setHeading();
+    new Setting(this.containerEl).setName("Notes sidebar: left column").setHeading();
 
     new Setting(this.containerEl)
-      .setName("Show the action buttons")
+      .setName("Action buttons")
       .setDesc(
-        "The row of buttons at the top. Without it, everything they do is still there: " +
-          "the + on Notes, Tasks, Folders and Tags, and the commands."
+        "The Note button and the round buttons beside it, at the top of the column. " +
+          "Turned off, everything they do is still there: the + on Notes, Tasks, Folders and Tags, and the commands."
       )
       .addToggle((toggle) =>
         toggle.setValue(settings.showActionRow).onChange(async (value) => {
@@ -72,12 +72,16 @@ export class WysiwygSettingTab extends PluginSettingTab {
         })
       );
     const rowOff = !settings.showActionRow;
+    const intoMore = "Turned off, it moves into the ⋯ menu.";
     const buttons = [
-      ["showNoteButton", "Note button", ""],
-      ["showSearchButton", "Search button", "A round button that's off moves into the ⋯ menu."],
-      ["showNewFolderButton", "New folder button", ""],
-      ["showNewTaskButton", "New task button", ""],
-      ["showMoreButton", "⋯ button", ""],
+      ["showSearchButton", "Search button", `Search everywhere. ${intoMore}`],
+      ["showNewFolderButton", "New folder button", intoMore],
+      ["showNewTaskButton", "New task button", intoMore],
+      [
+        "showMoreButton",
+        "⋯ button",
+        "New tag, canvas and boards, templates, Obsidian search, import, expand or collapse all.",
+      ],
     ] as const;
     for (const [key, name, desc] of buttons) {
       new Setting(this.containerEl)
@@ -94,7 +98,7 @@ export class WysiwygSettingTab extends PluginSettingTab {
         );
     }
 
-    new Setting(this.containerEl).setName("Sidebar: right column").setHeading();
+    new Setting(this.containerEl).setName("Notes sidebar: right column").setHeading();
 
     new Setting(this.containerEl)
       .setName("Preview on hover")
@@ -119,8 +123,8 @@ export class WysiwygSettingTab extends PluginSettingTab {
         .setName(name)
         .setDesc(
           key === "listInsetTop"
-            ? "The list of notes and tasks sits on a white panel. Choose the sides where it keeps " +
-                "a gap from the window's edge; a side with a gap also gets rounded corners."
+            ? "The list sits on a white panel. Turn on each side where it should keep a gap " +
+                "from the window's edge; a side with a gap gets rounded corners."
             : ""
         )
         .addToggle((toggle) =>
@@ -134,7 +138,7 @@ export class WysiwygSettingTab extends PluginSettingTab {
 
     new Setting(this.containerEl)
       .setName("Default note for new tasks")
-      .setDesc("Where the sidebar's New task adds tasks. Leave empty to be asked the first time.")
+      .setDesc("Where the sidebar's New task button and the + on Tasks add tasks. Leave empty to be asked the first time.")
       .addText((text) => {
         text.setPlaceholder("e.g. Tasks.md").setValue(settings.defaultTaskNote);
         text.onChange(async (value) => {
@@ -165,8 +169,8 @@ export class WysiwygSettingTab extends PluginSettingTab {
     new Setting(this.containerEl)
       .setName("Plainsight's commands")
       .setDesc(
-        "Bold, italic, inline code and headings have keys already. Search everywhere, " +
-          "Open notes sidebar and Toggle WYSIWYG editing have none until you give them one."
+        "Bold, italic, inline code and headings have keys already. Search everywhere, Open notes sidebar, " +
+          "Toggle WYSIWYG editing and the menu commands have none until you give them one."
       )
       .addButton((button) =>
         button.setButtonText("Set hotkeys").onClick(() => openHotkeys(this.app, "Plainsight"))

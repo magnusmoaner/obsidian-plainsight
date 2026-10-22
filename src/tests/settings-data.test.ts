@@ -19,7 +19,6 @@ describe("parseSettings", () => {
       listInsetLeft: true,
       listInsetRight: true,
       showActionRow: false,
-      showNoteButton: false,
       showSearchButton: false,
       showNewFolderButton: false,
       showNewTaskButton: true,
@@ -49,7 +48,7 @@ describe("parseSettings", () => {
   });
 
   test("a retired setting isn't carried along", () => {
-    expect(parseSettings({ sidebar: false }).extra).toEqual({});
+    expect(parseSettings({ sidebar: false, showNoteButton: false }).extra).toEqual({});
   });
 
   test("view state moved to the device isn't carried along", () => {
