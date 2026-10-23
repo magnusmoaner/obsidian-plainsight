@@ -1,4 +1,3 @@
-import { WRITING_TOOLS } from "./menu-items";
 import { LEGACY_VIEW_KEYS } from "./sidebar/core/view-state";
 
 /*
@@ -29,11 +28,6 @@ export interface WysiwygSettings {
   showNewFolderButton: boolean;
   showNewTaskButton: boolean;
   showMoreButton: boolean;
-  /** Commands for Edit › Writing Tools (macOS) as a whole, then which ones. */
-  writingToolsCommands: boolean;
-  writingTools: string[];
-  /** More menu items to make commands of, one "Menu > Item" per line. */
-  menuCommands: string;
 }
 
 export const DEFAULT_SETTINGS: WysiwygSettings = {
@@ -51,16 +45,14 @@ export const DEFAULT_SETTINGS: WysiwygSettings = {
   showNewFolderButton: true,
   showNewTaskButton: true,
   showMoreButton: true,
-  writingToolsCommands: false,
-  writingTools: [...WRITING_TOOLS],
-  menuCommands: "",
 };
 
 const KNOWN = new Set<string>(Object.keys(DEFAULT_SETTINGS));
 
-/** Settings that no longer exist: `sidebar` (the sidebar is always on) and
- * `showNoteButton` (the Note button shows whenever the action row does). */
-const RETIRED = ["sidebar", "showNoteButton"];
+/** Settings that no longer exist: `sidebar` (the sidebar is always on),
+ * `showNoteButton` (the Note button shows whenever the action row does),
+ * and the menu commands', which moved to Plainsight Menu Commands. */
+const RETIRED = ["sidebar", "showNoteButton", "writingToolsCommands", "writingTools", "menuCommands"];
 
 /**
  * A stored data.json, field by field: a value of the wrong type falls back
@@ -76,11 +68,7 @@ export function parseSettings(raw: unknown): { settings: WysiwygSettings; extra:
   for (const [key, value] of Object.entries(data)) {
     if (KNOWN.has(key)) {
       const name = key as keyof WysiwygSettings;
-      const fallback = DEFAULT_SETTINGS[name];
-      const valid = Array.isArray(fallback)
-        ? Array.isArray(value) && value.every((item) => typeof item === "string")
-        : typeof value === typeof fallback;
-      if (valid) (settings as Record<string, unknown>)[name] = value;
+      if (typeof value === typeof DEFAULT_SETTINGS[name]) (settings as Record<string, unknown>)[name] = value;
     } else if (!LEGACY_VIEW_KEYS.includes(key) && !RETIRED.includes(key)) {
       extra[key] = value;
     }

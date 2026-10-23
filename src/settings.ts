@@ -1,17 +1,15 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
-import { explainMenuFailure, WRITING_TOOLS } from "./menu-items";
-import { canUseMenus, checkMenuAccess, openPrivacySettings } from "./menu-runner";
-import { openHotkeys } from "./sidebar/internals";
+import { App, Platform, PluginSettingTab, Setting } from "obsidian";
+import { openHotkeys, openSettingsTab, pluginInstalled } from "./sidebar/internals";
 import { NoteSuggest } from "./sidebar/modals";
 import type WysiwygPlugin from "./main";
 
 export { DEFAULT_SETTINGS } from "./settings-data";
 export type { WysiwygSettings } from "./settings-data";
 
-export class WysiwygSettingTab extends PluginSettingTab {
-  /** The last permission check's outcome, kept while the tab re-renders. */
-  private menuAccess = "";
+const MENU_COMMANDS_ID = "plainsight-menu-commands";
+const MENU_COMMANDS_URL = "https://github.com/magnusmoaner/obsidian-plainsight-menu-commands";
 
+export class WysiwygSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: WysiwygPlugin) {
     super(app, plugin);
   }
@@ -162,97 +160,35 @@ export class WysiwygSettingTab extends PluginSettingTab {
         })
       );
 
-    if (canUseMenus()) this.menuSection();
-
     new Setting(this.containerEl).setName("Hotkeys").setHeading();
 
     new Setting(this.containerEl)
       .setName("Plainsight's commands")
       .setDesc(
-        "Bold, italic, inline code and headings have keys already. Search everywhere, Open notes sidebar, " +
-          "Toggle WYSIWYG editing and the menu commands have none until you give them one."
+        "Bold, italic, inline code and headings have keys already. Search everywhere, Open notes sidebar " +
+          "and Toggle WYSIWYG editing have none until you give them one."
       )
       .addButton((button) =>
         button.setButtonText("Set hotkeys").onClick(() => openHotkeys(this.app, "Plainsight"))
       );
-  }
 
-  private menuSection(): void {
-    const { settings } = this.plugin;
-
-    new Setting(this.containerEl)
-      .setName("Menu commands")
-      .setDesc(
-        "Turn items in the menu bar into commands, so you can give them a hotkey in Obsidian, " +
-          "run them from the command palette or put them on a toolbar. Plainsight picks the menu item for you, " +
-          "which macOS allows only once Obsidian has two permissions."
-      )
-      .setHeading();
-
-    const access = new Setting(this.containerEl)
-      .setName("Permissions")
-      .setDesc(
-        this.menuAccess ||
-          "Obsidian needs to be allowed to control System Events (Automation) and to be turned on under " +
-            "Accessibility. Check asks macOS for what's missing and opens the right page of System Settings."
-      )
-      .addButton((button) =>
-        button.setButtonText("Check").onClick(async () => {
-          button.setDisabled(true);
-          access.setDesc("Checking… answer macOS if it asks.");
-          const { failure, detail } = await checkMenuAccess();
-          if (!failure) {
-            this.menuAccess = "Both permissions are on. Menu commands are ready.";
-          } else if (failure === "automation" || failure === "accessibility") {
-            this.menuAccess = `${explainMenuFailure(failure, null)} System Settings is open there now; press Check again afterwards.`;
-            openPrivacySettings(failure);
-          } else {
-            this.menuAccess = explainMenuFailure(failure, null, detail);
-          }
-          this.display();
-        })
-      );
-
-    new Setting(this.containerEl)
-      .setName("Writing Tools")
-      .setDesc(
-        "Apple Intelligence's Edit › Writing Tools as commands, named \"Writing Tools: Summarize\" and so on. " +
-          "Select text in a note, then run one. Needs Apple Intelligence turned on."
-      )
-      .addToggle((toggle) =>
-        toggle.setValue(settings.writingToolsCommands).onChange(async (value) => {
-          await this.plugin.updateSettings({ writingToolsCommands: value });
-          this.display();
-        })
-      );
-    const toolsOff = !settings.writingToolsCommands;
-    for (const item of WRITING_TOOLS) {
+    // Hotkeys for Writing Tools come in a companion plugin: it needs macOS
+    // system access, which would make Plainsight itself desktop-only.
+    if (Platform.isMacOS && Platform.isDesktopApp) {
+      const installed = pluginInstalled(this.app, MENU_COMMANDS_ID);
       new Setting(this.containerEl)
-        .setName(item)
-        .setDisabled(toolsOff)
-        .addToggle((toggle) =>
-          toggle
-            .setValue(settings.writingTools.includes(item))
-            .setDisabled(toolsOff)
-            .onChange(async (value) => {
-              const chosen = this.plugin.settings.writingTools.filter((name) => name !== item);
-              await this.plugin.updateSettings({ writingTools: value ? [...chosen, item] : chosen });
-            })
+        .setName("Writing Tools and menu commands")
+        .setDesc(
+          "Hotkeys for Apple Intelligence's Writing Tools, and for any other menu item, come in a companion " +
+            "plugin, Plainsight Menu Commands. It's separate because it needs access to macOS, which would " +
+            "keep Plainsight itself off phones and tablets."
+        )
+        .addButton((button) =>
+          installed
+            ? button.setButtonText("Open its settings").onClick(() => openSettingsTab(this.app, MENU_COMMANDS_ID))
+            : button.setButtonText("Learn more").onClick(() => window.open(MENU_COMMANDS_URL))
         );
     }
-
-    new Setting(this.containerEl)
-      .setName("Other menu items")
-      .setDesc(
-        "One per line, from the menu bar down, with > between the levels, e.g. Window > Minimize. " +
-          "Names must match the menu exactly, in your Mac's language."
-      )
-      .addTextArea((text) => {
-        text.setPlaceholder("Window > Minimize").setValue(settings.menuCommands);
-        text.inputEl.rows = 4;
-        text.onChange(async (value) => {
-          await this.plugin.updateSettings({ menuCommands: value });
-        });
-      });
   }
+
 }

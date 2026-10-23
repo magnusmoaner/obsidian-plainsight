@@ -4,7 +4,7 @@ An Obsidian plugin for a calm, document-like note experience: Markdown that read
 
 Your files stay ordinary Markdown. Plainsight hides syntax and adds browsing on top; it never converts your notes into another format.
 
-> **Status:** early and in active development. Not yet in the Community Plugins directory, and only tested on desktop (macOS). The editor is in beta and a work in progress; the notes sidebar is in daily use.
+> **Status:** early and in active development. Not yet in the Community Plugins directory, and only tested on desktop (macOS). The editor is in beta and a work in progress; the notes sidebar is in daily use. Hotkeys for Apple Intelligence's Writing Tools come in a companion plugin, [Plainsight Menu Commands](https://github.com/magnusmoaner/obsidian-plainsight-menu-commands).
 
 ## The editor (beta, work in progress)
 
@@ -127,47 +127,11 @@ Heading shortcuts use `Opt/Alt` because Obsidian already binds `Cmd + 1…8` to 
 
 To set one, open **Settings → Hotkeys** and search for *Plainsight*, or click **Set hotkeys** at the bottom of Plainsight's settings, which opens that list for you. Click the `+` next to a command and press the keys. Obsidian warns you if they're already in use. The editor shortcuts above can be changed there too.
 
-### Menu commands (Mac)
+## Hotkeys for Writing Tools and menus (Mac)
 
-Plainsight can turn items in Obsidian's menu bar into commands, so they can have an Obsidian hotkey, sit in the command palette or go on an Editing Toolbar button. The main use is Apple Intelligence's **Edit → Writing Tools**: turn on **Writing Tools** under *Menu commands* in Plainsight's settings, and you get *Plainsight: Writing Tools: Summarize*, *…: Proofread* and the rest, each of which can be switched off on its own. Select text in a note and run one. Any other menu item can be added under **Other menu items**, one per line, such as `Window > Minimize`.
+Apple Intelligence's **Writing Tools** (Summarize, Proofread, Rewrite and the rest) live in macOS's Edit menu, and Obsidian can't give menu items a hotkey. **[Plainsight Menu Commands](https://github.com/magnusmoaner/obsidian-plainsight-menu-commands)**, a companion plugin, turns each Writing Tool, and any other menu item you name, into an Obsidian command. Give *Summarize* a key, select text in a note, press it.
 
-When you run one, Plainsight picks the menu item for you, just as if you'd clicked it. macOS allows that only once Obsidian has two permissions, both in **System Settings → Privacy & Security**:
-
-- **Automation**: Obsidian may control *System Events*. macOS asks the first time.
-- **Accessibility**: Obsidian is turned on. If it isn't listed, add it with `+`.
-
-**Check** next to *Permissions* in Plainsight's settings asks macOS for what's missing and opens the right page of System Settings. If a menu command can't run, a message says why: a missing permission, a greyed-out item (Writing Tools needs selected text) or a name that isn't in the menu. Names must match the menu exactly, in your Mac's language; the Writing Tools commands use the English names. Menu commands exist only on a Mac.
-
-<details>
-<summary>What runs when you use a menu command</summary>
-
-Plainsight starts macOS's `osascript` with this AppleScript, passing the menu path as arguments (`Edit`, `Writing Tools`, `Summarize`). It finds Obsidian by its app ID (`md.obsidian`) and opens each menu on the way by name, as a mouse would (macOS checks what's selected as a menu opens, which Writing Tools relies on). It reports a greyed-out item instead of clicking it, and otherwise clicks the item. If anything goes wrong partway, it presses Escape to close the menus:
-
-```applescript
-on run argv
-  tell application "System Events"
-    tell (first application process whose bundle identifier is "md.obsidian")
-      set target to menu bar item (item 1 of argv) of menu bar 1
-      try
-        click target
-        repeat with i from 2 to count of argv
-          set target to menu item (item i of argv) of menu 1 of target
-          if i < (count of argv) then click target
-        end repeat
-        if not (enabled of target) then error "Greyed out" number 7001
-        click target
-      on error message number code
-        key code 53
-        error message number code
-      end try
-    end tell
-  end tell
-end run
-```
-
-**Check** runs a script that only reads the name of the first menu in Obsidian's menu bar, which needs the same two permissions but clicks nothing. Neither script touches any other app or reads your notes. Both are in [`src/menu-items.ts`](src/menu-items.ts).
-
-</details>
+It's a plugin of its own because it needs access to macOS to pick menu items, and that would keep Plainsight off phones and tablets. It works with or without Plainsight. On a Mac, Plainsight's settings point to it under **Hotkeys**, and open its settings once it's installed.
 
 ## How Plainsight treats your notes
 
@@ -179,7 +143,7 @@ end run
 
 ## Settings
 
-The settings are grouped under six headings (*Menu commands* shows only on a Mac).
+The settings are grouped under five headings.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
@@ -195,13 +159,9 @@ The settings are grouped under six headings (*Menu commands* shows only on a Mac
 | ***Tasks*** | | |
 | Default note for new tasks | (asked the first time) | Where the sidebar's New task button and the `+` on Tasks add tasks (any note except a Kanban board) |
 | List Kanban cards as tasks | Off | The Kanban plugin saves cards as checkbox lines. Off: they show on the Tasks page only when grouped by Kanban board. On: every card is listed among your tasks |
-| ***Menu commands*** (Mac) | | |
-| Permissions | — | **Check** asks macOS for the two permissions menu commands need and opens System Settings where one is missing |
-| Writing Tools | Off | A command for each item in Edit → Writing Tools (Apple Intelligence) |
-| Show Writing Tools, Proofread, Rewrite, … Compose | On | Each Writing Tools command (greyed out while Writing Tools is off) |
-| Other menu items | (none) | More menu items to make commands of, one per line, e.g. `Window > Minimize` |
 | ***Hotkeys*** | | |
 | Set hotkeys | — | Opens Settings → Hotkeys, showing only Plainsight's commands |
+| Writing Tools and menu commands | — | On a Mac only: points to [Plainsight Menu Commands](https://github.com/magnusmoaner/obsidian-plainsight-menu-commands), or opens its settings once it's installed |
 
 Settings live in the plugin's `data.json`, which syncs with your vault. If a sync service hasn't delivered that file yet when Obsidian starts, Plainsight uses the defaults and doesn't write over it: a change you make while the file can't be read, or within a minute of starting while it's missing, waits and is applied on top of your real settings once they arrive. A file that's still missing after that minute is treated as a fresh install, and your change is saved.
 
