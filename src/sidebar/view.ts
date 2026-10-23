@@ -40,6 +40,7 @@ import {
   taskRows,
   TreeRow,
   visibleRows,
+  VisibleRow,
   compareNames,
 } from "./core/queries";
 import {
@@ -110,8 +111,25 @@ const NAV_COMMANDS: Array<[string, string, string]> = [
 const MAX_CONTAINING = 5;
 /** Cards rendered per scroll step; the rest load as the end comes into view. */
 const BATCH = 100;
+/** Nav tree rows per skippable block, and a row's height with its margin. */
+const NAV_BLOCK = 40;
+/** How long typing must pause before the sidebar catches up with it. */
+const TYPING_PAUSE_MS = 800;
+const NAV_ROW_HEIGHT = 34;
 
 type ListItem = { label: string } | { note: NoteSummary } | { file: AttachmentFile };
+
+/**
+ * One row of the notes or tasks list: `key` says which row it is, `data`
+ * what it shows (compared value by value), `draw` makes its element, and
+ * `el` is that element once drawn (rows are drawn in batches on scroll).
+ */
+interface ListEntry {
+  key: string;
+  data: unknown[];
+  draw: () => HTMLElement;
+  el: HTMLElement | null;
+}
 
 /** Not attachments: notes, canvases and bases are documents in their own right. */
 const DOCUMENT_EXTENSIONS = new Set(["md", "canvas", "base"]);
@@ -144,6 +162,8 @@ export class SidebarView extends ItemView implements HoverParent {
   private bodyEl!: HTMLElement;
   private observers: IntersectionObserver[] = [];
   private renderTimer: number | null = null;
+  /** When a key was last pressed anywhere: updates wait for a pause in typing. */
+  private lastKey = 0;
   /** Items rendered so far; re-renders restore at least this many so the
    * saved scroll position still has content to land on. */
   private renderedCount = 0;
@@ -278,6 +298,7 @@ export class SidebarView extends ItemView implements HoverParent {
       }
     };
     this.registerDomEvent(window, "pointerup", release);
+    this.registerDomEvent(window, "keydown", () => (this.lastKey = Date.now()), { capture: true });
     this.registerDomEvent(window, "pointercancel", release);
     this.registerDomEvent(window, "blur", release);
     this.registerDomEvent(window, "contextmenu", release);
@@ -307,13 +328,18 @@ export class SidebarView extends ItemView implements HoverParent {
     if (this.renderTimer !== null) window.clearTimeout(this.renderTimer);
   }
 
-  /** Index changes arrive in bursts (startup, folder renames); coalesce them. */
+  /**
+   * Index changes arrive in bursts (startup, folder renames); coalesce them.
+   * While someone types they arrive with every save, so the update waits
+   * until typing pauses: sidebar work never lands between two keystrokes.
+   */
   private queueRender(): void {
     if (this.renderTimer !== null) return;
     this.renderTimer = window.setTimeout(() => {
       this.renderTimer = null;
+      if (Date.now() - this.lastKey < TYPING_PAUSE_MS) return this.queueRender();
       if (this.pointerHeld || this.popover) this.renderWaiting = true;
-      else this.render();
+      else this.update();
     }, 150);
   }
 
@@ -368,19 +394,31 @@ export class SidebarView extends ItemView implements HoverParent {
 
   /** Re-render everything, e.g. after a setting changed what's shown. */
   refresh(): void {
+    this.navKey = "";
     this.render();
   }
 
   private render(): void {
-    // A renamed or deleted notebook would otherwise leave an empty list whose
-    // "New note" targets a folder that no longer exists.
-    if (this.place.kind === "notebook" && !this.plugin.indexer.folders().includes(this.place.folder)) {
-      this.place = { kind: "notes" };
-      this.resetScroll();
-    }
+    this.leaveMissingNotebook();
     this.contentEl.toggleClass("show-list", this.mobilePane === "list");
     this.renderNav();
     this.renderList();
+  }
+
+  /** After the index or vault changed: only what that changed is redrawn. */
+  private update(): void {
+    if (this.leaveMissingNotebook()) return this.render();
+    this.renderNav();
+    this.updateList();
+  }
+
+  /** A renamed or deleted notebook would otherwise leave an empty list whose
+   * "New note" targets a folder that no longer exists. */
+  private leaveMissingNotebook(): boolean {
+    if (this.place.kind !== "notebook" || this.plugin.indexer.folders().includes(this.place.folder)) return false;
+    this.place = { kind: "notes" };
+    this.resetScroll();
+    return true;
   }
 
   private setPlace(place: Place): void {
@@ -494,18 +532,47 @@ export class SidebarView extends ItemView implements HoverParent {
     this.unsubscribeBookmarks = onBookmarksChanged(this.app, () => this.renderNav());
   }
 
+  /** What the nav was last drawn from; a render with the same skips the DOM. */
+  private navKey = "";
+
+  /**
+   * The places column. Index changes arrive every couple of seconds while a
+   * note is being typed in, and rebuilding ~1,000 rows each time made
+   * typing lag (every new element needs styling, which the editor's own
+   * measuring then waits for). So everything the column shows is gathered
+   * first, and the DOM is rebuilt only when that differs.
+   */
   private renderNav(): void {
-    this.watchBookmarks();
     const nav = this.navEl;
-    nav.empty();
     const { notes, isAttachmentFolder } = this.partition();
     const templates = templateOptions(this.app).folder;
     const unfiltered = this.queryOptions("");
+    const s = this.plugin.settings;
+    const bookmarks = readBookmarks(this.app);
+    const noteCount = notesFor(notes, { kind: "notes" }, unfiltered).length;
+    const openTasks = taskRows(notes, "open", localISODate(), templates, s.boardCardsInTasks).length;
+    const attachmentCount = this.attachmentFiles().length;
+    const templateCount = templates ? notesFor(notes, { kind: "templates" }, unfiltered).length : null;
+    const notebooks = folderRows(this.plugin.indexer.folders(), notes, templates, isAttachmentFolder);
+    const tags = tagRows(notes);
+
+    const tree = (rows: TreeRow[]) => rows.map((r) => [r.path, r.count]);
+    const key = JSON.stringify([
+      [s.showActionRow, s.showSearchButton, s.showNewFolderButton, s.showNewTaskButton, s.showMoreButton],
+      this.place,
+      this.plugin.viewState.state.collapsed,
+      bookmarks?.map((b) => [b.kind, b.title, b.target, b.group, b.kind === "search" || !!this.app.vault.getAbstractFileByPath(b.target)]) ?? null,
+      [noteCount, openTasks, attachmentCount, templateCount, templates],
+      tree(notebooks),
+      tree(tags),
+    ]);
+    if (key === this.navKey) return;
+    this.navKey = key;
+    nav.empty();
 
     // Evernote-style action row: the Note pill, then round icon buttons. The
     // row and each round button can be turned off in settings; a round
     // button that's off moves into the ⋯ menu.
-    const s = this.plugin.settings;
     const show = (on: boolean) => s.showActionRow && on;
     const showSearchButton = show(s.showSearchButton);
     const showNewFolderButton = show(s.showNewFolderButton);
@@ -532,7 +599,7 @@ export class SidebarView extends ItemView implements HoverParent {
     if (show(s.showMoreButton)) this.roundButton(actions, "more-horizontal", "More", (evt) =>
       this.moreMenu(
         evt,
-        tagRows(notes).map((t) => t.path),
+        tagRows(this.partition().notes).map((t) => t.path),
         {
           search: !showSearchButton,
           folder: !newFolder || newFolder.offsetParent === null,
@@ -542,33 +609,19 @@ export class SidebarView extends ItemView implements HoverParent {
       )
     );
 
-    const bookmarks = readBookmarks(this.app);
     if (bookmarks && bookmarks.length && this.navHeading(nav, "Bookmarks", "bookmark", "section:bookmarks")) {
       for (const b of bookmarks) this.bookmarkRow(nav, b);
     }
 
-    const noteCount = notesFor(notes, { kind: "notes" }, unfiltered).length;
-    const openTasks = taskRows(
-      notes,
-      "open",
-      localISODate(),
-      templates,
-      this.plugin.settings.boardCardsInTasks
-    ).length;
-    const templateCount = templates
-      ? notesFor(notes, { kind: "templates" }, unfiltered).length
-      : null;
     this.placeRow(nav, "Notes", "file-text", { kind: "notes" }, 0, noteCount, () => void createNote(this.app, null));
     this.placeRow(nav, "Tasks", "check-circle-2", { kind: "tasks" }, 0, openTasks, () => void this.newTask());
-    this.placeRow(nav, "Attachments", "paperclip", { kind: "attachments" }, 0, this.attachmentFiles().length);
+    this.placeRow(nav, "Attachments", "paperclip", { kind: "attachments" }, 0, attachmentCount);
     this.placeRow(nav, "Templates", "layout-template", { kind: "templates" }, 0, templateCount);
 
-    const notebooks = folderRows(this.plugin.indexer.folders(), notes, templates, isAttachmentFolder);
     if (this.navHeading(nav, "Folders", "folder", "section:notebooks", () => this.newNotebook(isAttachmentFolder))) {
       this.treeSection(nav, notebooks, "notebook", (row) => ({ kind: "notebook", folder: row.path }), "folder");
     }
 
-    const tags = tagRows(notes);
     if (this.navHeading(nav, "Tags", "tag", "section:tags", () => this.newTag(tags.map((t) => t.path)))) {
       this.treeSection(nav, tags, "tag", (row) => ({ kind: "tag", tag: row.path }));
     }
@@ -827,35 +880,54 @@ export class SidebarView extends ItemView implements HoverParent {
         .filter((k) => k.startsWith(`${keyPrefix}:`))
         .map((k) => k.slice(keyPrefix.length + 1))
     );
-    for (const row of visibleRows(rows, collapsed)) {
-      const place = toPlace(row);
-      const el = this.navRow(parent, row.name, icon, row.depth + 1, row.count, this.isActive(place));
-      const key = `${keyPrefix}:${row.path}`;
-      if (place.kind === "notebook") {
-        el.addEventListener("contextmenu", (evt) => {
-          const folder = this.app.vault.getAbstractFileByPath(place.folder);
-          if (folder instanceof TFolder) this.fileMenu(evt, folder);
-        });
+    // Rows go in blocks the browser skips while they're scrolled out of
+    // view (content-visibility), so a long tree costs little to restyle.
+    const visible = visibleRows(rows, collapsed);
+    let block = parent;
+    visible.forEach((row, i) => {
+      if (i % NAV_BLOCK === 0) {
+        block = parent.createDiv("ps-nav-block");
+        const n = Math.min(NAV_BLOCK, visible.length - i);
+        block.style.setProperty("contain-intrinsic-size", `auto ${n * NAV_ROW_HEIGHT}px`);
       }
-      el.addEventListener("click", () => {
-        if (!row.hasChildren) return this.setPlace(place);
-        // A parent is a place and a group: the first click selects it (and
-        // opens it if folded); clicking it again while selected folds or
-        // unfolds it, like a section heading.
-        if (this.isActive(place)) return this.toggleCollapsed(key);
-        if (row.collapsed) this.setCollapsed(key, false);
-        this.setPlace(place);
-      });
-      if (!row.hasChildren) continue;
-      // Swap the icon slot for one that shows the chevron on hover.
-      el.addClass("is-foldable");
-      const slot = this.foldSlot(el, icon, row.collapsed);
-      el.querySelector(".ps-nav-icon")!.replaceWith(slot);
-      slot.addEventListener("click", (evt) => {
-        evt.stopPropagation();
-        this.toggleCollapsed(key);
+      this.treeRow(block, row, keyPrefix, toPlace, icon);
+    });
+  }
+
+  private treeRow(
+    parent: HTMLElement,
+    row: VisibleRow,
+    keyPrefix: string,
+    toPlace: (row: TreeRow) => Place,
+    icon: string | null
+  ): void {
+    const place = toPlace(row);
+    const el = this.navRow(parent, row.name, icon, row.depth + 1, row.count, this.isActive(place));
+    const key = `${keyPrefix}:${row.path}`;
+    if (place.kind === "notebook") {
+      el.addEventListener("contextmenu", (evt) => {
+        const folder = this.app.vault.getAbstractFileByPath(place.folder);
+        if (folder instanceof TFolder) this.fileMenu(evt, folder);
       });
     }
+    el.addEventListener("click", () => {
+      if (!row.hasChildren) return this.setPlace(place);
+      // A parent is a place and a group: the first click selects it (and
+      // opens it if folded); clicking it again while selected folds or
+      // unfolds it, like a section heading.
+      if (this.isActive(place)) return this.toggleCollapsed(key);
+      if (row.collapsed) this.setCollapsed(key, false);
+      this.setPlace(place);
+    });
+    if (!row.hasChildren) return;
+    // Swap the icon slot for one that shows the chevron on hover.
+    el.addClass("is-foldable");
+    const slot = this.foldSlot(el, icon, row.collapsed);
+    el.querySelector(".ps-nav-icon")!.replaceWith(slot);
+    slot.addEventListener("click", (evt) => {
+      evt.stopPropagation();
+      this.toggleCollapsed(key);
+    });
   }
 
   private bookmarkRow(parent: HTMLElement, bookmark: Bookmark): void {
@@ -1142,35 +1214,94 @@ export class SidebarView extends ItemView implements HoverParent {
     };
   }
 
+  /** The notes or tasks list as drawn; empty for the other lists. */
+  private listEntries: ListEntry[] = [];
+
   private renderList(): void {
     const what = { tasks: "tasks", attachments: "attachments", templates: "templates" } as Record<string, string>;
     this.filterInput.setPlaceholder(`Search ${what[this.place.kind] ?? "notes"}`);
-    this.disconnectObservers();
-    this.taskRowEls.clear();
-    this.activeTaskEl = null;
     const scroll = this.bodyEl.scrollTop;
     this.headerEl.empty();
     this.filtersEl.empty();
-    this.bodyEl.empty();
+    this.listEntries = [];
 
-
-    if (this.place.kind === "tasks") {
-      this.renderTasks();
+    if (this.place.kind === "tasks" || this.isNoteList()) {
+      this.drawEntries(this.place.kind === "tasks" ? this.renderTasks() : this.renderNotes());
     } else if (this.place.kind === "attachments") {
+      this.clearBody();
       this.renderAttachments();
     } else if (this.place.kind === "templates" && !templateOptions(this.app).folder) {
+      this.clearBody();
       this.renderHeader("Templates", null);
       const empty = this.bodyEl.createDiv("ps-empty");
       empty.createDiv({ text: "No templates folder is set." });
       const button = empty.createEl("button", { text: "Choose folder" });
       button.addEventListener("click", () => openSettingsTab(this.app, "templates"));
-    } else {
-      this.renderNotes();
     }
     this.bodyEl.scrollTop = scroll;
   }
 
-  private renderNotes(): void {
+  /** Places listed as note cards (a Templates place without a folder isn't). */
+  private isNoteList(): boolean {
+    const kind = this.place.kind;
+    return kind !== "tasks" && kind !== "attachments" && !(kind === "templates" && !templateOptions(this.app).folder);
+  }
+
+  private clearBody(): void {
+    this.disconnectObservers();
+    this.taskRowEls.clear();
+    this.activeTaskEl = null;
+    this.bodyEl.empty();
+  }
+
+  /** A fresh list body: the rows (drawn in batches), or the empty-list text. */
+  private drawEntries(entries: ListEntry[] | string): void {
+    this.clearBody();
+    if (typeof entries === "string") {
+      this.bodyEl.createDiv({ cls: "ps-empty", text: entries });
+      return;
+    }
+    this.listEntries = entries;
+    this.renderIncrementally(entries.length, (i) => {
+      entries[i].el = entries[i].draw();
+    });
+  }
+
+  /**
+   * The list after the index changed, typically a note being typed in.
+   * Header and filters are redrawn (they're small); in the body, when the
+   * same rows are listed in the same order, only rows whose content changed
+   * are drawn again, in place. Otherwise the body is rebuilt.
+   */
+  private updateList(): void {
+    if (!(this.place.kind === "tasks" || this.isNoteList()) || !this.listEntries.length) return this.renderList();
+    const scroll = this.bodyEl.scrollTop;
+    this.headerEl.empty();
+    this.filtersEl.empty();
+    const next = this.place.kind === "tasks" ? this.renderTasks() : this.renderNotes();
+    const old = this.listEntries;
+    const sameRows =
+      typeof next !== "string" && next.length === old.length && next.every((entry, i) => entry.key === old[i].key);
+    if (typeof next === "string" || !sameRows) {
+      this.drawEntries(next);
+      this.bodyEl.scrollTop = scroll;
+      return;
+    }
+    next.forEach((entry, i) => {
+      const was = old[i];
+      const same = entry.data.length === was.data.length && entry.data.every((value, j) => value === was.data[j]);
+      if (same) return;
+      // `old` is the array the batch renderer reads, so rows not drawn yet
+      // pick up the new content when they're scrolled to.
+      old[i] = entry;
+      if (!was.el) return;
+      const el = entry.draw();
+      was.el.replaceWith(el);
+      entry.el = el;
+    });
+  }
+
+  private renderNotes(): ListEntry[] | string {
     const view = this.plugin.viewState.state;
     const everything = notesFor(this.partition().notes, this.place, this.queryOptions());
     const counts = kindCounts(everything);
@@ -1182,20 +1313,26 @@ export class SidebarView extends ItemView implements HoverParent {
     this.renderHeader(this.placeTitle(), list.length);
     this.kindChips(counts, kind);
     if (!list.length) {
-      const text = this.plugin.index.loading ? "Loading notes…" : this.search ? "No matches" : "No notes";
-      this.bodyEl.createDiv({ cls: "ps-empty", text });
-      return;
+      return this.plugin.index.loading ? "Loading notes…" : this.search ? "No matches" : "No notes";
     }
-    const items: ListItem[] = [];
+    const entries: ListEntry[] = [];
     for (const group of groupNotesBy(list, this.sort, grouping)) {
-      if (group.label) items.push({ label: group.label });
-      for (const note of group.notes) items.push({ note });
+      if (group.label) entries.push(this.labelEntry(group.label, group.label));
+      for (const note of group.notes) {
+        // A changed note is a new summary object, so the reference says it all.
+        entries.push({ key: `note:${note.path}`, data: [note], draw: () => this.renderCard(note), el: null });
+      }
     }
-    this.renderIncrementally(items.length, (i) => {
-      const item = items[i];
-      if ("label" in item) this.bodyEl.createDiv({ cls: "ps-group-label", text: item.label });
-      else if ("note" in item) this.renderCard(item.note);
-    });
+    return entries;
+  }
+
+  private labelEntry(name: string, text: string): ListEntry {
+    return {
+      key: `label:${name}`,
+      data: [text],
+      draw: () => this.bodyEl.createDiv({ cls: "ps-group-label", text }),
+      el: null,
+    };
   }
 
   /**
@@ -1445,7 +1582,7 @@ export class SidebarView extends ItemView implements HoverParent {
     }
   }
 
-  private renderCard(note: NoteSummary): void {
+  private renderCard(note: NoteSummary): HTMLElement {
     const card = this.bodyEl.createDiv({ cls: "ps-card", attr: { "data-path": note.path } });
     card.toggleClass("is-active", this.activeFile()?.path === note.path);
     const text = card.createDiv("ps-card-text");
@@ -1500,6 +1637,7 @@ export class SidebarView extends ItemView implements HoverParent {
     });
     card.addEventListener("contextmenu", (evt) => this.cardMenu(evt, note));
     this.previewOnHover(card, note.path);
+    return card;
   }
 
   /**
@@ -1922,7 +2060,7 @@ export class SidebarView extends ItemView implements HoverParent {
 
   // ---------- task rows ----------
 
-  private renderTasks(): void {
+  private renderTasks(): ListEntry[] | string {
     const today = localISODate();
     // Validated when loaded: anything unknown is already the default.
     const grouping: TaskGrouping = this.plugin.viewState.state.taskGroupBy;
@@ -1977,7 +2115,7 @@ export class SidebarView extends ItemView implements HoverParent {
     if (!groups.length) {
       // Board grouping drops tasks from ordinary notes; say so rather than
       // leave an empty list with no visible cause.
-      const empty = this.plugin.index.loading
+      return this.plugin.index.loading
         ? "Loading tasks…"
         : this.search
         ? "No matches"
@@ -1986,85 +2124,90 @@ export class SidebarView extends ItemView implements HoverParent {
           : grouping === "board"
             ? "No Kanban cards"
             : "No tasks";
-      this.bodyEl.createDiv({ cls: "ps-empty", text: empty });
-      return;
     }
-    const items: Array<{ label: string } | TaskRow> = [];
+    const entries: ListEntry[] = [];
     for (const group of groups) {
-      if (group.label) items.push({ label: `${group.label} · ${group.rows.length}` });
-      items.push(...group.rows);
+      if (group.label) entries.push(this.labelEntry(group.label, `${group.label} · ${group.rows.length}`));
+      for (const row of group.rows) {
+        // Task objects are new whenever their note changes, so compare what
+        // the row shows: the task line's facts and the note's title.
+        entries.push({
+          key: `task:${row.note.path}\u0000${row.task.line}`,
+          data: [JSON.stringify(row.task), row.note.title, today],
+          draw: () => this.renderTaskRow(row, today),
+          el: null,
+        });
+      }
     }
-    this.renderIncrementally(items.length, (i) => {
-      const item = items[i];
-      if ("label" in item) {
-        this.bodyEl.createDiv({ cls: "ps-group-label", text: item.label });
-        return;
-      }
-      const { note, task } = item;
-      const row = this.bodyEl.createDiv("ps-task");
-      const key = `${note.path}\u0000${task.line}`;
-      this.taskRowEls.set(key, row);
-      const active = this.plugin.activeTask;
-      if (active && active.path === note.path && active.line === task.line) {
-        row.addClass("is-active");
-        this.activeTaskEl = row;
-      }
-      const box = row.createEl("input", { type: "checkbox", cls: "task-list-item-checkbox" });
-      box.checked = isClosed(task);
-      box.addEventListener("click", (evt) => evt.stopPropagation());
-      box.addEventListener("change", async () => {
-        // On success the index update re-renders the row. When nothing was
-        // written (stale line, or Tasks declined), put the box back.
-        const written = await toggleTask(this.app, note.path, task);
-        if (!written) box.checked = isClosed(task);
-      });
+    return entries;
+  }
 
-      const details = taskDetails(task.text);
-      const closed = isClosed(task);
-      const body = row.createDiv("ps-task-body");
-      body.createDiv({ cls: "ps-task-text", text: details.description || task.text });
-      const meta = body.createDiv("ps-task-meta");
-      const noteLink = meta.createSpan({
-        cls: "ps-task-note",
-        text: note.title,
-        attr: { "aria-label": `Show only tasks in ${note.title}` },
-      });
-      noteLink.addEventListener("click", (evt) => {
-        evt.stopPropagation();
-        this.filterTasksTo(note.path);
-      });
-      // Details as badges: priority, dates (relative), recurrence, tags.
-      const badge = (icon: string | null, text: string, label: string | null, cls = "") => {
-        const el = meta.createSpan({ cls: `ps-badge ${cls}`.trim() });
-        if (label) el.setAttr("aria-label", label);
-        if (icon) setIcon(el.createSpan("ps-badge-icon"), icon);
-        el.createSpan({ text });
-        return el;
-      };
-      const priority = PRIORITIES.find((p) => p.value === details.priority);
-      if (priority) badge("flag", priority.label, `${priority.label} priority`, `is-priority-${priority.value}`);
-      const due = details.due ?? task.due;
-      if (due && !closed) {
-        const el = badge("calendar", dueDateLabel(due, today), `Due ${due}`);
-        el.toggleClass("is-overdue", due < today);
-        el.toggleClass("is-today", due === today);
-      }
-      if (details.scheduled && !closed) {
-        const el = badge("calendar-clock", dueDateLabel(details.scheduled, today), `Scheduled ${details.scheduled}`);
-        el.toggleClass("is-today", details.scheduled === today);
-      }
-      // A start date matters only until it's reached.
-      if (details.start && !closed && details.start > today) {
-        badge("calendar-plus", dueDateLabel(details.start, today), `Starts ${details.start}`);
-      }
-      if (details.recurrence) badge("repeat", details.recurrence, `Repeats ${details.recurrence}`);
-      const done = details.done ?? task.done;
-      if (closed && done) badge("check", dueDateLabel(done, today), `Done ${done}`, "is-quiet");
-      if (details.cancelled) badge("x", dueDateLabel(details.cancelled, today), `Cancelled ${details.cancelled}`, "is-quiet");
-      for (const tag of details.badgeTags) badge(null, `#${tag}`, null, "ps-badge-tag");
-
-      row.addEventListener("click", (evt) => void this.openTask(note.path, task.line, evt));
-      this.previewOnHover(row, note.path, task.line);
+  private renderTaskRow(item: TaskRow, today: string): HTMLElement {
+    const { note, task } = item;
+    const row = this.bodyEl.createDiv("ps-task");
+    const key = `${note.path}\u0000${task.line}`;
+    this.taskRowEls.set(key, row);
+    const active = this.plugin.activeTask;
+    if (active && active.path === note.path && active.line === task.line) {
+      row.addClass("is-active");
+      this.activeTaskEl = row;
+    }
+    const box = row.createEl("input", { type: "checkbox", cls: "task-list-item-checkbox" });
+    box.checked = isClosed(task);
+    box.addEventListener("click", (evt) => evt.stopPropagation());
+    box.addEventListener("change", async () => {
+      // On success the index update re-renders the row. When nothing was
+      // written (stale line, or Tasks declined), put the box back.
+      const written = await toggleTask(this.app, note.path, task);
+      if (!written) box.checked = isClosed(task);
     });
+
+    const details = taskDetails(task.text);
+    const closed = isClosed(task);
+    const body = row.createDiv("ps-task-body");
+    body.createDiv({ cls: "ps-task-text", text: details.description || task.text });
+    const meta = body.createDiv("ps-task-meta");
+    const noteLink = meta.createSpan({
+      cls: "ps-task-note",
+      text: note.title,
+      attr: { "aria-label": `Show only tasks in ${note.title}` },
+    });
+    noteLink.addEventListener("click", (evt) => {
+      evt.stopPropagation();
+      this.filterTasksTo(note.path);
+    });
+    // Details as badges: priority, dates (relative), recurrence, tags.
+    const badge = (icon: string | null, text: string, label: string | null, cls = "") => {
+      const el = meta.createSpan({ cls: `ps-badge ${cls}`.trim() });
+      if (label) el.setAttr("aria-label", label);
+      if (icon) setIcon(el.createSpan("ps-badge-icon"), icon);
+      el.createSpan({ text });
+      return el;
+    };
+    const priority = PRIORITIES.find((p) => p.value === details.priority);
+    if (priority) badge("flag", priority.label, `${priority.label} priority`, `is-priority-${priority.value}`);
+    const due = details.due ?? task.due;
+    if (due && !closed) {
+      const el = badge("calendar", dueDateLabel(due, today), `Due ${due}`);
+      el.toggleClass("is-overdue", due < today);
+      el.toggleClass("is-today", due === today);
+    }
+    if (details.scheduled && !closed) {
+      const el = badge("calendar-clock", dueDateLabel(details.scheduled, today), `Scheduled ${details.scheduled}`);
+      el.toggleClass("is-today", details.scheduled === today);
+    }
+    // A start date matters only until it's reached.
+    if (details.start && !closed && details.start > today) {
+      badge("calendar-plus", dueDateLabel(details.start, today), `Starts ${details.start}`);
+    }
+    if (details.recurrence) badge("repeat", details.recurrence, `Repeats ${details.recurrence}`);
+    const done = details.done ?? task.done;
+    if (closed && done) badge("check", dueDateLabel(done, today), `Done ${done}`, "is-quiet");
+    if (details.cancelled) badge("x", dueDateLabel(details.cancelled, today), `Cancelled ${details.cancelled}`, "is-quiet");
+    for (const tag of details.badgeTags) badge(null, `#${tag}`, null, "ps-badge-tag");
+
+    row.addEventListener("click", (evt) => void this.openTask(note.path, task.line, evt));
+    this.previewOnHover(row, note.path, task.line);
+    return row;
   }
 }

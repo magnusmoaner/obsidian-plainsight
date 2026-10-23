@@ -99,6 +99,7 @@ In a list of notes, a task query keeps the notes that have a matching task.
 ### Good to know
 
 - **Fast start.** The sidebar opens at once and reads your most recently changed notes first, so they show almost straight away. A thin bar under the list header runs until the rest are read.
+- **Out of the way while you type.** Changes to the note you're typing in reach the sidebar when you pause, and only the cards, tasks and counts that changed are redrawn, so the sidebar never slows typing down.
 - **Per device.** Folded sections, column width, grouping and the filter chips are remembered on each device and don't sync, so your phone and computer can each keep their own (Obsidian 1.8.7 or later).
 
 ## Commands and hotkeys
