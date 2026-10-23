@@ -155,6 +155,12 @@ export function openSettingsTab(app: App, tabId: string): void {
  * Settings → Hotkeys, with its search filled in. If the tab's search field
  * isn't where we expect, the tab still opens, unfiltered.
  */
+/** Whether a community plugin is installed and turned on. */
+export function pluginInstalled(app: App, id: string): boolean {
+  const plugins = (app as unknown as { plugins?: { enabledPlugins?: Set<string> } }).plugins;
+  return plugins?.enabledPlugins instanceof Set && plugins.enabledPlugins.has(id);
+}
+
 export function openHotkeys(app: App, query: string): void {
   openSettingsTab(app, "hotkeys");
   const tab = (app as unknown as { setting?: { activeTab?: Loose } }).setting?.activeTab;
