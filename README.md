@@ -186,7 +186,6 @@ From Obsidian's core plugins, Plainsight uses **Bookmarks** (the Bookmarks place
 Plainsight doesn't talk to these plugins, but together they make Obsidian feel more like a proper visual note editor:
 
 - **[Editing Toolbar](https://github.com/PKM-er/obsidian-editing-toolbar)** puts bold, headings, lists and colours on buttons above the note, for when you'd rather click than remember a shortcut. Whatever it inserts, Plainsight draws like anything you type.
-- **[Dragger](https://github.com/Ariestar/obsidian-dragger)** gives every paragraph, list and block a handle, so you can reorder a note by dragging, the way you'd move blocks in Notion.
 - **[Advanced Tables](https://github.com/tgrosinger/advanced-tables-obsidian)** keeps tables tidy while you type: columns line up, and Tab and Enter move between cells. Plainsight doesn't draw tables yet, so this makes the Markdown pleasant in the meantime.
 
 **Pick one of the two:** [Notebook Navigator](https://github.com/johansan/notebook-navigator) is another notes sidebar, built for the same job as Plainsight's. Both can be on together, but you'd use one.
