@@ -191,11 +191,22 @@ Plainsight doesn't talk to these plugins, but together they make Obsidian feel m
 
 **Pick one of the two:** [Notebook Navigator](https://github.com/johansan/notebook-navigator) is another notes sidebar, built for the same job as Plainsight's. Both can be on together, but you'd use one.
 
+## The Plainsight family
+
+Plainsight is also the name for a small family of Obsidian plugins with the same aim: Obsidian that feels calm and works like a proper note editor.
+
+| Plugin | What it does |
+| --- | --- |
+| **Plainsight** (this one) | The editor without Markdown syntax, and the two-column notes sidebar |
+| **[Plainsight Menu Commands](https://github.com/magnusmoaner/obsidian-plainsight-menu-commands)** | Hotkeys for Apple Intelligence's Writing Tools and any other menu item, on a Mac |
+
+Each works on its own; together they fit.
+
 ## Installation
 
-Plainsight isn't in the Community Plugins directory yet. To install it manually:
+Plainsight isn't in the Community Plugins directory yet, and there are no releases yet either. To install it by hand:
 
-1. Build it (see below), or take `main.js`, `manifest.json` and `styles.css` from a release.
+1. Build it (see Development below), which produces `main.js`; `manifest.json` and `styles.css` are in the repo.
 2. Copy those three files to `<your vault>/.obsidian/plugins/plainsight/`.
 3. In Obsidian, go to Settings → Community plugins, reload, and enable **Plainsight**.
 
