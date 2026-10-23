@@ -22,7 +22,7 @@ Anything Plainsight doesn't render yet (lists, tables, embeds and more) stays vi
 
 ### Live Preview vs Source mode
 
-Obsidian's Live Preview draws some blocks, such as callouts, itself, and turns them back into Markdown when you click in. To make Plainsight the only renderer, turn on **Take over rendering (Source mode)**. Your previous editor mode is restored when you turn it off. The trade-off is that in Source mode anything Plainsight doesn't render yet shows as Markdown.
+Obsidian's Live Preview draws some blocks, such as callouts, itself, and turns them back into Markdown when you click in. To make Plainsight the only renderer, turn on **Let Plainsight draw everything (Source mode)**. Your previous editor mode is restored when you turn it off. The trade-off is that in Source mode anything Plainsight doesn't render yet shows as Markdown.
 
 The editor's keyboard shortcuts are listed under [Commands and hotkeys](#commands-and-hotkeys).
 
@@ -62,7 +62,7 @@ Rest the mouse on a card to preview the note or file beside the list; rest it on
 
 ### Creating things
 
-- **The button row** at the top of the left column: the **Note** pill, then round buttons for **Search**, **New folder**, **New task** and **⋯**. Settings can hide the row or any button in it; a hidden round button (and, on a narrow column, New folder and New task) moves into the **⋯** menu.
+- **The button row** at the top of the left column: the **Note** pill, then round buttons for **Search**, **New folder**, **New task** and **⋯**. Settings can hide the whole row, or any of the round buttons; a hidden Search, New folder or New task button (and, on a narrow column, New folder and New task) moves into the **⋯** menu.
 - **A `+`** appears when you hover Notes, Tasks, Folders or Tags (not on touch screens).
 - **The list header** has a button for a new note (a new task on the Tasks page), and one for a new [Kanban](https://github.com/mgmeyers/obsidian-kanban) or [Task List Kanban](https://github.com/erikars/task-list-kanban) board in the folder you're viewing (with both plugins enabled, it asks which).
 - **The ⋯ menu** creates tags, canvases and boards, inserts a template into the open note, opens Obsidian's search, quick switcher, graph view and the Importer, and has expand/collapse all, bookmark cleanup and settings.
@@ -99,6 +99,7 @@ In a list of notes, a task query keeps the notes that have a matching task.
 ### Good to know
 
 - **Fast start.** The sidebar opens at once and reads your most recently changed notes first, so they show almost straight away. A thin bar under the list header runs until the rest are read.
+- **Out of the way while you type.** Changes to the note you're typing in reach the sidebar when you pause, and only the cards, tasks and counts that changed are redrawn, so the sidebar never slows typing down.
 - **Per device.** Folded sections, column width, grouping and the filter chips are remembered on each device and don't sync, so your phone and computer can each keep their own (Obsidian 1.8.7 or later).
 
 ## Commands and hotkeys
@@ -126,6 +127,48 @@ Heading shortcuts use `Opt/Alt` because Obsidian already binds `Cmd + 1…8` to 
 
 To set one, open **Settings → Hotkeys** and search for *Plainsight*, or click **Set hotkeys** at the bottom of Plainsight's settings, which opens that list for you. Click the `+` next to a command and press the keys. Obsidian warns you if they're already in use. The editor shortcuts above can be changed there too.
 
+### Menu commands (Mac)
+
+Plainsight can turn items in Obsidian's menu bar into commands, so they can have an Obsidian hotkey, sit in the command palette or go on an Editing Toolbar button. The main use is Apple Intelligence's **Edit → Writing Tools**: turn on **Writing Tools** under *Menu commands* in Plainsight's settings, and you get *Plainsight: Writing Tools: Summarize*, *…: Proofread* and the rest, each of which can be switched off on its own. Select text in a note and run one. Any other menu item can be added under **Other menu items**, one per line, such as `Window > Minimize`.
+
+When you run one, Plainsight picks the menu item for you, just as if you'd clicked it. macOS allows that only once Obsidian has two permissions, both in **System Settings → Privacy & Security**:
+
+- **Automation**: Obsidian may control *System Events*. macOS asks the first time.
+- **Accessibility**: Obsidian is turned on. If it isn't listed, add it with `+`.
+
+**Check** next to *Permissions* in Plainsight's settings asks macOS for what's missing and opens the right page of System Settings. If a menu command can't run, a message says why: a missing permission, a greyed-out item (Writing Tools needs selected text) or a name that isn't in the menu. Names must match the menu exactly, in your Mac's language; the Writing Tools commands use the English names. Menu commands exist only on a Mac.
+
+<details>
+<summary>What runs when you use a menu command</summary>
+
+Plainsight starts macOS's `osascript` with this AppleScript, passing the menu path as arguments (`Edit`, `Writing Tools`, `Summarize`). It finds Obsidian by its app ID (`md.obsidian`) and opens each menu on the way by name, as a mouse would (macOS checks what's selected as a menu opens, which Writing Tools relies on). It reports a greyed-out item instead of clicking it, and otherwise clicks the item. If anything goes wrong partway, it presses Escape to close the menus:
+
+```applescript
+on run argv
+  tell application "System Events"
+    tell (first application process whose bundle identifier is "md.obsidian")
+      set target to menu bar item (item 1 of argv) of menu bar 1
+      try
+        click target
+        repeat with i from 2 to count of argv
+          set target to menu item (item i of argv) of menu 1 of target
+          if i < (count of argv) then click target
+        end repeat
+        if not (enabled of target) then error "Greyed out" number 7001
+        click target
+      on error message number code
+        key code 53
+        error message number code
+      end try
+    end tell
+  end tell
+end run
+```
+
+**Check** runs a script that only reads the name of the first menu in Obsidian's menu bar, which needs the same two permissions but clicks nothing. Neither script touches any other app or reads your notes. Both are in [`src/menu-items.ts`](src/menu-items.ts).
+
+</details>
+
 ## How Plainsight treats your notes
 
 - **Markdown stays the source of truth.** No database and no separate copy. Everything shown comes from your files.
@@ -136,22 +179,27 @@ To set one, open **Settings → Hotkeys** and search for *Plainsight*, or click 
 
 ## Settings
 
-The settings are grouped under five headings.
+The settings are grouped under six headings (*Menu commands* shows only on a Mac).
 
 | Setting | Default | What it does |
 | --- | --- | --- |
 | ***Editor (beta, work in progress)*** | | |
 | Enable WYSIWYG editing | On | Hides syntax and enables the editor shortcuts |
-| Take over rendering (Source mode) | Off | Turns Live Preview off so Plainsight is the only renderer. Greyed out while the editor is off |
-| ***Sidebar: left column*** | | |
-| Show the action buttons | On | The row of buttons at the top of the left column. Everything they do stays reachable without it, through the `+` on Notes, Tasks, Folders and Tags and through the commands |
-| Note, Search, New folder, New task and ⋯ buttons | On | Each button in that row (greyed out while the row is off). A round button that's off moves into the **⋯** menu |
-| ***Sidebar: right column*** | | |
+| Let Plainsight draw everything (Source mode) | Off | Switches notes from Live Preview to Source mode, so Plainsight alone draws them. Greyed out while the editor is off |
+| ***Notes sidebar: left column*** | | |
+| Action buttons | On | The Note button and the round buttons beside it, at the top of the left column. Everything they do stays reachable without it, through the `+` on Notes, Tasks, Folders and Tags and through the commands |
+| Search, New folder, New task and ⋯ buttons | On | Each round button (greyed out while the action buttons are off). Search, New folder or New task turned off moves into the **⋯** menu |
+| ***Notes sidebar: right column*** | | |
 | Preview on hover | On | Resting the mouse on a note card or a task previews the note (needs the core Page preview plugin) |
 | Gap at the top, bottom, left, right | Bottom only | A gap between the white list panel and the window edge on each chosen side; corners round on sides with a gap |
 | ***Tasks*** | | |
-| Default note for new tasks | (asked the first time) | Where the sidebar's "New task" adds tasks (any note except a Kanban board) |
+| Default note for new tasks | (asked the first time) | Where the sidebar's New task button and the `+` on Tasks add tasks (any note except a Kanban board) |
 | List Kanban cards as tasks | Off | The Kanban plugin saves cards as checkbox lines. Off: they show on the Tasks page only when grouped by Kanban board. On: every card is listed among your tasks |
+| ***Menu commands*** (Mac) | | |
+| Permissions | — | **Check** asks macOS for the two permissions menu commands need and opens System Settings where one is missing |
+| Writing Tools | Off | A command for each item in Edit → Writing Tools (Apple Intelligence) |
+| Show Writing Tools, Proofread, Rewrite, … Compose | On | Each Writing Tools command (greyed out while Writing Tools is off) |
+| Other menu items | (none) | More menu items to make commands of, one per line, e.g. `Window > Minimize` |
 | ***Hotkeys*** | | |
 | Set hotkeys | — | Opens Settings → Hotkeys, showing only Plainsight's commands |
 

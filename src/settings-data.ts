@@ -1,3 +1,4 @@
+import { WRITING_TOOLS } from "./menu-items";
 import { LEGACY_VIEW_KEYS } from "./sidebar/core/view-state";
 
 /*
@@ -21,14 +22,18 @@ export interface WysiwygSettings {
   listInsetBottom: boolean;
   listInsetLeft: boolean;
   listInsetRight: boolean;
-  /** The sidebar's action row as a whole, then each of its buttons. */
+  /** The sidebar's action row (the Note button always shows with it), then
+   * its round buttons; one that's off moves into the ⋯ menu. */
   showActionRow: boolean;
-  showNoteButton: boolean;
-  /** Round buttons; one that's off moves into the ⋯ menu. */
   showSearchButton: boolean;
   showNewFolderButton: boolean;
   showNewTaskButton: boolean;
   showMoreButton: boolean;
+  /** Commands for Edit › Writing Tools (macOS) as a whole, then which ones. */
+  writingToolsCommands: boolean;
+  writingTools: string[];
+  /** More menu items to make commands of, one "Menu > Item" per line. */
+  menuCommands: string;
 }
 
 export const DEFAULT_SETTINGS: WysiwygSettings = {
@@ -42,17 +47,20 @@ export const DEFAULT_SETTINGS: WysiwygSettings = {
   listInsetLeft: false,
   listInsetRight: false,
   showActionRow: true,
-  showNoteButton: true,
   showSearchButton: true,
   showNewFolderButton: true,
   showNewTaskButton: true,
   showMoreButton: true,
+  writingToolsCommands: false,
+  writingTools: [...WRITING_TOOLS],
+  menuCommands: "",
 };
 
 const KNOWN = new Set<string>(Object.keys(DEFAULT_SETTINGS));
 
-/** Settings that no longer exist: `sidebar` (the sidebar is always on). */
-const RETIRED = ["sidebar"];
+/** Settings that no longer exist: `sidebar` (the sidebar is always on) and
+ * `showNoteButton` (the Note button shows whenever the action row does). */
+const RETIRED = ["sidebar", "showNoteButton"];
 
 /**
  * A stored data.json, field by field: a value of the wrong type falls back
@@ -68,7 +76,11 @@ export function parseSettings(raw: unknown): { settings: WysiwygSettings; extra:
   for (const [key, value] of Object.entries(data)) {
     if (KNOWN.has(key)) {
       const name = key as keyof WysiwygSettings;
-      if (typeof value === typeof DEFAULT_SETTINGS[name]) (settings as Record<string, unknown>)[name] = value;
+      const fallback = DEFAULT_SETTINGS[name];
+      const valid = Array.isArray(fallback)
+        ? Array.isArray(value) && value.every((item) => typeof item === "string")
+        : typeof value === typeof fallback;
+      if (valid) (settings as Record<string, unknown>)[name] = value;
     } else if (!LEGACY_VIEW_KEYS.includes(key) && !RETIRED.includes(key)) {
       extra[key] = value;
     }

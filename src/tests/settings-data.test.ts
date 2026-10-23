@@ -19,11 +19,13 @@ describe("parseSettings", () => {
       listInsetLeft: true,
       listInsetRight: true,
       showActionRow: false,
-      showNoteButton: false,
       showSearchButton: false,
       showNewFolderButton: false,
       showNewTaskButton: true,
       showMoreButton: false,
+      writingToolsCommands: true,
+      writingTools: ["Summarize"],
+      menuCommands: "Window > Minimize",
     };
     expect(parseSettings(stored).settings).toEqual(stored);
   });
@@ -33,6 +35,12 @@ describe("parseSettings", () => {
     expect(settings).toEqual(DEFAULT_SETTINGS);
   });
 
+  test("a list must be a list of names", () => {
+    expect(parseSettings({ writingTools: "Summarize" }).settings.writingTools).toEqual(DEFAULT_SETTINGS.writingTools);
+    expect(parseSettings({ writingTools: [1] }).settings.writingTools).toEqual(DEFAULT_SETTINGS.writingTools);
+    expect(parseSettings({ writingTools: [] }).settings.writingTools).toEqual([]);
+  });
+
   test("unknown keys are kept aside, so a save never drops them", () => {
     const { extra } = parseSettings({ enabled: true, futureOption: { a: 1 } });
     expect(extra).toEqual({ futureOption: { a: 1 } });
@@ -40,7 +48,7 @@ describe("parseSettings", () => {
   });
 
   test("a retired setting isn't carried along", () => {
-    expect(parseSettings({ sidebar: false }).extra).toEqual({});
+    expect(parseSettings({ sidebar: false, showNoteButton: false }).extra).toEqual({});
   });
 
   test("view state moved to the device isn't carried along", () => {

@@ -328,6 +328,11 @@
   min-height: 32px;
   box-sizing: border-box;
 }
+/* Long folder and tag trees come in blocks of rows; one scrolled out of
+   view costs nothing to style or lay out (sized to its rows meanwhile). */
+.ps-nav-block {
+  content-visibility: auto;
+}
 .ps-fold-slot {
   position: relative;
   width: 16px;
