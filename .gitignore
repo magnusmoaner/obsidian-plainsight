@@ -5,3 +5,5 @@ main.js
 .env.local
 # Design docs and plans are kept locally, not published.
 docs/plans/
+# Working rules for Claude Code, kept locally.
+CLAUDE.md
