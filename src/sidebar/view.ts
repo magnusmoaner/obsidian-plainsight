@@ -155,6 +155,9 @@ export class SidebarView extends ItemView implements HoverParent {
   /** Mobile shows one column at a time. */
   private mobilePane: "nav" | "list" = "nav";
 
+  /** The left column: the action row above the scrolling places. */
+  private placesEl!: HTMLElement;
+  private actionsEl!: HTMLElement;
   private navEl!: HTMLElement;
   private filterInput!: SearchComponent;
   private headerEl!: HTMLElement;
@@ -220,32 +223,6 @@ export class SidebarView extends ItemView implements HoverParent {
     return "notebook";
   }
 
-  /**
-   * The sidebar is see-through, so it shows what the theme paints behind it,
-   * as the ribbon and title bar do (Velocity: a gradient on the body). Its
-   * sticky action row must be opaque, so give it a copy of that painting:
-   * the first background colour behind the sidebar, plus any image (such as
-   * a gradient) found on the way there.
-   */
-  private matchSurface(): void {
-    let color = "";
-    let image = "";
-    for (let el = this.contentEl.parentElement; el; el = el.parentElement) {
-      const style = getComputedStyle(el);
-      if (!image && style.backgroundImage !== "none") image = style.backgroundImage;
-      const bg = style.backgroundColor;
-      if (bg && bg !== "transparent" && !/^rgba\(.*,\s*0\)$/.test(bg)) {
-        color = bg;
-        break;
-      }
-    }
-    const root = this.contentEl.style;
-    if (color) root.setProperty("--ps-surface-color", color);
-    else root.removeProperty("--ps-surface-color");
-    if (image) root.setProperty("--ps-surface-image", image);
-    else root.removeProperty("--ps-surface-image");
-  }
-
   /** The list panel's gaps and rounded corners, from the settings. */
   applyListInset(): void {
     const s = this.plugin.settings;
@@ -263,7 +240,11 @@ export class SidebarView extends ItemView implements HoverParent {
     root.toggleClass("is-mobile", Platform.isMobile);
     root.style.setProperty("--ps-nav-width", `${this.plugin.viewState.state.navWidth}px`);
 
-    this.navEl = root.createDiv("ps-nav");
+    // The action row sits above the scrolling places, not over them, so it
+    // needs no background of its own (a translucent window has none to copy).
+    this.placesEl = root.createDiv("ps-places");
+    this.actionsEl = this.placesEl.createDiv("ps-nav-actions");
+    this.navEl = this.placesEl.createDiv("ps-nav");
     const divider = root.createDiv("ps-divider");
     const list = root.createDiv("ps-list");
     this.headerEl = list.createDiv("ps-list-header");
@@ -304,9 +285,6 @@ export class SidebarView extends ItemView implements HoverParent {
     this.registerDomEvent(window, "contextmenu", release);
     this.watchBookmarks();
     this.registerEvent(this.app.workspace.on("file-open", () => this.markActive()));
-    // Theme, light/dark or accent changes repaint the ribbon.
-    this.matchSurface();
-    this.registerEvent(this.app.workspace.on("css-change", () => this.matchSurface()));
     // The index tracks .md only; everything else (attachments, and bookmarked
     // canvases/bases) comes straight from the vault, so re-render ourselves.
     const onFile = (file: { path: string }) => {
@@ -569,6 +547,7 @@ export class SidebarView extends ItemView implements HoverParent {
     if (key === this.navKey) return;
     this.navKey = key;
     nav.empty();
+    this.actionsEl.empty();
 
     // Evernote-style action row: the Note pill, then round icon buttons. The
     // row and each round button can be turned off in settings; a round
@@ -577,7 +556,7 @@ export class SidebarView extends ItemView implements HoverParent {
     const showSearchButton = show(s.showSearchButton);
     const showNewFolderButton = show(s.showNewFolderButton);
     const showNewTaskButton = show(s.showNewTaskButton);
-    const actions = s.showActionRow ? nav.createDiv("ps-nav-actions") : createDiv();
+    const actions = s.showActionRow ? this.actionsEl : createDiv();
     if (s.showActionRow) {
       const newNote = actions.createDiv("ps-new-note");
       setIcon(newNote.createSpan("ps-nav-icon"), "file-plus-2");
@@ -1057,7 +1036,7 @@ export class SidebarView extends ItemView implements HoverParent {
     divider.addEventListener("mousedown", (down) => {
       down.preventDefault();
       const startX = down.clientX;
-      const startWidth = this.navEl.getBoundingClientRect().width;
+      const startWidth = this.placesEl.getBoundingClientRect().width;
       let width = startWidth;
       const move = (evt: MouseEvent) => {
         width = Math.min(NAV_WIDTH.max, Math.max(NAV_WIDTH.min, startWidth + evt.clientX - startX));
