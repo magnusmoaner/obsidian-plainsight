@@ -16,6 +16,7 @@ describe("parseViewState", () => {
       taskFilter: "done",
       noteKindFilter: "canvas",
       noteGroupBy: "folder",
+      attachmentGroupBy: "type",
     };
     expect(parseViewState(state)).toEqual(state);
   });
@@ -29,6 +30,7 @@ describe("parseViewState", () => {
         taskFilter: "someday",
         noteKindFilter: "pdf",
         noteGroupBy: "kind",
+        attachmentGroupBy: "kind",
       })
     ).toEqual({
       ...DEFAULT_VIEW_STATE,

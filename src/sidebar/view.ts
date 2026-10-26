@@ -22,7 +22,6 @@ import { cardDate, dueDateLabel, localISODate } from "./core/format";
 import {
   filterTaskRows,
   folderRows,
-  groupNotes,
   groupNotesBy,
   kindCounts,
   NoteGrouping,
@@ -46,7 +45,9 @@ import {
 import {
   AttachmentFile,
   attachmentFolderMatcher,
+  AttachmentGrouping,
   attachmentsFor,
+  groupAttachments,
   formatSize,
 } from "./core/attachments";
 import type { OcrBox } from "./core/ocr-boxes";
@@ -80,6 +81,8 @@ import {
   attachmentFolderSetting,
   Bookmark,
   bookmarksInstance,
+  corePluginEnabled,
+  dailyNotesFolder,
   onBookmarksChanged,
   openGlobalSearch,
   openSettingsTab,
@@ -103,6 +106,7 @@ export const SIDEBAR_VIEW = "plainsight-sidebar";
 // Items whose command isn't registered (plugin off or missing) are hidden.
 const IMPORTER = "obsidian-importer:open-modal";
 const INSERT_TEMPLATE = "templates:insert-template";
+const OPEN_TODAY = "daily-notes";
 const NAV_COMMANDS: Array<[string, string, string]> = [
   ["switcher:open", "Quick switcher", "file-search"],
   ["graph:open", "Open graph view", "git-fork"],
@@ -148,6 +152,8 @@ interface Partitioned {
 export class SidebarView extends ItemView implements HoverParent {
   private popover: HoverPopover | null = null;
   private place: Place = { kind: "notes" };
+  /** The folder last viewed: where a note from a template goes. */
+  private lastNotebook: string | null = null;
   private sort: SortKey = "modified";
   private search = "";
   /** Tasks page: only this note's tasks, or all notes when null. */
@@ -155,6 +161,9 @@ export class SidebarView extends ItemView implements HoverParent {
   /** Mobile shows one column at a time. */
   private mobilePane: "nav" | "list" = "nav";
 
+  /** The left column: the action row above the scrolling places. */
+  private placesEl!: HTMLElement;
+  private actionsEl!: HTMLElement;
   private navEl!: HTMLElement;
   private filterInput!: SearchComponent;
   private headerEl!: HTMLElement;
@@ -220,32 +229,6 @@ export class SidebarView extends ItemView implements HoverParent {
     return "notebook";
   }
 
-  /**
-   * The sidebar is see-through, so it shows what the theme paints behind it,
-   * as the ribbon and title bar do (Velocity: a gradient on the body). Its
-   * sticky action row must be opaque, so give it a copy of that painting:
-   * the first background colour behind the sidebar, plus any image (such as
-   * a gradient) found on the way there.
-   */
-  private matchSurface(): void {
-    let color = "";
-    let image = "";
-    for (let el = this.contentEl.parentElement; el; el = el.parentElement) {
-      const style = getComputedStyle(el);
-      if (!image && style.backgroundImage !== "none") image = style.backgroundImage;
-      const bg = style.backgroundColor;
-      if (bg && bg !== "transparent" && !/^rgba\(.*,\s*0\)$/.test(bg)) {
-        color = bg;
-        break;
-      }
-    }
-    const root = this.contentEl.style;
-    if (color) root.setProperty("--ps-surface-color", color);
-    else root.removeProperty("--ps-surface-color");
-    if (image) root.setProperty("--ps-surface-image", image);
-    else root.removeProperty("--ps-surface-image");
-  }
-
   /** The list panel's gaps and rounded corners, from the settings. */
   applyListInset(): void {
     const s = this.plugin.settings;
@@ -263,7 +246,11 @@ export class SidebarView extends ItemView implements HoverParent {
     root.toggleClass("is-mobile", Platform.isMobile);
     root.style.setProperty("--ps-nav-width", `${this.plugin.viewState.state.navWidth}px`);
 
-    this.navEl = root.createDiv("ps-nav");
+    // The action row sits above the scrolling places, not over them, so it
+    // needs no background of its own (a translucent window has none to copy).
+    this.placesEl = root.createDiv("ps-places");
+    this.actionsEl = this.placesEl.createDiv("ps-nav-actions");
+    this.navEl = this.placesEl.createDiv("ps-nav");
     const divider = root.createDiv("ps-divider");
     const list = root.createDiv("ps-list");
     this.headerEl = list.createDiv("ps-list-header");
@@ -304,9 +291,6 @@ export class SidebarView extends ItemView implements HoverParent {
     this.registerDomEvent(window, "contextmenu", release);
     this.watchBookmarks();
     this.registerEvent(this.app.workspace.on("file-open", () => this.markActive()));
-    // Theme, light/dark or accent changes repaint the ribbon.
-    this.matchSurface();
-    this.registerEvent(this.app.workspace.on("css-change", () => this.matchSurface()));
     // The index tracks .md only; everything else (attachments, and bookmarked
     // canvases/bases) comes straight from the vault, so re-render ourselves.
     const onFile = (file: { path: string }) => {
@@ -399,7 +383,7 @@ export class SidebarView extends ItemView implements HoverParent {
   }
 
   private render(): void {
-    this.leaveMissingNotebook();
+    this.leaveMissingPlace();
     this.contentEl.toggleClass("show-list", this.mobilePane === "list");
     this.renderNav();
     this.renderList();
@@ -407,15 +391,21 @@ export class SidebarView extends ItemView implements HoverParent {
 
   /** After the index or vault changed: only what that changed is redrawn. */
   private update(): void {
-    if (this.leaveMissingNotebook()) return this.render();
+    if (this.leaveMissingPlace()) return this.render();
     this.renderNav();
     this.updateList();
   }
 
   /** A renamed or deleted notebook would otherwise leave an empty list whose
-   * "New note" targets a folder that no longer exists. */
-  private leaveMissingNotebook(): boolean {
-    if (this.place.kind !== "notebook" || this.plugin.indexer.folders().includes(this.place.folder)) return false;
+   * "New note" targets a folder that no longer exists; a Daily notes or
+   * Templates place whose row is now hidden, a list with no way back. */
+  private leaveMissingPlace(): boolean {
+    const kind = this.place.kind;
+    const gone =
+      kind === "notebook"
+        ? !this.plugin.indexer.folders().includes(this.place.folder)
+        : (kind === "daily" && !this.showsDaily()) || (kind === "templates" && !this.showsTemplates());
+    if (!gone) return false;
     this.place = { kind: "notes" };
     this.resetScroll();
     return true;
@@ -423,6 +413,7 @@ export class SidebarView extends ItemView implements HoverParent {
 
   private setPlace(place: Place): void {
     this.place = place;
+    if (place.kind === "notebook") this.lastNotebook = place.folder;
     this.taskNoteFilter = null;
     this.mobilePane = "list";
     this.resetScroll();
@@ -440,7 +431,42 @@ export class SidebarView extends ItemView implements HoverParent {
   }
 
   private queryOptions(search = this.search): QueryOptions {
-    return { sort: this.sort, search, templatesFolder: templateOptions(this.app).folder };
+    return {
+      sort: this.sort,
+      search,
+      templatesFolder: templateOptions(this.app).folder,
+      dailyFolder: dailyNotesFolder(this.app),
+    };
+  }
+
+  /** The Daily notes row: on in settings, and its core plugin on. */
+  private showsDaily(): boolean {
+    return this.plugin.settings.showDailyNotes && corePluginEnabled(this.app, "daily-notes");
+  }
+
+  /** The Templates row: on in settings, and its core plugin on. */
+  private showsTemplates(): boolean {
+    return this.plugin.settings.showTemplates && corePluginEnabled(this.app, "templates");
+  }
+
+  /**
+   * Folders listed by a row of their own (Daily notes, Templates), so left
+   * out of Folders. Only while that row shows: otherwise Folders is the
+   * way to them.
+   */
+  private ownPlaceFolders(): string[] {
+    const folders: string[] = [];
+    const daily = this.showsDaily() ? dailyNotesFolder(this.app) : null;
+    const templates = this.showsTemplates() ? templateOptions(this.app).folder : null;
+    if (daily) folders.push(daily);
+    if (templates) folders.push(templates);
+    return folders;
+  }
+
+  /** In Folders' terms: not an attachment folder, nor one with its own row. */
+  private notebookFilter(isAttachmentFolder: (folder: string) => boolean): (folder: string) => boolean {
+    const own = this.ownPlaceFolders();
+    return (f) => !isAttachmentFolder(f) && !own.some((h) => inFolder(f, h));
   }
 
   /**
@@ -512,8 +538,54 @@ export class SidebarView extends ItemView implements HoverParent {
       }));
   }
 
+  /** Where a new note goes: the folder viewed, or the templates folder
+   * for a new template; null = Obsidian's default location. */
   private currentFolder(): string | null {
-    return this.place.kind === "notebook" ? this.place.folder : null;
+    if (this.place.kind === "notebook") return this.place.folder;
+    if (this.place.kind === "templates") return templateOptions(this.app).folder;
+    return null;
+  }
+
+  /** Where a note from a template goes: the folder last viewed, if it's still there. */
+  private templateTarget(): string | null {
+    const folder = this.lastNotebook;
+    return folder && this.plugin.indexer.folders().includes(folder) ? folder : null;
+  }
+
+  private newFromTemplate(template: TFile): void {
+    void createNote(this.app, this.templateTarget(), template);
+  }
+
+  /** Every template, for the Note button's "New note from template…". */
+  private pickTemplate(): void {
+    const folder = templateOptions(this.app).folder;
+    if (!folder) {
+      new Notice("Choose a templates folder first, in the Templates core plugin's settings.");
+      openSettingsTab(this.app, "templates", () => this.refresh());
+      return;
+    }
+    const templates = this.app.vault
+      .getMarkdownFiles()
+      .filter((f) => inFolder(f.parent?.path ?? "", folder))
+      .sort((a, b) => compareNames(a.path, b.path));
+    if (!templates.length) {
+      new Notice(`There are no templates in ${folder} yet.`);
+      return;
+    }
+    new PickerModal(this.app, "New note from template", templates, (f) => f.path.slice(folder.length + 1).replace(/\.md$/, ""), (f) =>
+      this.newFromTemplate(f)
+    ).open();
+  }
+
+  /** A new template in the templates folder; without one, where to set it. */
+  private newTemplate(): void {
+    const folder = templateOptions(this.app).folder;
+    if (folder) void createNote(this.app, folder);
+    else this.setPlace({ kind: "templates" });
+  }
+
+  private openToday(): void {
+    if (!runCommand(this.app, OPEN_TODAY)) new Notice("Turn on the Daily notes core plugin first.");
   }
 
   // ---------- nav column ----------
@@ -552,8 +624,12 @@ export class SidebarView extends ItemView implements HoverParent {
     const noteCount = notesFor(notes, { kind: "notes" }, unfiltered).length;
     const openTasks = taskRows(notes, "open", localISODate(), templates, s.boardCardsInTasks).length;
     const attachmentCount = this.attachmentFiles().length;
-    const templateCount = templates ? notesFor(notes, { kind: "templates" }, unfiltered).length : null;
-    const notebooks = folderRows(this.plugin.indexer.folders(), notes, templates, isAttachmentFolder);
+    const showsDaily = this.showsDaily();
+    const showsTemplates = this.showsTemplates();
+    const dailyFolder = dailyNotesFolder(this.app);
+    const dailyCount = showsDaily && dailyFolder ? notesFor(notes, { kind: "daily" }, unfiltered).length : null;
+    const templateCount = showsTemplates && templates ? notesFor(notes, { kind: "templates" }, unfiltered).length : null;
+    const notebooks = folderRows(this.plugin.indexer.folders(), notes, this.ownPlaceFolders(), isAttachmentFolder);
     const tags = tagRows(notes);
 
     const tree = (rows: TreeRow[]) => rows.map((r) => [r.path, r.count]);
@@ -562,13 +638,14 @@ export class SidebarView extends ItemView implements HoverParent {
       this.place,
       this.plugin.viewState.state.collapsed,
       bookmarks?.map((b) => [b.kind, b.title, b.target, b.group, b.kind === "search" || !!this.app.vault.getAbstractFileByPath(b.target)]) ?? null,
-      [noteCount, openTasks, attachmentCount, templateCount, templates],
+      [noteCount, openTasks, attachmentCount, templateCount, templates, dailyCount, dailyFolder, showsDaily, showsTemplates],
       tree(notebooks),
       tree(tags),
     ]);
     if (key === this.navKey) return;
     this.navKey = key;
     nav.empty();
+    this.actionsEl.empty();
 
     // Evernote-style action row: the Note pill, then round icon buttons. The
     // row and each round button can be turned off in settings; a round
@@ -577,12 +654,19 @@ export class SidebarView extends ItemView implements HoverParent {
     const showSearchButton = show(s.showSearchButton);
     const showNewFolderButton = show(s.showNewFolderButton);
     const showNewTaskButton = show(s.showNewTaskButton);
-    const actions = s.showActionRow ? nav.createDiv("ps-nav-actions") : createDiv();
+    const actions = s.showActionRow ? this.actionsEl : createDiv();
     if (s.showActionRow) {
       const newNote = actions.createDiv("ps-new-note");
       setIcon(newNote.createSpan("ps-nav-icon"), "file-plus-2");
       newNote.createSpan({ text: "Note" });
       newNote.addEventListener("click", () => void createNote(this.app, this.currentFolder()));
+      if (showsTemplates) {
+        newNote.addEventListener("contextmenu", (evt) => {
+          const menu = new Menu();
+          menu.addItem((i) => i.setTitle("New note from template…").setIcon("layout-template").onClick(() => this.pickTemplate()));
+          menu.showAtMouseEvent(evt);
+        });
+      }
     }
     if (showSearchButton) {
       this.roundButton(actions, "search", "Search everywhere", () => this.openSearch()).addClass("is-accent");
@@ -614,9 +698,14 @@ export class SidebarView extends ItemView implements HoverParent {
     }
 
     this.placeRow(nav, "Notes", "file-text", { kind: "notes" }, 0, noteCount, () => void createNote(this.app, null));
+    if (showsDaily) {
+      this.placeRow(nav, "Daily notes", "calendar-days", { kind: "daily" }, 0, dailyCount, () => this.openToday(), "Open today's note");
+    }
     this.placeRow(nav, "Tasks", "check-circle-2", { kind: "tasks" }, 0, openTasks, () => void this.newTask());
     this.placeRow(nav, "Attachments", "paperclip", { kind: "attachments" }, 0, attachmentCount);
-    this.placeRow(nav, "Templates", "layout-template", { kind: "templates" }, 0, templateCount);
+    if (showsTemplates) {
+      this.placeRow(nav, "Templates", "layout-template", { kind: "templates" }, 0, templateCount, () => this.newTemplate());
+    }
 
     if (this.navHeading(nav, "Folders", "folder", "section:notebooks", () => this.newNotebook(isAttachmentFolder))) {
       this.treeSection(nav, notebooks, "notebook", (row) => ({ kind: "notebook", folder: row.path }), "folder");
@@ -789,7 +878,6 @@ export class SidebarView extends ItemView implements HoverParent {
   private setAllCollapsed(collapsed: boolean): void {
     if (collapsed) {
       const { notes, isAttachmentFolder } = this.partition();
-      const templates = templateOptions(this.app).folder;
       const parents = (rows: TreeRow[], prefix: string) =>
         visibleRows(rows, new Set())
           .filter((r) => r.hasChildren)
@@ -799,7 +887,7 @@ export class SidebarView extends ItemView implements HoverParent {
           "section:bookmarks",
           "section:notebooks",
           "section:tags",
-          ...parents(folderRows(this.plugin.indexer.folders(), notes, templates, isAttachmentFolder), "notebook"),
+          ...parents(folderRows(this.plugin.indexer.folders(), notes, this.ownPlaceFolders(), isAttachmentFolder), "notebook"),
           ...parents(tagRows(notes), "tag"),
         ],
       });
@@ -859,10 +947,11 @@ export class SidebarView extends ItemView implements HoverParent {
     place: Place,
     depth: number,
     count: number | null,
-    onAdd?: (evt: MouseEvent) => void
+    onAdd?: (evt: MouseEvent) => void,
+    addLabel = `New ${label.toLowerCase().replace(/s$/, "")}`
   ): void {
     const row = this.navRow(parent, label, icon, depth, count, this.isActive(place));
-    if (onAdd) this.addButton(row, `New ${label.toLowerCase().replace(/s$/, "")}`, onAdd);
+    if (onAdd) this.addButton(row, addLabel, onAdd);
     row.addEventListener("click", () => this.setPlace(place));
   }
 
@@ -1018,11 +1107,7 @@ export class SidebarView extends ItemView implements HoverParent {
   }
 
   private newNotebook(isAttachmentFolder: (folder: string) => boolean, parentFolder?: string): void {
-    const templates = templateOptions(this.app).folder;
-    const folders = this.plugin.indexer
-      .folders()
-      .filter((f) => !isAttachmentFolder(f) && !(templates && (f === templates || f.startsWith(`${templates}/`))))
-      .sort(compareNames);
+    const folders = this.plugin.indexer.folders().filter(this.notebookFilter(isAttachmentFolder)).sort(compareNames);
     const parent = parentFolder ?? (this.place.kind === "notebook" ? this.place.folder : "");
     new NotebookModal(this.app, folders, parent, (path) => {
       void this.app.vault.createFolder(path).then(
@@ -1057,7 +1142,7 @@ export class SidebarView extends ItemView implements HoverParent {
     divider.addEventListener("mousedown", (down) => {
       down.preventDefault();
       const startX = down.clientX;
-      const startWidth = this.navEl.getBoundingClientRect().width;
+      const startWidth = this.placesEl.getBoundingClientRect().width;
       let width = startWidth;
       const move = (evt: MouseEvent) => {
         width = Math.min(NAV_WIDTH.max, Math.max(NAV_WIDTH.min, startWidth + evt.clientX - startX));
@@ -1138,18 +1223,16 @@ export class SidebarView extends ItemView implements HoverParent {
           companion: companions.get(file.path)?.[0]?.path ?? null,
           boxText: boxes.get(file.path)?.map((b) => b.box.text).join("\n") ?? null,
         })),
-      folders: () =>
-        this.plugin.indexer
-          .folders()
-          .filter((f) => !isAttachmentFolder(f) && !(templates && (f === templates || f.startsWith(`${templates}/`))))
-          .sort(compareNames),
+      folders: () => this.plugin.indexer.folders().filter(this.notebookFilter(isAttachmentFolder)).sort(compareNames),
       tags: () => [...tags.values()].sort(compareNames),
-      // A note: its folder in the nav (Notes for the vault root, Templates for
-      // a template), with the note's card selected, and the note open.
+      // A note: its folder in the nav (Notes for the vault root; Daily notes
+      // or Templates for theirs), with the note's card selected, and the note open.
       openNote: (path, newTab) => {
         const note = this.plugin.index.get(path);
+        const own = (folder: string | null, shown: boolean) => !!note && shown && !!folder && inFolder(note.folder, folder);
         let place: Place = { kind: "notes" };
-        if (note && templates && inFolder(note.folder, templates)) place = { kind: "templates" };
+        if (own(templates, this.showsTemplates())) place = { kind: "templates" };
+        else if (own(dailyNotesFolder(this.app), this.showsDaily())) place = { kind: "daily" };
         else if (note?.folder) place = { kind: "notebook", folder: note.folder };
         // A remembered kind filter that leaves this note out would hide it here too.
         const kind = this.plugin.viewState.state.noteKindFilter;
@@ -1218,7 +1301,10 @@ export class SidebarView extends ItemView implements HoverParent {
   private listEntries: ListEntry[] = [];
 
   private renderList(): void {
-    const what = { tasks: "tasks", attachments: "attachments", templates: "templates" } as Record<string, string>;
+    const what = { tasks: "tasks", attachments: "attachments", templates: "templates", daily: "daily notes" } as Record<
+      string,
+      string
+    >;
     this.filterInput.setPlaceholder(`Search ${what[this.place.kind] ?? "notes"}`);
     const scroll = this.bodyEl.scrollTop;
     this.headerEl.empty();
@@ -1230,21 +1316,31 @@ export class SidebarView extends ItemView implements HoverParent {
     } else if (this.place.kind === "attachments") {
       this.clearBody();
       this.renderAttachments();
-    } else if (this.place.kind === "templates" && !templateOptions(this.app).folder) {
+    } else {
+      // Daily notes or Templates with no folder set in its core plugin.
+      const daily = this.place.kind === "daily";
       this.clearBody();
-      this.renderHeader("Templates", null);
+      this.renderHeader(this.placeTitle(), null);
       const empty = this.bodyEl.createDiv("ps-empty");
-      empty.createDiv({ text: "No templates folder is set." });
+      empty.createDiv({ text: `No ${daily ? "daily notes" : "templates"} folder is set.` });
+      empty.createDiv({
+        cls: "ps-empty-hint",
+        text: `Choose one in the ${daily ? "Daily notes" : "Templates"} core plugin's settings, and its notes are listed here.`,
+      });
       const button = empty.createEl("button", { text: "Choose folder" });
-      button.addEventListener("click", () => openSettingsTab(this.app, "templates"));
+      button.addEventListener("click", () =>
+        openSettingsTab(this.app, daily ? "daily-notes" : "templates", () => this.refresh())
+      );
     }
     this.bodyEl.scrollTop = scroll;
   }
 
-  /** Places listed as note cards (a Templates place without a folder isn't). */
+  /** Places listed as note cards (Daily notes or Templates without a folder isn't). */
   private isNoteList(): boolean {
     const kind = this.place.kind;
-    return kind !== "tasks" && kind !== "attachments" && !(kind === "templates" && !templateOptions(this.app).folder);
+    if (kind === "templates") return !!templateOptions(this.app).folder;
+    if (kind === "daily") return !!dailyNotesFolder(this.app);
+    return kind !== "tasks" && kind !== "attachments";
   }
 
   private clearBody(): void {
@@ -1309,7 +1405,8 @@ export class SidebarView extends ItemView implements HoverParent {
     // with no visible cause; fall back to all.
     const kind = view.noteKindFilter !== "all" && counts[view.noteKindFilter] ? view.noteKindFilter : null;
     const list = kind ? everything.filter((n) => n.kind === kind) : everything;
-    const grouping: NoteGrouping = view.noteGroupBy;
+    const datedOnly = this.place.kind === "daily" || this.place.kind === "templates";
+    const grouping: NoteGrouping = datedOnly ? "date" : view.noteGroupBy;
     this.renderHeader(this.placeTitle(), list.length);
     this.kindChips(counts, kind);
     if (!list.length) {
@@ -1503,20 +1600,28 @@ export class SidebarView extends ItemView implements HoverParent {
     const actions = row.createDiv("ps-actions");
 
     // The first button creates what this place lists: a task on Tasks, a
-    // note everywhere else.
+    // template on Templates, a note everywhere else.
     if (this.place.kind === "tasks") {
       const task = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "New task" } });
       setIcon(task, "list-checks");
       task.addEventListener("click", () => void this.newTask());
+    } else if (this.place.kind === "daily") {
+      const today = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "Open today's note" } });
+      setIcon(today, "calendar-plus");
+      today.addEventListener("click", () => this.openToday());
     } else {
-      const add = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "New note" } });
+      const templates = this.place.kind === "templates";
+      const add = actions.createDiv({ cls: "ps-action", attr: { "aria-label": templates ? "New template" : "New note" } });
       setIcon(add, "file-plus-2");
-      add.addEventListener("click", () => void createNote(this.app, this.currentFolder()));
+      add.addEventListener("click", () => (templates ? this.newTemplate() : void createNote(this.app, this.currentFolder())));
     }
 
     // New board: only for board plugins that are enabled. With one, a click
     // creates that kind; with both, it asks which.
-    const boards = this.boardMakers();
+    // Daily notes and Templates: none, nor a choice of grouping; they're
+    // grouped by date.
+    const datedOnly = this.place.kind === "daily" || this.place.kind === "templates";
+    const boards = datedOnly ? [] : this.boardMakers();
     if (boards.length) {
       const label = boards.length === 1 ? boards[0].label : "New board";
       const board = actions.createDiv({ cls: "ps-action", attr: { "aria-label": label } });
@@ -1535,10 +1640,12 @@ export class SidebarView extends ItemView implements HoverParent {
       group.addEventListener("click", (evt) => this.groupMenu(evt));
       return;
     }
-    if (this.place.kind !== "attachments") {
+    if (!datedOnly) {
       const group = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "Group by" } });
       setIcon(group, "group");
-      group.addEventListener("click", (evt) => this.noteGroupMenu(evt));
+      group.addEventListener("click", (evt) =>
+        this.place.kind === "attachments" ? this.attachmentGroupMenu(evt) : this.noteGroupMenu(evt)
+      );
     }
     const sort = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "Sort" } });
     setIcon(sort, "arrow-up-down");
@@ -1571,6 +1678,8 @@ export class SidebarView extends ItemView implements HoverParent {
         return "Notes";
       case "tasks":
         return "Tasks";
+      case "daily":
+        return "Daily notes";
       case "templates":
         return "Templates";
       case "attachments":
@@ -1628,12 +1737,23 @@ export class SidebarView extends ItemView implements HoverParent {
       card.createDiv("ps-card-thumb").createEl("img", { attr: { src, loading: "lazy", alt: "" } });
     }
 
+    // Templates: the card opens the template; this button makes a note from
+    // it. Only Markdown can seed a note; a canvas "template" just opens.
+    if (this.place.kind === "templates" && note.kind === "note") {
+      card.addClass("is-template");
+      const use = card.createDiv({ cls: "ps-card-use", attr: { "aria-label": "New note from template" } });
+      setIcon(use.createSpan(), "file-plus-2");
+      use.createSpan({ text: "New note" });
+      use.addEventListener("click", (evt) => {
+        evt.stopPropagation();
+        const file = this.app.vault.getAbstractFileByPath(note.path);
+        if (file instanceof TFile) this.newFromTemplate(file);
+      });
+    }
+
     card.addEventListener("click", (evt) => {
       const file = this.app.vault.getAbstractFileByPath(note.path);
-      if (!(file instanceof TFile)) return;
-      // Only Markdown can seed a new note; a canvas "template" just opens.
-      if (this.place.kind === "templates" && file.extension === "md") void createNote(this.app, null, file);
-      else void openFile(this.app, file, Keymap.isModEvent(evt));
+      if (file instanceof TFile) void openFile(this.app, file, Keymap.isModEvent(evt));
     });
     card.addEventListener("contextmenu", (evt) => this.cardMenu(evt, note));
     this.previewOnHover(card, note.path);
@@ -1700,12 +1820,12 @@ export class SidebarView extends ItemView implements HoverParent {
             .onClick(() => void togglePin(this.app, file))
         );
       }
-      if (this.place.kind === "templates") {
+      if (this.place.kind === "templates" && file.extension === "md") {
         menu.addItem((item) =>
           item
-            .setTitle("Edit template")
-            .setIcon("pencil")
-            .onClick(() => void openFile(this.app, file, false))
+            .setTitle("New note from template")
+            .setIcon("file-plus-2")
+            .onClick(() => this.newFromTemplate(file))
         );
       }
     });
@@ -1794,7 +1914,7 @@ export class SidebarView extends ItemView implements HoverParent {
       return;
     }
     const items: ListItem[] = [];
-    for (const group of groupNotes(files, this.sort)) {
+    for (const group of groupAttachments(files, this.sort, this.plugin.viewState.state.attachmentGroupBy)) {
       if (group.label) items.push({ label: group.label });
       for (const file of group.notes) items.push({ file });
     }
@@ -1923,6 +2043,30 @@ export class SidebarView extends ItemView implements HoverParent {
           .setChecked(this.plugin.viewState.state.noteGroupBy === key)
           .onClick(() => {
             this.plugin.viewState.update({ noteGroupBy: key });
+            this.resetScroll();
+            this.renderList();
+          })
+      );
+    }
+    menu.showAtMouseEvent(evt);
+  }
+
+  private attachmentGroupMenu(evt: MouseEvent): void {
+    const menu = new Menu();
+    const options: Array<[AttachmentGrouping, string, string]> = [
+      ["date", "Date", "calendar"],
+      ["folder", "Folder", "folder"],
+      ["type", "Type", "shapes"],
+      ["none", "No grouping", "list"],
+    ];
+    for (const [key, label, icon] of options) {
+      menu.addItem((item) =>
+        item
+          .setTitle(label)
+          .setIcon(icon)
+          .setChecked(this.plugin.viewState.state.attachmentGroupBy === key)
+          .onClick(() => {
+            this.plugin.viewState.update({ attachmentGroupBy: key });
             this.resetScroll();
             this.renderList();
           })

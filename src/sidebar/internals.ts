@@ -88,6 +88,24 @@ export function onBookmarksChanged(app: App, callback: () => void): (() => void)
   return () => instance.offref?.(ref);
 }
 
+/** Whether a core plugin (by id, e.g. "daily-notes") is turned on. */
+export function corePluginEnabled(app: App, id: string): boolean {
+  return internalPlugin(app, id) !== null;
+}
+
+/** A folder setting as a vault path; null when unset or the vault root. */
+function folderSetting(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const folder = normalizePath(value.trim());
+  return folder && folder !== "/" ? folder : null;
+}
+
+/** The Daily notes core plugin's folder, or null when unset or the plugin is off. */
+export function dailyNotesFolder(app: App): string | null {
+  const options = internalPlugin(app, "daily-notes")?.options as Record<string, unknown> | undefined;
+  return folderSetting(options?.folder);
+}
+
 export interface TemplateOptions {
   folder: string | null;
   dateFormat: string;
@@ -97,9 +115,8 @@ export interface TemplateOptions {
 export function templateOptions(app: App): TemplateOptions {
   const options = internalPlugin(app, "templates")?.options as Record<string, unknown> | undefined;
   const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
-  const folder = str(options?.folder);
   return {
-    folder: folder ? normalizePath(folder) : null,
+    folder: folderSetting(options?.folder),
     dateFormat: str(options?.dateFormat) ?? "YYYY-MM-DD",
     timeFormat: str(options?.timeFormat) ?? "HH:mm",
   };
@@ -144,11 +161,21 @@ export function runCommand(app: App, id: string): boolean {
   return commands!.executeCommandById!(id) !== false;
 }
 
-export function openSettingsTab(app: App, tabId: string): void {
-  const setting = (app as unknown as { setting?: { open(): void; openTabById(id: string): void } })
-    .setting;
+/** Settings on a tab; `onClosed` runs once, when the window closes. */
+export function openSettingsTab(app: App, tabId: string, onClosed?: () => void): void {
+  type Settings = { open(): void; openTabById(id: string): void; onClose?(): void };
+  const setting = (app as unknown as { setting?: Settings }).setting;
   setting?.open();
   setting?.openTabById(tabId);
+  if (!setting || !onClosed) return;
+  const hadOwn = Object.prototype.hasOwnProperty.call(setting, "onClose");
+  const original = setting.onClose;
+  setting.onClose = function (this: Settings) {
+    if (hadOwn) setting.onClose = original;
+    else delete setting.onClose;
+    original?.call(this);
+    onClosed();
+  };
 }
 
 /**

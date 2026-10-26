@@ -9,6 +9,7 @@ export type Place =
   | { kind: "notebook"; folder: string }
   | { kind: "tag"; tag: string }
   | { kind: "tasks" }
+  | { kind: "daily" }
   | { kind: "templates" }
   | { kind: "attachments" };
 
@@ -18,6 +19,8 @@ export interface QueryOptions {
   sort: SortKey;
   search: string;
   templatesFolder: string | null;
+  /** The Daily notes core plugin's folder; null = not set (or plugin off). */
+  dailyFolder?: string | null;
   /** Only this kind (note / board / canvas); undefined or null = all. */
   kind?: NoteKind | null;
   /** YYYY-MM-DD for date filters (due:today…); defaults to the local date. */
@@ -36,7 +39,7 @@ interface Dated {
   pinned?: boolean;
 }
 
-function inPlace(note: NoteSummary, place: Place, templates: string | null): boolean {
+function inPlace(note: NoteSummary, place: Place, templates: string | null, daily: string | null): boolean {
   const isTemplate = templates !== null && inFolder(note.folder, templates);
   switch (place.kind) {
     case "notes":
@@ -50,6 +53,8 @@ function inPlace(note: NoteSummary, place: Place, templates: string | null): boo
         return lower === tag || lower.startsWith(`${tag}/`);
       });
     }
+    case "daily":
+      return daily !== null && inFolder(note.folder, daily);
     case "templates":
       return isTemplate;
     case "tasks":
@@ -87,7 +92,7 @@ export function notesFor(notes: NoteSummary[], place: Place, opts: QueryOptions)
   const today = opts.today ?? localISODate();
   return notes
     .filter((n) => !opts.kind || n.kind === opts.kind)
-    .filter((n) => inPlace(n, place, opts.templatesFolder) && matchNote(n, query, today))
+    .filter((n) => inPlace(n, place, opts.templatesFolder, opts.dailyFolder ?? null) && matchNote(n, query, today))
     .sort(comparator(opts.sort));
 }
 
@@ -158,14 +163,15 @@ function treeRows(counts: Map<string, number>): TreeRow[] {
 }
 
 /**
- * Notebooks: every folder except templates and those `exclude` rejects
+ * Notebooks: every folder except those under `hidden` (folders with a place
+ * of their own: templates, daily notes) and those `exclude` rejects
  * (attachment folders). Empty folders are included — a brand-new notebook
  * has no notes yet — and counts include notes in subfolders.
  */
 export function folderRows(
   folders: string[],
   notes: NoteSummary[],
-  templatesFolder: string | null,
+  hidden: string[],
   exclude: (folder: string) => boolean = () => false
 ): TreeRow[] {
   // Notes per folder, subfolders included, in one pass over the notes rather
@@ -179,7 +185,7 @@ export function folderRows(
   const countUnder = (folder: string) => under.get(folder) ?? 0;
   const counts = new Map<string, number>();
   for (const folder of folders) {
-    if (!folder || (templatesFolder && inFolder(folder, templatesFolder)) || exclude(folder)) continue;
+    if (!folder || hidden.some((h) => inFolder(folder, h)) || exclude(folder)) continue;
     counts.set(folder, countUnder(folder));
   }
   // An excluded parent (an attachment folder holding a real notebook) would

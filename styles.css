@@ -175,12 +175,22 @@
   overflow: hidden;
   font-size: var(--font-ui-small);
 }
-.ps-nav {
+.ps-places {
   flex: 0 0 var(--ps-nav-width, 200px);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  container: ps-nav / inline-size;
+}
+.ps-nav {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding: 10px 6px;
   background: transparent;
-  container: ps-nav / inline-size;
+}
+.ps-nav-actions:not(:empty) + .ps-nav {
+  padding-top: 0;
 }
 /* A 5px grab area, invisible until hovered. */
 .ps-divider {
@@ -204,28 +214,18 @@
 }
 
 /* Nav */
-/*
- * Action row: the Note pill grows, the round icon buttons keep their size.
- * Sticky at the top of the scrolling nav column. The negative margins cancel
- * .ps-nav's padding so the row's background spans the full width and covers
- * items scrolling underneath; top matches the padding so it pins flush.
- */
+/* Action row: the Note pill grows, the round icon buttons keep their size.
+   It stays put above the places column, which scrolls on its own. */
 .ps-nav-actions {
   --ps-button: 40px;
-  position: sticky;
-  top: -10px;
-  z-index: 2;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: -10px -6px 0;
   padding: 10px 10px 12px;
-  /* Opaque, to cover the list scrolling under it: a copy of what's painted
-   * behind the sidebar (set by the view), pinned to the window so a
-   * gradient lines up with the one behind. */
-  background-color: var(--ps-surface-color, var(--background-secondary));
-  background-image: var(--ps-surface-image, none);
-  background-attachment: fixed;
+}
+.ps-nav-actions:empty {
+  display: none;
 }
 .ps-round-button {
   flex: 0 0 auto;
@@ -297,7 +297,7 @@
   cursor: pointer;
 }
 /* With the action row turned off, the first heading starts at the top. */
-.ps-nav > .ps-nav-heading:first-child {
+.ps-nav-actions:empty + .ps-nav > .ps-nav-heading:first-child {
   margin-top: 0;
 }
 .ps-nav-heading:hover {
@@ -823,6 +823,10 @@
 .ps-empty button {
   margin-top: 10px;
 }
+.ps-empty-hint {
+  margin-top: 6px;
+  color: var(--text-faint);
+}
 .ps-sentinel {
   height: 1px;
 }
@@ -836,6 +840,38 @@
 }
 .ps-card:hover {
   background: var(--background-modifier-hover);
+}
+/* Templates: "New note from template", on the card's bottom corner while hovered. */
+.ps-card.is-template {
+  position: relative;
+}
+.ps-card-use {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-semibold);
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+  cursor: pointer;
+}
+.ps-card:hover .ps-card-use {
+  display: inline-flex;
+}
+.ps-card-use:hover {
+  background: var(--interactive-accent-hover);
+}
+.ps-card-use span {
+  display: inline-flex;
+}
+.ps-card-use svg {
+  width: 18px;
+  height: 18px;
 }
 /* The selected note lifts off the grey as a white card (the editor's own
    background, so dark themes get their dark equivalent). */
@@ -1024,13 +1060,13 @@
 .ps-sidebar.is-mobile .ps-divider {
   display: none;
 }
-.ps-sidebar.is-mobile .ps-nav {
+.ps-sidebar.is-mobile .ps-places {
   flex: 1 1 auto;
 }
 .ps-sidebar.is-mobile .ps-list {
   display: none;
 }
-.ps-sidebar.is-mobile.show-list .ps-nav {
+.ps-sidebar.is-mobile.show-list .ps-places {
   display: none;
 }
 .ps-sidebar.is-mobile.show-list .ps-list {
@@ -1258,10 +1294,10 @@
   font-size: var(--font-ui-small);
 }
 
-/* The action row as the places column narrows (its width less 12px padding).
+/* The action row as the places column narrows.
    Buttons stay 40px: first New folder and New task move into the ⋯ menu (the
    + on Folders and Tasks does both too), then the pill drops its label. */
-@container ps-nav (max-width: 283px) {
+@container ps-nav (max-width: 295px) {
   .ps-nav-actions .is-optional {
     display: none;
   }
@@ -1269,7 +1305,7 @@
     padding: 8px 12px;
   }
 }
-@container ps-nav (max-width: 185px) {
+@container ps-nav (max-width: 197px) {
   .ps-new-note {
     flex: 0 0 var(--ps-button);
     padding: 0;

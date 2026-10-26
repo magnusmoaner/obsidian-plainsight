@@ -1,7 +1,7 @@
 import { inFolder } from "./types";
-import { compareNames } from "./queries";
+import { compareNames, groupNotes } from "./queries";
 import { matchAttachment, parseQuery } from "./search";
-import type { SortKey } from "./queries";
+import type { NoteGroup, SortKey } from "./queries";
 
 /** A non-note file, as the Attachments place shows it. */
 export interface AttachmentFile {
@@ -56,6 +56,52 @@ export function attachmentsFor(
     const key = sort === "created" ? "ctime" : "mtime";
     return b[key] - a[key] || byName(a, b);
   });
+}
+
+export type AttachmentGrouping = "date" | "folder" | "type" | "none";
+export const ATTACHMENT_GROUPINGS: AttachmentGrouping[] = ["date", "folder", "type", "none"];
+
+/** File types, in the order their groups are listed; the rest are "Other files". */
+const TYPES: Array<[string, RegExp]> = [
+  ["Images", /^(png|jpe?g|gif|webp|svg|bmp|avif|heic|tiff?)$/],
+  ["PDFs", /^pdf$/],
+  ["Audio", /^(mp3|m4a|wav|ogg|flac|aac|webm|3gp)$/],
+  ["Video", /^(mp4|mov|mkv|avi|ogv)$/],
+];
+const OTHER = "Other files";
+
+function typeOf(file: AttachmentFile): string {
+  return TYPES.find(([, pattern]) => pattern.test(file.extension))?.[0] ?? OTHER;
+}
+
+/**
+ * Group sorted attachments for the list: by month (as notes are; none under
+ * a name sort), by folder (vault root first, then alphabetical), by file
+ * type (images, PDFs, audio, video, other) or not at all. Order within a
+ * group is kept.
+ */
+export function groupAttachments(
+  sorted: AttachmentFile[],
+  sort: SortKey,
+  by: AttachmentGrouping
+): NoteGroup<AttachmentFile>[] {
+  if (by === "date") return groupNotes(sorted, sort);
+  if (!sorted.length) return [];
+  if (by === "none") return [{ label: "", notes: sorted }];
+  const buckets = new Map<string, AttachmentFile[]>();
+  for (const file of sorted) {
+    const key = by === "folder" ? file.folder : typeOf(file);
+    const list = buckets.get(key);
+    if (list) list.push(file);
+    else buckets.set(key, [file]);
+  }
+  const order = [...TYPES.map(([label]) => label), OTHER];
+  const keys = [...buckets.keys()].sort(
+    by === "folder"
+      ? (a, b) => (a === "" ? -1 : b === "" ? 1 : compareNames(a, b))
+      : (a, b) => order.indexOf(a) - order.indexOf(b)
+  );
+  return keys.map((key) => ({ label: by === "folder" ? key || "Vault root" : key, notes: buckets.get(key)! }));
 }
 
 export function formatSize(bytes: number): string {

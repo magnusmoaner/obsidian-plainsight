@@ -28,6 +28,10 @@ export interface WysiwygSettings {
   showNewFolderButton: boolean;
   showNewTaskButton: boolean;
   showMoreButton: boolean;
+  /** Daily notes and Templates rows in the places column (each shows only
+   * while its core plugin is on). */
+  showDailyNotes: boolean;
+  showTemplates: boolean;
 }
 
 export const DEFAULT_SETTINGS: WysiwygSettings = {
@@ -45,6 +49,8 @@ export const DEFAULT_SETTINGS: WysiwygSettings = {
   showNewFolderButton: true,
   showNewTaskButton: true,
   showMoreButton: true,
+  showDailyNotes: true,
+  showTemplates: true,
 };
 
 const KNOWN = new Set<string>(Object.keys(DEFAULT_SETTINGS));
