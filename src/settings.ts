@@ -1,5 +1,5 @@
 import { App, Platform, PluginSettingTab, Setting } from "obsidian";
-import { openHotkeys, openSettingsTab, pluginInstalled } from "./sidebar/internals";
+import { corePluginEnabled, openHotkeys, openSettingsTab, pluginInstalled } from "./sidebar/internals";
 import { NoteSuggest } from "./sidebar/modals";
 import type WysiwygPlugin from "./main";
 
@@ -93,6 +93,24 @@ export class WysiwygSettingTab extends PluginSettingTab {
             .onChange(async (value) => {
               await this.plugin.updateSettings({ [key]: value });
             })
+        );
+    }
+
+    const places = [
+      ["showDailyNotes", "Daily notes", "daily-notes", "Your daily notes, with a + that opens today's."],
+      ["showTemplates", "Templates", "templates", "Your templates: click one to edit it, or make a note from it."],
+    ] as const;
+    for (const [key, name, plugin, desc] of places) {
+      const off = corePluginEnabled(this.app, plugin)
+        ? ""
+        : ` The ${name} core plugin is off, so it's hidden; turn it on under Core plugins.`;
+      new Setting(this.containerEl)
+        .setName(`${name} in the left column`)
+        .setDesc(`${desc} Its folder is listed here instead of under Folders.${off}`)
+        .addToggle((toggle) =>
+          toggle.setValue(settings[key]).onChange(async (value) => {
+            await this.plugin.updateSettings({ [key]: value });
+          })
         );
     }
 

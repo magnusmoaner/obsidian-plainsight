@@ -351,6 +351,8 @@ export default class WysiwygPlugin extends Plugin {
       "showNewFolderButton",
       "showNewTaskButton",
       "showMoreButton",
+      "showDailyNotes",
+      "showTemplates",
     ] as const;
     if (
       before.boardCardsInTasks !== now.boardCardsInTasks ||

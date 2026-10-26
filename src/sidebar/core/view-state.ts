@@ -1,3 +1,4 @@
+import { ATTACHMENT_GROUPINGS, AttachmentGrouping } from "./attachments";
 import { NOTE_GROUPINGS, NoteGrouping, TASK_GROUPINGS, TaskFilter, TaskGrouping } from "./queries";
 
 export type KindFilter = "all" | "note" | "board" | "canvas";
@@ -23,6 +24,8 @@ export interface ViewState {
   noteKindFilter: KindFilter;
   /** How note lists group cards. */
   noteGroupBy: NoteGrouping;
+  /** How the Attachments list groups cards. */
+  attachmentGroupBy: AttachmentGrouping;
 }
 
 /** What the column divider allows. At the minimum, the action row's three
@@ -36,6 +39,7 @@ export const DEFAULT_VIEW_STATE: ViewState = {
   taskFilter: "open",
   noteKindFilter: "all",
   noteGroupBy: "date",
+  attachmentGroupBy: "date",
 };
 
 function oneOf<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
@@ -60,6 +64,7 @@ export function parseViewState(raw: unknown): ViewState {
     taskFilter: oneOf(data.taskFilter, TASK_FILTERS, DEFAULT_VIEW_STATE.taskFilter),
     noteKindFilter: oneOf(data.noteKindFilter, KIND_FILTERS, DEFAULT_VIEW_STATE.noteKindFilter),
     noteGroupBy: oneOf(data.noteGroupBy, NOTE_GROUPINGS, DEFAULT_VIEW_STATE.noteGroupBy),
+    attachmentGroupBy: oneOf(data.attachmentGroupBy, ATTACHMENT_GROUPINGS, DEFAULT_VIEW_STATE.attachmentGroupBy),
   };
 }
 

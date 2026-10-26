@@ -4,7 +4,47 @@ import {
   attachmentFolderMatcher,
   attachmentsFor,
   formatSize,
+  groupAttachments,
 } from "../../sidebar/core/attachments";
+
+describe("groupAttachments", () => {
+  const file = (path: string, mtime = 0): AttachmentFile => {
+    const name = path.split("/").pop()!;
+    return {
+      path,
+      name,
+      folder: path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "",
+      extension: name.split(".").pop()!.toLowerCase(),
+      size: 1,
+      mtime,
+      ctime: mtime,
+    };
+  };
+  const files = [file("Work/b.PDF"), file("a.png"), file("Work/c.zip"), file("Home/d.jpg")];
+  const shape = (by: "folder" | "type" | "none") =>
+    groupAttachments(files, "title", by).map((g) => [g.label, g.notes.map((f) => f.name)]);
+
+  test("by folder: vault root first, then by name", () => {
+    expect(shape("folder")).toEqual([
+      ["Vault root", ["a.png"]],
+      ["Home", ["d.jpg"]],
+      ["Work", ["b.PDF", "c.zip"]],
+    ]);
+  });
+
+  test("by type: images, PDFs, then other files", () => {
+    expect(shape("type")).toEqual([
+      ["Images", ["a.png", "d.jpg"]],
+      ["PDFs", ["b.PDF"]],
+      ["Other files", ["c.zip"]],
+    ]);
+  });
+
+  test("no grouping is one unlabelled group; nothing is no groups", () => {
+    expect(shape("none")).toEqual([["", ["b.PDF", "a.png", "c.zip", "d.jpg"]]]);
+    expect(groupAttachments([], "modified", "type")).toEqual([]);
+  });
+});
 
 describe("attachmentFolderMatcher", () => {
   test("root and same-folder settings hide nothing", () => {

@@ -823,6 +823,10 @@
 .ps-empty button {
   margin-top: 10px;
 }
+.ps-empty-hint {
+  margin-top: 6px;
+  color: var(--text-faint);
+}
 .ps-sentinel {
   height: 1px;
 }
@@ -836,6 +840,38 @@
 }
 .ps-card:hover {
   background: var(--background-modifier-hover);
+}
+/* Templates: "New note from template", on the card's bottom corner while hovered. */
+.ps-card.is-template {
+  position: relative;
+}
+.ps-card-use {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-semibold);
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+  cursor: pointer;
+}
+.ps-card:hover .ps-card-use {
+  display: inline-flex;
+}
+.ps-card-use:hover {
+  background: var(--interactive-accent-hover);
+}
+.ps-card-use span {
+  display: inline-flex;
+}
+.ps-card-use svg {
+  width: 18px;
+  height: 18px;
 }
 /* The selected note lifts off the grey as a white card (the editor's own
    background, so dark themes get their dark equivalent). */

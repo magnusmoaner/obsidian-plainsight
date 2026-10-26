@@ -23,6 +23,8 @@ describe("parseSettings", () => {
       showNewFolderButton: false,
       showNewTaskButton: true,
       showMoreButton: false,
+      showDailyNotes: false,
+      showTemplates: true,
     };
     expect(parseSettings(stored).settings).toEqual(stored);
   });

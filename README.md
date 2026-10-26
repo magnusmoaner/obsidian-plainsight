@@ -36,10 +36,13 @@ Evernote-style browsing for your vault. The sidebar is its own tab in Obsidian's
 | --- | --- |
 | **Bookmarks** | Obsidian's own bookmarks, with their bookmark group on the right. Bookmarks to deleted notes are crossed out; click one to remove it. |
 | **Notes** | Every note, pinned notes first. Group by month, folder or type, or not at all. Chips filter to Notes, Boards ([Kanban](https://github.com/mgmeyers/obsidian-kanban) and [Task List Kanban](https://github.com/erikars/task-list-kanban)) or Canvases. |
+| **Daily notes** | The core Daily notes folder. The `+` opens today's note. |
 | **Tasks** | Tasks from all your notes. See below. |
-| **Attachments** | PDFs, images and other files, with thumbnails, searchable by the text inside them. See below. |
-| **Templates** | The core Templates folder. Click a template to create a note from it. |
-| **Folders** and **Tags** | Collapsible trees with counts. Folders Obsidian uses for attachments are left out. |
+| **Attachments** | PDFs, images and other files, with thumbnails, searchable by the text inside them. Group by month, folder or file type, or not at all. See below. |
+| **Templates** | The core Templates folder. The `+` makes a new template. Click a template to open it; its **New note from template** button (also on right-click) makes a note from it in the folder you last viewed. Right-click the **Note** button to pick a template from anywhere. |
+| **Folders** and **Tags** | Collapsible trees with counts. Folders Obsidian uses for attachments are left out, and so are the daily notes and templates folders while they have a place of their own. |
+
+Daily notes and Templates show while their core plugin is on, and each can be turned off in settings. Until its folder is set, the place offers **Choose folder**, which opens that core plugin's settings.
 
 **Tasks.** Filter by Open, Overdue or Done, or by a single note. Each task shows its note, plus badges for priority, due and scheduled dates ("Tomorrow"; overdue in red), recurrence and tags. Group by due date, scheduled date (done tasks by the day they were done), priority, recurrence, tag, folder, note or Kanban board ("Board › List", in the board's order). The task under your cursor in a note is highlighted in the list. Ticking a task goes through the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) plugin when it's installed, so done dates and recurring tasks behave exactly as inside a note.
 
@@ -153,6 +156,7 @@ The settings are grouped under five headings.
 | ***Notes sidebar: left column*** | | |
 | Action buttons | On | The Note button and the round buttons beside it, at the top of the left column. Everything they do stays reachable without it, through the `+` on Notes, Tasks, Folders and Tags and through the commands |
 | Search, New folder, New task and ⋯ buttons | On | Each round button (greyed out while the action buttons are off). Search, New folder or New task turned off moves into the **⋯** menu |
+| Daily notes, Templates in the left column | On | Each place, while its core plugin is on. Its folder is listed there instead of under Folders |
 | ***Notes sidebar: right column*** | | |
 | Preview on hover | On | Resting the mouse on a note card or a task previews the note (needs the core Page preview plugin) |
 | Gap at the top, bottom, left, right | Bottom only | A gap between the white list panel and the window edge on each chosen side; corners round on sides with a gap |
@@ -179,7 +183,7 @@ Plainsight needs no other plugin. These add to it when they're installed and ena
 | [Importer](https://github.com/obsidianmd/obsidian-importer) | An Importer item in the **⋯** menu | The item is hidden |
 | [Dataview](https://github.com/blacksmithgu/obsidian-dataview) | Nothing to set up: Dataview fields (`key:: value`) are shown cleaned up in card previews | — |
 
-From Obsidian's core plugins, Plainsight uses **Bookmarks** (the Bookmarks place), **Templates** (the Templates place and *Insert template*), **Page preview** (hover previews), **Search** (*Show in Obsidian search*), **Quick switcher** and **Graph view** (in the **⋯** menu) and **Canvas** (canvases are listed and can be created). Each is optional in the same way.
+From Obsidian's core plugins, Plainsight uses **Bookmarks** (the Bookmarks place), **Daily notes** (the Daily notes place), **Templates** (the Templates place and *Insert template*), **Page preview** (hover previews), **Search** (*Show in Obsidian search*), **Quick switcher** and **Graph view** (in the **⋯** menu) and **Canvas** (canvases are listed and can be created). Each is optional in the same way.
 
 ### Good companions
 

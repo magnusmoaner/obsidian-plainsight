@@ -56,6 +56,11 @@ describe("notesFor", () => {
     expect(notesFor(notes, { kind: "templates" }, { ...opts, templatesFolder: null })).toEqual([]);
   });
 
+  test("daily place lists only the daily notes folder", () => {
+    expect(paths(notesFor(notes, { kind: "daily" }, { ...opts, dailyFolder: "Inbox/Sub" }))).toEqual(["Inbox/Sub/b.md"]);
+    expect(notesFor(notes, { kind: "daily" }, opts)).toEqual([]);
+  });
+
   test("search requires every term", () => {
     const list = [
       note("x.md", { searchText: "budget plan 2026" }),
@@ -99,7 +104,7 @@ describe("folderRows", () => {
   const list = [note("A/x.md"), note("A/B/y.md"), note("A B/z.md"), note("root.md")];
 
   test("indented tree, parents before children, counts include descendants", () => {
-    expect(folderRows(["A", "A/B", "A B"], list, null)).toEqual([
+    expect(folderRows(["A", "A/B", "A B"], list, [])).toEqual([
       { path: "A", name: "A", depth: 0, count: 2 },
       { path: "A/B", name: "B", depth: 1, count: 1 },
       { path: "A B", name: "A B", depth: 0, count: 1 },
@@ -107,7 +112,7 @@ describe("folderRows", () => {
   });
 
   test("empty folders are notebooks too (a new one has no notes yet)", () => {
-    expect(folderRows(["Empty"], [], null)).toEqual([
+    expect(folderRows(["Empty"], [], [])).toEqual([
       { path: "Empty", name: "Empty", depth: 0, count: 0 },
     ]);
   });
@@ -115,14 +120,15 @@ describe("folderRows", () => {
   test("excludes folders the predicate rejects, e.g. attachment folders", () => {
     const withAtt = [note("A/x.md"), note("A/Attachments/c.md")];
     expect(
-      folderRows(["A", "A/Attachments"], withAtt, null, (f) => f.endsWith("/Attachments")).map(
+      folderRows(["A", "A/Attachments"], withAtt, [], (f) => f.endsWith("/Attachments")).map(
         (r) => [r.path, r.count]
       )
     ).toEqual([["A", 2]]);
   });
 
   test("excludes the templates folder", () => {
-    expect(folderRows(["Templates"], [note("Templates/t.md")], "Templates")).toEqual([]);
+    expect(folderRows(["Templates"], [note("Templates/t.md")], ["Templates"])).toEqual([]);
+    expect(folderRows(["Daily", "Daily/2026", "Work"], [], ["Templates", "Daily"]).map((r) => r.path)).toEqual(["Work"]);
   });
 });
 
