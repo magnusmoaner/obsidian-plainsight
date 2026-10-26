@@ -146,23 +146,26 @@ It's a plugin of its own because it needs access to macOS to pick menu items, an
 
 ## Settings
 
-The settings are grouped under five headings.
+The settings are grouped under eight headings.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| ***Editor (beta, work in progress)*** | | |
-| Enable WYSIWYG editing | On | Hides syntax and enables the editor shortcuts |
-| Let Plainsight draw everything (Source mode) | Off | Switches notes from Live Preview to Source mode, so Plainsight alone draws them. Greyed out while the editor is off |
-| ***Notes sidebar: left column*** | | |
-| Action buttons | On | The Note button and the round buttons beside it, at the top of the left column. Everything they do stays reachable without it, through the `+` on Notes, Tasks, Folders and Tags and through the commands |
+| ***Action buttons*** | | |
+| Show action buttons | On | The Note button and the round buttons beside it, at the top of the left column. Everything they do stays reachable without it, through the `+` on Notes, Tasks, Folders and Tags and through the commands |
 | Search, New folder, New task and ⋯ buttons | On | Each round button (greyed out while the action buttons are off). Search, New folder or New task turned off moves into the **⋯** menu |
-| Daily notes, Templates in the left column | On | Each place, while its core plugin is on. Its folder is listed there instead of under Folders |
-| ***Notes sidebar: right column*** | | |
+| ***Daily notes*** and ***Templates*** | | |
+| Show in the left column | On | The place, while its core plugin is on. Its folder is listed there instead of under Folders |
+| Core plugin is off / No folder set / Folder | — | Where that place stands, with a button to turn the core plugin on, choose its folder or change it |
+| ***Previews*** | | |
 | Preview on hover | On | Resting the mouse on a note card or a task previews the note (needs the core Page preview plugin) |
-| Gap at the top, bottom, left, right | Bottom only | A gap between the white list panel and the window edge on each chosen side; corners round on sides with a gap |
+| ***Gaps*** | | |
+| Top, Bottom, Left, Right | Bottom only | A gap between the white list panel and the window edge on each chosen side; corners round on sides with a gap |
 | ***Tasks*** | | |
 | Default note for new tasks | (asked the first time) | Where the sidebar's New task button and the `+` on Tasks add tasks (any note except a Kanban board) |
 | List Kanban cards as tasks | Off | The Kanban plugin saves cards as checkbox lines. Off: they show on the Tasks page only when grouped by Kanban board. On: every card is listed among your tasks |
+| ***Editor (beta)*** | | |
+| Enable WYSIWYG editing | On | Hides syntax and enables the editor shortcuts |
+| Let Plainsight draw everything (Source mode) | Off | Switches notes from Live Preview to Source mode, so Plainsight alone draws them. Greyed out while the editor is off |
 | ***Hotkeys*** | | |
 | Set hotkeys | — | Opens Settings → Hotkeys, showing only Plainsight's commands |
 | Writing Tools and menu commands | — | On a Mac only: points to [Plainsight Menu Commands](https://github.com/magnusmoaner/obsidian-plainsight-menu-commands), or opens its settings once it's installed |
