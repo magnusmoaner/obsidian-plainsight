@@ -65,9 +65,9 @@ Rest the mouse on a card to preview the note or file beside the list; rest it on
 
 ### Creating things
 
-- **The button row** at the top of the left column: the **Note** pill, then round buttons for **Search**, **New folder**, **New task** and **⋯**. Settings can hide the whole row, or any of the round buttons; a hidden Search, New folder or New task button (and, on a narrow column, New folder and New task) moves into the **⋯** menu.
-- **A `+`** appears when you hover Notes, Tasks, Folders or Tags (not on touch screens).
-- **The list header** has a button for a new note (a new task on the Tasks page), and one for a new [Kanban](https://github.com/mgmeyers/obsidian-kanban) or [Task List Kanban](https://github.com/erikars/task-list-kanban) board in the folder you're viewing (with both plugins enabled, it asks which).
+- **The button row** at the top of the left column: the **Note** pill, then round buttons for **Search**, **New folder**, **New task** and **⋯**. Settings can hide the whole row, or any of the round buttons; a hidden Search, New folder or New task button (and, on a narrow column, New folder and New task) moves into the **⋯** menu. Right-click the **Note** pill for **New note from template…**.
+- **A `+`** appears when you hover Notes, Daily notes (today's note), Tasks, Templates (a new template), Folders or Tags (not on touch screens).
+- **The list header** has a button for a new note (a new task on Tasks, today's note on Daily notes, a new template on Templates). Outside Daily notes and Templates, a second one makes a new [Kanban](https://github.com/mgmeyers/obsidian-kanban) or [Task List Kanban](https://github.com/erikars/task-list-kanban) board in the folder you're viewing (with both plugins enabled, it asks which).
 - **The ⋯ menu** creates tags, canvases and boards, inserts a template into the open note, opens Obsidian's search, quick switcher, graph view and the Importer, and has expand/collapse all, bookmark cleanup and settings.
 
 Buttons and menu items for plugins that aren't enabled are hidden.
