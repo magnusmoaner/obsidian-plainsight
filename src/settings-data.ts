@@ -57,7 +57,8 @@ const KNOWN = new Set<string>(Object.keys(DEFAULT_SETTINGS));
 
 /** Settings that no longer exist: `sidebar` (the sidebar is always on),
  * `showNoteButton` (the Note button shows whenever the action row does),
- * and the menu commands', which moved to Plainsight Menu Commands. */
+ * and the menu commands', which moved to Plainsight Menu Commands and were
+ * later retired. */
 const RETIRED = ["sidebar", "showNoteButton", "writingToolsCommands", "writingTools", "menuCommands"];
 
 /**
