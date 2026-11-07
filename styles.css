@@ -1295,21 +1295,26 @@
 }
 
 /* The action row as the places column narrows.
-   Buttons stay 40px: first Daily note, New folder and New task move into the
-   ⋯ menu (the + on Daily notes, Folders and Tasks does them too; with the
-   Daily note button there, one button's width sooner), then the pill drops
-   its label. */
+   Buttons stay 40px and move into the ⋯ menu one by one (the + on Folders,
+   Tasks and Daily notes does each too): New folder, then New task, then
+   Daily note; then the pill drops its label. Each step frees one button's
+   width (46px). */
 @container ps-nav (max-width: 341px) {
-  .ps-nav-actions:has(.is-daily) .is-optional {
+  .ps-nav-actions:has(.is-daily) .is-folder {
     display: none;
   }
 }
 @container ps-nav (max-width: 295px) {
-  .ps-nav-actions .is-optional {
+  .ps-nav-actions .is-optional:not(.is-daily) {
     display: none;
   }
   .ps-new-note {
     padding: 8px 12px;
+  }
+}
+@container ps-nav (max-width: 249px) {
+  .ps-nav-actions .is-daily {
+    display: none;
   }
 }
 @container ps-nav (max-width: 197px) {
