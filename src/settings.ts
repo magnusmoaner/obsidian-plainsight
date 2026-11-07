@@ -1,20 +1,10 @@
-import { App, Platform, PluginSettingTab, Setting } from "obsidian";
-import {
-  corePluginEnabled,
-  dailyNotesFolder,
-  openHotkeys,
-  openSettingsTab,
-  pluginInstalled,
-  templateOptions,
-} from "./sidebar/internals";
+import { App, PluginSettingTab, Setting } from "obsidian";
+import { corePluginEnabled, dailyNotesFolder, openHotkeys, openSettingsTab, templateOptions } from "./sidebar/internals";
 import { NoteSuggest } from "./sidebar/modals";
 import type WysiwygPlugin from "./main";
 
 export { DEFAULT_SETTINGS } from "./settings-data";
 export type { WysiwygSettings } from "./settings-data";
-
-const MENU_COMMANDS_ID = "plainsight-menu-commands";
-const MENU_COMMANDS_URL = "https://github.com/magnusmoaner/obsidian-plainsight-menu-commands";
 
 export class WysiwygSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: WysiwygPlugin) {
@@ -193,24 +183,6 @@ export class WysiwygSettingTab extends PluginSettingTab {
       .addButton((button) =>
         button.setButtonText("Set hotkeys").onClick(() => openHotkeys(this.app, "Plainsight"))
       );
-
-    // Hotkeys for Writing Tools come in a companion plugin: it needs macOS
-    // system access, which would make Plainsight itself desktop-only.
-    if (Platform.isMacOS && Platform.isDesktopApp) {
-      const installed = pluginInstalled(this.app, MENU_COMMANDS_ID);
-      new Setting(this.containerEl)
-        .setName("Writing Tools and menu commands")
-        .setDesc(
-          "Hotkeys for Apple Intelligence's Writing Tools, and for any other menu item, come in a companion " +
-            "plugin, Plainsight Menu Commands. It's separate because it needs access to macOS, which would " +
-            "keep Plainsight itself off phones and tablets."
-        )
-        .addButton((button) =>
-          installed
-            ? button.setButtonText("Open its settings").onClick(() => openSettingsTab(this.app, MENU_COMMANDS_ID))
-            : button.setButtonText("Learn more").onClick(() => window.open(MENU_COMMANDS_URL))
-        );
-    }
   }
 
   /**
