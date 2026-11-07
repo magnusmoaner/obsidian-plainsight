@@ -250,6 +250,8 @@ export class SidebarView extends ItemView implements HoverParent {
     // needs no background of its own (a translucent window has none to copy).
     this.placesEl = root.createDiv("ps-places");
     this.actionsEl = this.placesEl.createDiv("ps-nav-actions");
+    this.actionsObserver = new ResizeObserver(() => this.fitActions());
+    this.actionsObserver.observe(this.actionsEl);
     this.navEl = this.placesEl.createDiv("ps-nav");
     const divider = root.createDiv("ps-divider");
     const list = root.createDiv("ps-list");
@@ -305,6 +307,7 @@ export class SidebarView extends ItemView implements HoverParent {
 
   async onClose(): Promise<void> {
     this.resizeObserver?.disconnect();
+    this.actionsObserver?.disconnect();
     if (this.fitFrame !== null) window.cancelAnimationFrame(this.fitFrame);
     this.unsubscribe?.();
     this.unsubscribeBookmarks?.();
@@ -677,15 +680,16 @@ export class SidebarView extends ItemView implements HoverParent {
     const today = dailyPlugin && show(s.showDailyNoteButton)
       ? this.roundButton(actions, "calendar-plus", "Today's daily note", () => this.openToday())
       : null;
-    today?.addClass("is-optional", "is-daily");
+    today?.addClass("is-daily");
     const newFolder = showNewFolderButton
       ? this.roundButton(actions, "folder-plus", "New folder", () => this.newNotebook(isAttachmentFolder))
       : null;
     const newTask = showNewTaskButton
       ? this.roundButton(actions, "list-checks", "New task", () => void this.newTask())
       : null;
-    newFolder?.addClass("is-optional", "is-folder");
-    newTask?.addClass("is-optional");
+    newFolder?.addClass("is-folder");
+    newTask?.addClass("is-task");
+    this.fitActions();
     if (show(s.showMoreButton)) this.roundButton(actions, "more-horizontal", "More", (evt) =>
       this.moreMenu(
         evt,
@@ -753,6 +757,28 @@ export class SidebarView extends ItemView implements HoverParent {
     chevron.toggleClass("is-collapsed", collapsed);
     setIcon(chevron, "chevron-down");
     return slot;
+  }
+
+  /**
+   * On a narrow column the optional round buttons give way one at a time,
+   * New folder, then New task, then Daily note, for as long as the Note
+   * pill's label is cut short. Once the column is so narrow the label is
+   * hidden (styles.css), they all have. The ⋯ menu offers what gave way, and
+   * the + on Folders, Tasks and Daily notes does each too.
+   */
+  private fitActions(): void {
+    const row = this.actionsEl;
+    const label = row.querySelector<HTMLElement>(".ps-new-note > span:last-child");
+    const optional = [".is-folder", ".is-task", ".is-daily"]
+      .map((sel) => row.querySelector<HTMLElement>(sel))
+      .filter((b): b is HTMLElement => b !== null);
+    for (const b of optional) b.removeClass("is-given-way");
+    if (!label || !row.isShown()) return;
+    const cut = () => !label.isShown() || label.scrollWidth > label.clientWidth;
+    for (const b of optional) {
+      if (!cut()) break;
+      b.addClass("is-given-way");
+    }
   }
 
   private roundButton(
@@ -1509,6 +1535,7 @@ export class SidebarView extends ItemView implements HoverParent {
 
   private fitFrame: number | null = null;
   private resizeObserver: ResizeObserver | null = null;
+  private actionsObserver: ResizeObserver | null = null;
   private lastBodyWidth = 0;
 
   /** Fit newly rendered cards' tag rows on the next frame, once per batch. */
