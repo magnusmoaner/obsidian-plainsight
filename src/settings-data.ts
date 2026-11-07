@@ -22,9 +22,11 @@ export interface WysiwygSettings {
   listInsetLeft: boolean;
   listInsetRight: boolean;
   /** The sidebar's action row (the Note button always shows with it), then
-   * its round buttons; one that's off moves into the ⋯ menu. */
+   * its round buttons; one that's off moves into the ⋯ menu. The Daily note
+   * button shows only while the Daily notes core plugin is on. */
   showActionRow: boolean;
   showSearchButton: boolean;
+  showDailyNoteButton: boolean;
   showNewFolderButton: boolean;
   showNewTaskButton: boolean;
   showMoreButton: boolean;
@@ -46,6 +48,7 @@ export const DEFAULT_SETTINGS: WysiwygSettings = {
   listInsetRight: false,
   showActionRow: true,
   showSearchButton: true,
+  showDailyNoteButton: true,
   showNewFolderButton: true,
   showNewTaskButton: true,
   showMoreButton: true,

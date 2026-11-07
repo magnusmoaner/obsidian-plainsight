@@ -20,6 +20,7 @@ describe("parseSettings", () => {
       listInsetRight: true,
       showActionRow: false,
       showSearchButton: false,
+      showDailyNoteButton: false,
       showNewFolderButton: false,
       showNewTaskButton: true,
       showMoreButton: false,
