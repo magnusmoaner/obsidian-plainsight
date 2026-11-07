@@ -684,7 +684,7 @@ export class SidebarView extends ItemView implements HoverParent {
     const newTask = showNewTaskButton
       ? this.roundButton(actions, "list-checks", "New task", () => void this.newTask())
       : null;
-    newFolder?.addClass("is-optional");
+    newFolder?.addClass("is-optional", "is-folder");
     newTask?.addClass("is-optional");
     if (show(s.showMoreButton)) this.roundButton(actions, "more-horizontal", "More", (evt) =>
       this.moreMenu(
