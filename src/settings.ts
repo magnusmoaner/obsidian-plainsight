@@ -33,6 +33,11 @@ export class WysiwygSettingTab extends PluginSettingTab {
     const intoMore = "Turned off, it moves into the ⋯ menu.";
     const buttons = [
       ["showSearchButton", "Search button", `Search everywhere. ${intoMore}`],
+      [
+        "showDailyNoteButton",
+        "Daily note button",
+        `Opens today's daily note, making it if needed. Shows while the Daily notes core plugin is on. ${intoMore}`,
+      ],
       ["showNewFolderButton", "New folder button", intoMore],
       ["showNewTaskButton", "New task button", intoMore],
       [

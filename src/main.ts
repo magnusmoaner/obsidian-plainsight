@@ -348,6 +348,7 @@ export default class WysiwygPlugin extends Plugin {
     const buttons = [
       "showActionRow",
       "showSearchButton",
+      "showDailyNoteButton",
       "showNewFolderButton",
       "showNewTaskButton",
       "showMoreButton",

@@ -626,6 +626,7 @@ export class SidebarView extends ItemView implements HoverParent {
     const attachmentCount = this.attachmentFiles().length;
     const showsDaily = this.showsDaily();
     const showsTemplates = this.showsTemplates();
+    const dailyPlugin = corePluginEnabled(this.app, "daily-notes");
     const dailyFolder = dailyNotesFolder(this.app);
     const dailyCount = showsDaily && dailyFolder ? notesFor(notes, { kind: "daily" }, unfiltered).length : null;
     const templateCount = showsTemplates && templates ? notesFor(notes, { kind: "templates" }, unfiltered).length : null;
@@ -634,11 +635,11 @@ export class SidebarView extends ItemView implements HoverParent {
 
     const tree = (rows: TreeRow[]) => rows.map((r) => [r.path, r.count]);
     const key = JSON.stringify([
-      [s.showActionRow, s.showSearchButton, s.showNewFolderButton, s.showNewTaskButton, s.showMoreButton],
+      [s.showActionRow, s.showSearchButton, s.showDailyNoteButton, s.showNewFolderButton, s.showNewTaskButton, s.showMoreButton],
       this.place,
       this.plugin.viewState.state.collapsed,
       bookmarks?.map((b) => [b.kind, b.title, b.target, b.group, b.kind === "search" || !!this.app.vault.getAbstractFileByPath(b.target)]) ?? null,
-      [noteCount, openTasks, attachmentCount, templateCount, templates, dailyCount, dailyFolder, showsDaily, showsTemplates],
+      [noteCount, openTasks, attachmentCount, templateCount, templates, dailyCount, dailyFolder, showsDaily, showsTemplates, dailyPlugin],
       tree(notebooks),
       tree(tags),
     ]);
@@ -672,6 +673,11 @@ export class SidebarView extends ItemView implements HoverParent {
       this.roundButton(actions, "search", "Search everywhere", () => this.openSearch()).addClass("is-accent");
     }
     // Optional: on a narrow column these give way, and the ⋯ menu offers them.
+    // The Daily note button needs the Daily notes core plugin.
+    const today = dailyPlugin && show(s.showDailyNoteButton)
+      ? this.roundButton(actions, "calendar-plus", "Today's daily note", () => this.openToday())
+      : null;
+    today?.addClass("is-optional", "is-daily");
     const newFolder = showNewFolderButton
       ? this.roundButton(actions, "folder-plus", "New folder", () => this.newNotebook(isAttachmentFolder))
       : null;
@@ -686,6 +692,7 @@ export class SidebarView extends ItemView implements HoverParent {
         tagRows(this.partition().notes).map((t) => t.path),
         {
           search: !showSearchButton,
+          daily: dailyPlugin && (!today || today.offsetParent === null),
           folder: !newFolder || newFolder.offsetParent === null,
           task: !newTask || newTask.offsetParent === null,
         },
@@ -785,15 +792,18 @@ export class SidebarView extends ItemView implements HoverParent {
   private moreMenu(
     evt: MouseEvent,
     tags: string[],
-    hidden: { search: boolean; folder: boolean; task: boolean },
+    hidden: { search: boolean; daily: boolean; folder: boolean; task: boolean },
     isAttachmentFolder: (folder: string) => boolean
   ): void {
     const menu = new Menu();
     const folder = this.currentFolder();
     // Round buttons that aren't in the row: turned off in settings, or
-    // (New folder, New task) given way on a narrow column.
+    // (Daily note, New folder, New task) given way on a narrow column.
     if (hidden.search) {
       menu.addItem((i) => i.setTitle("Search everywhere…").setIcon("search").onClick(() => this.openSearch()));
+    }
+    if (hidden.daily) {
+      menu.addItem((i) => i.setTitle("Today's daily note").setIcon("calendar-plus").onClick(() => this.openToday()));
     }
     if (hidden.folder) {
       menu.addItem((i) => i.setTitle("New folder…").setIcon("folder-plus").onClick(() => this.newNotebook(isAttachmentFolder)));
