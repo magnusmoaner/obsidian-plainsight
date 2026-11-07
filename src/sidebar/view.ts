@@ -678,7 +678,7 @@ export class SidebarView extends ItemView implements HoverParent {
     // Optional: on a narrow column these give way, and the ⋯ menu offers them.
     // The Daily note button needs the Daily notes core plugin.
     const today = dailyPlugin && show(s.showDailyNoteButton)
-      ? this.roundButton(actions, "calendar-plus", "New daily note", () => this.openToday())
+      ? this.roundButton(actions, "calendar-plus", "Daily note", () => this.openToday())
       : null;
     today?.addClass("is-daily");
     const newFolder = showNewFolderButton
@@ -829,7 +829,7 @@ export class SidebarView extends ItemView implements HoverParent {
       menu.addItem((i) => i.setTitle("Search everywhere…").setIcon("search").onClick(() => this.openSearch()));
     }
     if (hidden.daily) {
-      menu.addItem((i) => i.setTitle("New daily note").setIcon("calendar-plus").onClick(() => this.openToday()));
+      menu.addItem((i) => i.setTitle("Daily note").setIcon("calendar-plus").onClick(() => this.openToday()));
     }
     if (hidden.folder) {
       menu.addItem((i) => i.setTitle("New folder…").setIcon("folder-plus").onClick(() => this.newNotebook(isAttachmentFolder)));
