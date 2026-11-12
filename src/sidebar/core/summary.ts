@@ -69,8 +69,9 @@ const FENCE = /^\s*(```|~~~)/;
  * list items under them are cards. Stops at the plugin's trailing
  * "%% kanban:settings" block.
  */
-export function parseBoard(text: string): { columns: string[]; cards: number; end: number } {
+export function parseBoard(text: string): { columns: string[]; laneCards: number[]; cards: number; end: number } {
   const columns: string[] = [];
+  const laneCards: number[] = [];
   let cards = 0;
   let inFence = false;
   const lines = text.split(/\r?\n/);
@@ -89,10 +90,15 @@ export function parseBoard(text: string): { columns: string[]; cards: number; en
     }
     if (inFence) continue;
     const heading = /^##\s+(.+?)\s*$/.exec(line);
-    if (heading) columns.push(heading[1]);
-    else if (columns.length && /^[-*+]\s+/.test(line)) cards++;
+    if (heading) {
+      columns.push(heading[1]);
+      laneCards.push(0);
+    } else if (columns.length && /^[-*+]\s+/.test(line)) {
+      cards++;
+      laneCards[laneCards.length - 1]++;
+    }
   }
-  return { columns, cards, end };
+  return { columns, laneCards, cards, end };
 }
 
 export function summarize(facts: FileFacts, text: string): NoteSummary {
@@ -107,6 +113,7 @@ export function summarize(facts: FileFacts, text: string): NoteSummary {
     path: facts.path,
     kind: board || taskListBoard ? "board" : "note",
     columns: board?.columns ?? [],
+    laneCards: board?.laneCards ?? [],
     items: board?.cards ?? 0,
     title: facts.basename,
     folder: facts.folder,
@@ -150,6 +157,7 @@ export function summarizeCanvas(facts: FileFacts, json: string): NoteSummary {
     path: facts.path,
     kind: "canvas",
     columns: [],
+    laneCards: [],
     items: nodes,
     title: facts.basename,
     folder: facts.folder,

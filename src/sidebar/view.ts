@@ -1728,6 +1728,24 @@ export class SidebarView extends ItemView implements HoverParent {
     }
   }
 
+  /** A Kanban board's lists as tiles: name and card count; past 4, a "+N" tile. */
+  private renderMiniBoard(parent: HTMLElement, note: NoteSummary): void {
+    const MAX = 4;
+    const board = parent.createDiv("ps-card-board");
+    const shown = note.columns.length > MAX ? MAX - 1 : MAX;
+    note.columns.slice(0, shown).forEach((name, i) => {
+      const lane = board.createDiv({ cls: "ps-card-lane", attr: { title: name } });
+      lane.createDiv({ cls: "ps-card-lane-name", text: name });
+      lane.createDiv({ cls: "ps-card-lane-count", text: String(note.laneCards[i] ?? 0) });
+    });
+    const rest = note.columns.length - shown;
+    if (rest > 0) {
+      const lane = board.createDiv({ cls: "ps-card-lane is-more", attr: { title: note.columns.slice(shown).join(", ") } });
+      lane.createDiv({ cls: "ps-card-lane-name", text: "More lists" });
+      lane.createDiv({ cls: "ps-card-lane-count", text: `+${rest}` });
+    }
+  }
+
   private renderCard(note: NoteSummary): HTMLElement {
     const card = this.bodyEl.createDiv({ cls: "ps-card", attr: { "data-path": note.path } });
     card.toggleClass("is-active", this.activeFile()?.path === note.path);
@@ -1739,7 +1757,8 @@ export class SidebarView extends ItemView implements HoverParent {
     }
     title.createSpan({ text: note.title });
     if (note.pinned) setIcon(title.createSpan("ps-card-pin"), "pin");
-    if (note.snippet) text.createDiv({ cls: "ps-card-snippet", text: note.snippet });
+    if (note.columns.length) this.renderMiniBoard(text, note);
+    else if (note.snippet) text.createDiv({ cls: "ps-card-snippet", text: note.snippet });
 
     // One line: date · task badge (or a board's/canvas's count) · tags,
     // with tags that don't fit folded into "+N" by fitTagRows().
@@ -1753,8 +1772,8 @@ export class SidebarView extends ItemView implements HoverParent {
       const chip = meta.createSpan("ps-card-tasks ps-card-items");
       setIcon(chip.createSpan(), "list-checks");
       chip.createSpan({ text: "Task List Kanban" });
-    } else if (note.kind !== "note") {
-      // Boards: card count (their checkboxes are cards, not progress);
+    } else if (note.kind === "canvas" || (note.kind === "board" && !note.columns.length)) {
+      // Boards without lanes (their mini board shows the counts otherwise): card count (their checkboxes are cards, not progress);
       // canvases: how many boxes they hold.
       const label = note.kind === "board" ? "card" : "box";
       const chip = meta.createSpan("ps-card-tasks ps-card-items");
