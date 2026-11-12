@@ -32,6 +32,8 @@ export interface NoteSummary {
   kind: NoteKind;
   /** Kanban plugin boards: column (lane) names. Empty otherwise. */
   columns: string[];
+  /** Kanban plugin boards: cards in each column, in `columns` order. */
+  laneCards: number[];
   /** Kanban plugin boards: number of cards; canvases: number of nodes. 0 otherwise. */
   items: number;
   title: string;

@@ -122,8 +122,12 @@ const BOARD = [
 ].join("\n");
 
 describe("Kanban boards", () => {
+  test("an empty lane counts 0 cards", () => {
+    expect(parseBoard("## Inbox\n\n## Doing\n\n- [ ] Card\n").laneCards).toEqual([0, 1]);
+  });
+
   test("parseBoard counts columns and cards, ignoring the settings block", () => {
-    expect(parseBoard(BOARD)).toMatchObject({ columns: ["Todo", "Done"], cards: 3 });
+    expect(parseBoard(BOARD)).toMatchObject({ columns: ["Todo", "Done"], laneCards: [2, 1], cards: 3 });
   });
 
   test("a note with kanban-plugin frontmatter is a board", () => {
@@ -216,7 +220,7 @@ describe("Kanban archive", () => {
   ].join("\n");
 
   test("the archive is not a column and its cards aren't counted", () => {
-    expect(parseBoard(archived)).toMatchObject({ columns: ["Todo"], cards: 1 });
+    expect(parseBoard(archived)).toMatchObject({ columns: ["Todo"], laneCards: [1], cards: 1 });
   });
 
   test("archived cards are not tasks", () => {

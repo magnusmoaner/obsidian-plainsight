@@ -922,6 +922,43 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+/* A Kanban board's mini board: one tile per list, name over card count. */
+.ps-card-board {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.ps-card-lane {
+  position: relative;
+  overflow: hidden;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--background-modifier-hover);
+}
+/* How many of the list's cards are checked off, as a line along the bottom. */
+.ps-card-lane-done {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--color-purple);
+}
+.ps-card-lane-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+.ps-card-lane-count {
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-semibold);
+}
+.ps-card-lane.is-more .ps-card-lane-count {
+  color: var(--text-muted);
+}
 .ps-card-tasks {
   flex: 0 0 auto;
   display: inline-flex;
