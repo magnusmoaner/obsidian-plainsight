@@ -12,6 +12,8 @@ describe("parseSettings", () => {
       enabled: false,
       takeOverRendering: true,
       defaultTaskNote: "Todo list.md",
+      boards: false,
+      showBoardsRow: false,
       boardCardsInTasks: true,
       hoverPreviews: false,
       listInsetTop: true,

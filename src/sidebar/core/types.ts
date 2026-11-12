@@ -48,6 +48,8 @@ export interface NoteSummary {
   tasks: TaskItem[];
   /** Link target of the first embedded image, unresolved. */
   thumbnail: string | null;
+  /** Link target of the first Kanban board embedded in the note, unresolved. */
+  embeddedBoard: string | null;
   /** Lower-cased title, tags and body for search, capped in length. */
   searchText: string;
   /**

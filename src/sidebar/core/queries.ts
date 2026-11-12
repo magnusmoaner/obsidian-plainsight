@@ -9,6 +9,7 @@ export type Place =
   | { kind: "notebook"; folder: string }
   | { kind: "tag"; tag: string }
   | { kind: "tasks" }
+  | { kind: "boards" }
   | { kind: "daily" }
   | { kind: "templates" }
   | { kind: "attachments" };
@@ -59,6 +60,8 @@ function inPlace(note: NoteSummary, place: Place, templates: string | null, dail
       return isTemplate;
     case "tasks":
       return note.tasks.length > 0;
+    case "boards":
+      return note.kind === "board" && !isTemplate;
     case "attachments":
       return false; // files, not notes: listed by attachmentsFor
   }

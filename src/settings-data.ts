@@ -12,6 +12,10 @@ export interface WysiwygSettings {
   takeOverRendering: boolean;
   /** Note that the sidebar's "+" on Tasks appends new tasks to; "" = ask. */
   defaultTaskNote: string;
+  /** Treat Kanban boards as boards; off, they are listed as ordinary notes. */
+  boards: boolean;
+  /** A Boards row in the places column, above Tasks. */
+  showBoardsRow: boolean;
   /** List Kanban board cards on the Tasks page (they're `- [ ]` lines too). */
   boardCardsInTasks: boolean;
   /** Page Preview when the mouse rests on a note card or a task. */
@@ -40,6 +44,8 @@ export const DEFAULT_SETTINGS: WysiwygSettings = {
   enabled: true,
   takeOverRendering: false,
   defaultTaskNote: "",
+  boards: true,
+  showBoardsRow: true,
   boardCardsInTasks: false,
   hoverPreviews: true,
   listInsetTop: false,

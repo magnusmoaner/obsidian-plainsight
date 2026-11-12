@@ -959,6 +959,32 @@
 .ps-card-lane.is-more .ps-card-lane-count {
   color: var(--text-muted);
 }
+/* A note with an embedded board: the board, then the meta line, span the
+   card below the text and the image. */
+.ps-card.has-board {
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+.ps-card.has-board .ps-card-text {
+  flex-basis: 0;
+}
+.ps-card.has-board > .ps-card-board,
+.ps-card.has-board > .ps-card-meta {
+  flex: 0 0 100%;
+  order: 1;
+  min-width: 0;
+}
+/* A board embedded in a note: slimmer tiles, name and count on one line. */
+.ps-card-board.is-compact .ps-card-lane {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 2px 8px 4px;
+}
+.ps-card-board.is-compact .ps-card-lane-count {
+  font-size: var(--font-ui-smaller);
+}
 .ps-card-tasks {
   flex: 0 0 auto;
   display: inline-flex;
@@ -993,8 +1019,9 @@
   flex: 0 0 auto;
   padding: 1px 6px;
   border-radius: 4px;
-  background: var(--background-modifier-hover);
-  color: var(--text-muted);
+  /* Obsidian's own tag colours, so a card's tags match tags in the note. */
+  background: var(--tag-background);
+  color: var(--tag-color);
 }
 .ps-card-thumb {
   flex: 0 0 64px;

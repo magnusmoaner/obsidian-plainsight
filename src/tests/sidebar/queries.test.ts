@@ -29,6 +29,15 @@ const notes = [
 const paths = (list: { path: string }[]) => list.map((n) => n.path);
 
 describe("notesFor", () => {
+  test("Boards = every board, wherever it is, except templates", () => {
+    const withBoards = [
+      ...notes,
+      note("Inbox/Plan.md", { kind: "board" }),
+      note("Templates/Board template.md", { kind: "board" }),
+    ];
+    expect(paths(notesFor(withBoards, { kind: "boards" }, opts))).toEqual(["Inbox/Plan.md"]);
+  });
+
   test("Notes = everything except templates; pinned first, then newest", () => {
     expect(paths(notesFor(notes, { kind: "notes" }, opts))).toEqual([
       "Other/c.md",

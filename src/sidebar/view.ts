@@ -407,7 +407,9 @@ export class SidebarView extends ItemView implements HoverParent {
     const gone =
       kind === "notebook"
         ? !this.plugin.indexer.folders().includes(this.place.folder)
-        : (kind === "daily" && !this.showsDaily()) || (kind === "templates" && !this.showsTemplates());
+        : (kind === "daily" && !this.showsDaily()) ||
+          (kind === "templates" && !this.showsTemplates()) ||
+          (kind === "boards" && !this.showsBoards());
     if (!gone) return false;
     this.place = { kind: "notes" };
     this.resetScroll();
@@ -543,6 +545,18 @@ export class SidebarView extends ItemView implements HoverParent {
 
   /** Where a new note goes: the folder viewed, or the templates folder
    * for a new template; null = Obsidian's default location. */
+  private showsBoards(): boolean {
+    return this.plugin.settings.boards && this.plugin.settings.showBoardsRow;
+  }
+
+  /** Make a board: at once with one board plugin, from a menu with both. */
+  private newBoard(evt: MouseEvent, boards = this.boardMakers()): void {
+    if (boards.length === 1) return boards[0].make();
+    const menu = new Menu();
+    for (const b of boards) menu.addItem((i) => i.setTitle(b.label).setIcon(b.icon).onClick(() => b.make()));
+    menu.showAtMouseEvent(evt);
+  }
+
   private currentFolder(): string | null {
     if (this.place.kind === "notebook") return this.place.folder;
     if (this.place.kind === "templates") return templateOptions(this.app).folder;
@@ -633,6 +647,9 @@ export class SidebarView extends ItemView implements HoverParent {
     const dailyFolder = dailyNotesFolder(this.app);
     const dailyCount = showsDaily && dailyFolder ? notesFor(notes, { kind: "daily" }, unfiltered).length : null;
     const templateCount = showsTemplates && templates ? notesFor(notes, { kind: "templates" }, unfiltered).length : null;
+    const showsBoards = this.showsBoards();
+    const boardCount = showsBoards ? notesFor(notes, { kind: "boards" }, unfiltered).length : null;
+    const canMakeBoard = this.boardMakers().length > 0;
     const notebooks = folderRows(this.plugin.indexer.folders(), notes, this.ownPlaceFolders(), isAttachmentFolder);
     const tags = tagRows(notes);
 
@@ -643,6 +660,7 @@ export class SidebarView extends ItemView implements HoverParent {
       this.plugin.viewState.state.collapsed,
       bookmarks?.map((b) => [b.kind, b.title, b.target, b.group, b.kind === "search" || !!this.app.vault.getAbstractFileByPath(b.target)]) ?? null,
       [noteCount, openTasks, attachmentCount, templateCount, templates, dailyCount, dailyFolder, showsDaily, showsTemplates, dailyPlugin],
+      [showsBoards, boardCount, canMakeBoard],
       tree(notebooks),
       tree(tags),
     ]);
@@ -711,6 +729,9 @@ export class SidebarView extends ItemView implements HoverParent {
     this.placeRow(nav, "Notes", "file-text", { kind: "notes" }, 0, noteCount, () => void createNote(this.app, null));
     if (showsDaily) {
       this.placeRow(nav, "Daily notes", "calendar-days", { kind: "daily" }, 0, dailyCount, () => this.openToday(), "Open today's note");
+    }
+    if (showsBoards) {
+      this.placeRow(nav, "Boards", "kanban", { kind: "boards" }, 0, boardCount, canMakeBoard ? (evt) => this.newBoard(evt) : undefined);
     }
     this.placeRow(nav, "Tasks", "check-circle-2", { kind: "tasks" }, 0, openTasks, () => void this.newTask());
     this.placeRow(nav, "Attachments", "paperclip", { kind: "attachments" }, 0, attachmentCount);
@@ -798,6 +819,7 @@ export class SidebarView extends ItemView implements HoverParent {
    * command is registered only then). Boards go in the folder being viewed.
    */
   private boardMakers(): Array<{ label: string; icon: string; make: () => void }> {
+    if (!this.plugin.settings.boards) return [];
     const folder = this.currentFolder();
     const run = (make: () => Promise<void>) => () =>
       void make().catch((err: Error) => new Notice(`Couldn't create the board: ${err.message}`));
@@ -1337,7 +1359,7 @@ export class SidebarView extends ItemView implements HoverParent {
   private listEntries: ListEntry[] = [];
 
   private renderList(): void {
-    const what = { tasks: "tasks", attachments: "attachments", templates: "templates", daily: "daily notes" } as Record<
+    const what = { tasks: "tasks", boards: "boards", attachments: "attachments", templates: "templates", daily: "daily notes" } as Record<
       string,
       string
     >;
@@ -1663,12 +1685,7 @@ export class SidebarView extends ItemView implements HoverParent {
       const label = boards.length === 1 ? boards[0].label : "New board";
       const board = actions.createDiv({ cls: "ps-action", attr: { "aria-label": label } });
       setIcon(board, "kanban");
-      board.addEventListener("click", (evt) => {
-        if (boards.length === 1) return boards[0].make();
-        const menu = new Menu();
-        for (const b of boards) menu.addItem((i) => i.setTitle(b.label).setIcon(b.icon).onClick(() => b.make()));
-        menu.showAtMouseEvent(evt);
-      });
+      board.addEventListener("click", (evt) => this.newBoard(evt, boards));
     }
 
     if (this.place.kind === "tasks") {
@@ -1715,6 +1732,8 @@ export class SidebarView extends ItemView implements HoverParent {
         return "Notes";
       case "tasks":
         return "Tasks";
+      case "boards":
+        return "Boards";
       case "daily":
         return "Daily notes";
       case "templates":
@@ -1728,10 +1747,22 @@ export class SidebarView extends ItemView implements HoverParent {
     }
   }
 
-  /** A Kanban board's lists as tiles: name and card count; past 4, a "+N" tile. */
-  private renderMiniBoard(parent: HTMLElement, note: NoteSummary): void {
+  /** The board a note embeds, if it resolves to a Kanban board with lists. */
+  private embeddedBoard(note: NoteSummary): NoteSummary | null {
+    if (!note.embeddedBoard) return null;
+    const file = this.app.metadataCache.getFirstLinkpathDest(note.embeddedBoard, note.path);
+    const board = file && this.plugin.index.get(file.path);
+    return board && board.columns.length ? board : null;
+  }
+
+  /**
+   * A Kanban board's lists as tiles: name and card count; past 4, a "+N"
+   * tile. `compact`: one line per tile, for a board embedded in a note.
+   */
+  private renderMiniBoard(parent: HTMLElement, note: NoteSummary, compact = false): void {
     const MAX = 4;
     const board = parent.createDiv("ps-card-board");
+    board.toggleClass("is-compact", compact);
     const shown = note.columns.length > MAX ? MAX - 1 : MAX;
     note.columns.slice(0, shown).forEach((name, i) => {
       const total = note.laneCards[i] ?? 0;
@@ -1763,13 +1794,24 @@ export class SidebarView extends ItemView implements HoverParent {
     if (note.pinned) setIcon(title.createSpan("ps-card-pin"), "pin");
     if (note.columns.length) this.renderMiniBoard(text, note);
     else if (note.snippet) text.createDiv({ cls: "ps-card-snippet", text: note.snippet });
+    // An embedded board spans the card, under the text and the image; the
+    // meta line follows it (CSS orders both after the image).
+    const embedded = this.embeddedBoard(note);
+    card.toggleClass("has-board", !!embedded);
+    if (embedded) this.renderMiniBoard(card, embedded, true);
 
     // One line: date · task badge (or a board's/canvas's count) · tags,
     // with tags that don't fit folded into "+N" by fitTagRows().
-    const meta = text.createDiv({ cls: "ps-card-meta", attr: { "data-fit": "pending" } });
+    const meta = (embedded ? card : text).createDiv({ cls: "ps-card-meta", attr: { "data-fit": "pending" } });
     const time = this.sort === "created" ? note.ctime : note.mtime;
     meta.createSpan({ cls: "ps-card-date", text: cardDate(time) });
-    const { closed, total } = taskProgress(note);
+    let { closed, total } = taskProgress(note);
+    if (embedded) {
+      // The embedded board's cards are this note's tasks too.
+      const board = taskProgress(embedded);
+      closed += board.closed;
+      total += board.total;
+    }
     if (note.taskListBoard) {
       // Its cards are tasks from other notes, chosen by that plugin's rules:
       // name the kind of board rather than guess a count.
@@ -2149,6 +2191,7 @@ export class SidebarView extends ItemView implements HoverParent {
       ["none", "No grouping", "list"],
     ];
     for (const [key, label, icon] of options) {
+      if (key === "board" && !this.plugin.settings.boards) continue;
       menu.addItem((item) =>
         item
           .setTitle(label)
@@ -2267,7 +2310,9 @@ export class SidebarView extends ItemView implements HoverParent {
   private renderTasks(): ListEntry[] | string {
     const today = localISODate();
     // Validated when loaded: anything unknown is already the default.
-    const grouping: TaskGrouping = this.plugin.viewState.state.taskGroupBy;
+    const stored = this.plugin.viewState.state.taskGroupBy;
+    // Grouped by board when boards were turned off: fall back to the default.
+    const grouping: TaskGrouping = stored === "board" && !this.plugin.settings.boards ? "due" : stored;
     const all = taskRows(
       this.partition().notes,
       this.plugin.viewState.state.taskFilter,

@@ -128,16 +128,52 @@ export class WysiwygSettingTab extends PluginSettingTab {
       });
 
     new Setting(this.containerEl)
+      .setName("Boards")
+      .setDesc("Boards made with the Kanban and Task List Kanban plugins.")
+      .setHeading();
+
+    new Setting(this.containerEl)
+      .setName("Show boards")
+      .setDesc(
+        "Boards get their own look in the sidebar: their lists and card counts on the card, a Boards filter, " +
+          "new-board buttons, grouping tasks by board, and a small board on notes that embed one. " +
+          "Off: a board is listed like any other note, and its cards are ordinary tasks."
+      )
+      .addToggle((toggle) =>
+        toggle.setValue(settings.boards).onChange(async (value) => {
+          await this.plugin.updateSettings({ boards: value });
+          this.display();
+        })
+      );
+
+    new Setting(this.containerEl)
+      .setName("Boards in the side menu")
+      .setDesc("A Boards row above Tasks that lists every board in the vault.")
+      .setDisabled(!settings.boards)
+      .addToggle((toggle) =>
+        toggle
+          .setValue(settings.showBoardsRow)
+          .setDisabled(!settings.boards)
+          .onChange(async (value) => {
+            await this.plugin.updateSettings({ showBoardsRow: value });
+          })
+      );
+
+    new Setting(this.containerEl)
       .setName("List Kanban cards as tasks")
       .setDesc(
         "The Kanban plugin saves each card as a checkbox line, so cards look like tasks. " +
           "Off: cards stay on their board, and show on the Tasks page only when grouped by Kanban board. " +
           "On: every card is also listed among your tasks."
       )
+      .setDisabled(!settings.boards)
       .addToggle((toggle) =>
-        toggle.setValue(settings.boardCardsInTasks).onChange(async (value) => {
-          await this.plugin.updateSettings({ boardCardsInTasks: value });
-        })
+        toggle
+          .setValue(settings.boardCardsInTasks)
+          .setDisabled(!settings.boards)
+          .onChange(async (value) => {
+            await this.plugin.updateSettings({ boardCardsInTasks: value });
+          })
       );
 
     new Setting(this.containerEl)

@@ -167,7 +167,7 @@ export default class WysiwygPlugin extends Plugin {
         }),
     });
 
-    this.indexer = new Indexer(this.app, this.index);
+    this.indexer = new Indexer(this.app, this.index, () => this.settings.boards);
     this.registerView(SIDEBAR_VIEW, (leaf: WorkspaceLeaf) => new SidebarView(leaf, this));
     // Listed in Page Preview's settings, where Cmd/Ctrl can be made required.
     this.registerHoverLinkSource(SIDEBAR_VIEW, { display: "Plainsight", defaultMod: false });
@@ -355,7 +355,11 @@ export default class WysiwygPlugin extends Plugin {
       "showDailyNotes",
       "showTemplates",
     ] as const;
+    // Boards on or off changes what every board file is: read them all again.
+    if (before.boards !== now.boards) void this.indexer.build();
     if (
+      before.boards !== now.boards ||
+      before.showBoardsRow !== now.showBoardsRow ||
       before.boardCardsInTasks !== now.boardCardsInTasks ||
       buttons.some((key) => before[key] !== now[key])
     ) {

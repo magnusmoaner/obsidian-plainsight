@@ -15,7 +15,8 @@ export class Indexer {
   private filling = false;
   private stopped = false;
 
-  constructor(private app: App, private index: NoteIndex) {}
+  /** `boards`: whether Kanban boards are read as boards (a setting). */
+  constructor(private app: App, private index: NoteIndex, private boards: () => boolean) {}
 
   /**
    * The initial fill. Call once, after start(). Reads the vault in batches,
@@ -139,6 +140,6 @@ export class Indexer {
       tags: cache ? getAllTags(cache) ?? [] : [],
       frontmatter: cache?.frontmatter,
     };
-    return file.extension === "canvas" ? summarizeCanvas(facts, text) : summarize(facts, text);
+    return file.extension === "canvas" ? summarizeCanvas(facts, text) : summarize(facts, text, this.boards());
   }
 }
