@@ -24,6 +24,7 @@ export function note(path: string, over: Partial<NoteSummary> = {}): NoteSummary
     sourceLinks: [],
     ocrBoxes: [],
     taskListBoard: false,
+    ownBoard: false,
     ...over,
   };
 }

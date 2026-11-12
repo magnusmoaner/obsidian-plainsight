@@ -1,10 +1,16 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, PluginSettingTab, Setting, SettingGroup } from "obsidian";
 import { corePluginEnabled, dailyNotesFolder, openHotkeys, openSettingsTab, templateOptions } from "./sidebar/internals";
 import { NoteSuggest } from "./sidebar/modals";
 import type WysiwygPlugin from "./main";
 
+import type { WysiwygSettings } from "./settings-data";
+
 export { DEFAULT_SETTINGS } from "./settings-data";
 export type { WysiwygSettings } from "./settings-data";
+
+type ToggleKey = { [K in keyof WysiwygSettings]: WysiwygSettings[K] extends boolean ? K : never }[keyof WysiwygSettings];
+/** Adds one setting to a group. */
+type Add = (build: (setting: Setting) => void) => void;
 
 export class WysiwygSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: WysiwygPlugin) {
@@ -15,262 +21,219 @@ export class WysiwygSettingTab extends PluginSettingTab {
     this.containerEl.empty();
     const { settings } = this.plugin;
 
-    new Setting(this.containerEl)
-      .setName("Action buttons")
-      .setDesc("The Note button and the round buttons beside it, at the top of the notes sidebar.")
-      .setHeading();
-
-    new Setting(this.containerEl)
-      .setName("Show action buttons")
-      .setDesc("Turned off, everything they do is still there: the + on Notes, Tasks, Folders and Tags, and the commands.")
-      .addToggle((toggle) =>
-        toggle.setValue(settings.showActionRow).onChange(async (value) => {
-          await this.plugin.updateSettings({ showActionRow: value });
-          this.display();
-        })
-      );
-    const rowOff = !settings.showActionRow;
-    const intoMore = "Turned off, it moves into the ⋯ menu.";
-    const buttons = [
-      ["showSearchButton", "Search button", `Search everywhere. ${intoMore}`],
-      [
-        "showDailyNoteButton",
-        "Daily note button",
-        `Opens today's daily note, making it if needed. Shows while the Daily notes core plugin is on. ${intoMore}`,
-      ],
-      ["showNewFolderButton", "New folder button", intoMore],
-      ["showNewTaskButton", "New task button", intoMore],
-      [
-        "showMoreButton",
-        "⋯ button",
-        "New tag, canvas and boards, templates, Obsidian search, import, expand or collapse all.",
-      ],
-    ] as const;
-    for (const [key, name, desc] of buttons) {
-      new Setting(this.containerEl)
-        .setName(name)
-        .setDesc(desc)
-        .setDisabled(rowOff)
-        .addToggle((toggle) =>
+    const sidebar = this.group("Sidebar");
+    this.toggle(
+      sidebar,
+      "showActionRow",
+      "Action buttons",
+      "The Note button and the round buttons at the top of the sidebar. A round button that's off moves into the ⋯ menu. " +
+        "With all of them off, what they do stays on the + buttons and in the commands.",
+      true
+    );
+    // The round buttons only matter while the row shows.
+    if (settings.showActionRow) {
+      this.toggle(sidebar, "showSearchButton", "Search button", "Search everywhere.");
+      this.toggle(sidebar, "showDailyNoteButton", "Daily note button", "Opens today's daily note. Needs the Daily notes core plugin.");
+      this.toggle(sidebar, "showNewFolderButton", "New folder button");
+      if (settings.tasks) this.toggle(sidebar, "showNewTaskButton", "New task button");
+      this.toggle(sidebar, "showMoreButton", "⋯ button", "New tag, canvas and boards, templates, Obsidian search, import, expand or collapse all.");
+    }
+    this.toggle(
+      sidebar,
+      "hoverPreviews",
+      "Preview on hover",
+      "Rest the mouse on a note card or a task to preview the note. Uses the core Page preview plugin, whose settings can require Cmd/Ctrl."
+    );
+    sidebar((setting) => {
+      setting
+        .setName("Gaps around the note list")
+        .setDesc("Top, bottom, left, right: each side that's on keeps a gap from the window's edge, with rounded corners.");
+      const sides = [
+        ["listInsetTop", "Top"],
+        ["listInsetBottom", "Bottom"],
+        ["listInsetLeft", "Left"],
+        ["listInsetRight", "Right"],
+      ] as const;
+      for (const [key, side] of sides) {
+        setting.addToggle((toggle) =>
           toggle
+            .setTooltip(side)
             .setValue(settings[key])
-            .setDisabled(rowOff)
             .onChange(async (value) => {
               await this.plugin.updateSettings({ [key]: value });
             })
         );
-    }
+      }
+    });
 
-    this.corePluginPlace({
+    const menu = this.group("Side menu");
+    this.corePluginPlace(menu, {
       key: "showDailyNotes",
       name: "Daily notes",
       plugin: "daily-notes",
-      desc: "A Daily notes place in the left column, listing your daily notes, with a + that opens today's.",
+      desc: "Lists your daily notes, with a + that opens today's.",
       folder: dailyNotesFolder(this.app),
     });
-    this.corePluginPlace({
+    this.corePluginPlace(menu, {
       key: "showTemplates",
       name: "Templates",
       plugin: "templates",
-      desc: "A Templates place in the left column: click a template to edit it, or make a note from it.",
+      desc: "Lists your templates: click one to edit it, or make a note from it.",
       folder: templateOptions(this.app).folder,
     });
+    if (settings.boards) this.toggle(menu, "showBoardsRow", "Boards", "Lists every board in the vault, below Tasks.");
 
-    new Setting(this.containerEl).setName("Previews").setHeading();
-
-    new Setting(this.containerEl)
-      .setName("Preview on hover")
-      .setDesc(
-        "Rest the mouse on a note card to preview the note, or on a task to preview its note at that task. " +
-          "Uses the core Page preview plugin; its settings can require Cmd/Ctrl to be held."
-      )
-      .addToggle((toggle) =>
-        toggle.setValue(settings.hoverPreviews).onChange(async (value) => {
-          await this.plugin.updateSettings({ hoverPreviews: value });
+    const tasks = this.group("Tasks");
+    this.toggle(
+      tasks,
+      "tasks",
+      "Tasks",
+      "The Tasks page in the side menu, the New task buttons, the done count on note cards, and tasks in Search everywhere. " +
+        "Off: all of that is hidden. Your tasks stay in your notes, untouched.",
+      true
+    );
+    if (settings.tasks) tasks((setting) =>
+      setting
+        .setName("Default note for new tasks")
+        .setDesc("Where the New task button and the + on Tasks add tasks. Leave empty to be asked the first time.")
+        .addText((text) => {
+          text.setPlaceholder("e.g. Tasks.md").setValue(settings.defaultTaskNote);
+          text.onChange(async (value) => {
+            await this.plugin.updateSettings({ defaultTaskNote: value.trim() });
+          });
+          new NoteSuggest(this.app, text.inputEl, async (file) => {
+            await this.plugin.updateSettings({ defaultTaskNote: file.path });
+          });
         })
-      );
-
-    new Setting(this.containerEl)
-      .setName("Gaps")
-      .setDesc(
-        "The note list sits on a white panel. Turn on each side where it should keep a gap " +
-          "from the window's edge; a side with a gap gets rounded corners."
-      )
-      .setHeading();
-
-    const sides = [
-      ["listInsetTop", "Top"],
-      ["listInsetBottom", "Bottom"],
-      ["listInsetLeft", "Left"],
-      ["listInsetRight", "Right"],
-    ] as const;
-    for (const [key, name] of sides) {
-      new Setting(this.containerEl).setName(name).addToggle((toggle) =>
-        toggle.setValue(settings[key]).onChange(async (value) => {
-          await this.plugin.updateSettings({ [key]: value });
-        })
+    );
+    if (settings.tasks && settings.boards) {
+      this.toggle(
+        tasks,
+        "boardCardsInTasks",
+        "Board cards as tasks",
+        "A board saves each card as a checkbox line, so cards look like tasks. On: every card is also listed among your tasks. " +
+          "Off: cards show on the Tasks page only when it's grouped by board."
       );
     }
 
-    new Setting(this.containerEl).setName("Tasks").setHeading();
-
-    new Setting(this.containerEl)
-      .setName("Default note for new tasks")
-      .setDesc("Where the sidebar's New task button and the + on Tasks add tasks. Leave empty to be asked the first time.")
-      .addText((text) => {
-        text.setPlaceholder("e.g. Tasks.md").setValue(settings.defaultTaskNote);
-        text.onChange(async (value) => {
-          await this.plugin.updateSettings({ defaultTaskNote: value.trim() });
-        });
-        new NoteSuggest(this.app, text.inputEl, async (file) => {
-          await this.plugin.updateSettings({ defaultTaskNote: file.path });
-        });
-      });
-
-    new Setting(this.containerEl)
-      .setName("Boards")
-      .setDesc("Boards made with the Kanban and Task List Kanban plugins.")
-      .setHeading();
-
-    new Setting(this.containerEl)
-      .setName("Show boards")
-      .setDesc(
-        "Boards get their own look in the sidebar: their lists and card counts on the card, a Boards filter, " +
-          "new-board buttons, grouping tasks by board, and a small board on notes that embed one. " +
-          "Off: a board is listed like any other note, and its cards are ordinary tasks."
-      )
-      .addToggle((toggle) =>
-        toggle.setValue(settings.boards).onChange(async (value) => {
-          await this.plugin.updateSettings({ boards: value });
-          this.display();
-        })
+    const boards = this.group("Boards");
+    this.toggle(
+      boards,
+      "boards",
+      "Boards",
+      "Plainsight's own boards, opened on their own page or embedded in a note and edited there, and boards made with the Kanban plugins. " +
+        "Off: a board is listed like any other note, its cards are ordinary tasks, and an embedded board shows as plain text.",
+      true
+    );
+    if (settings.boards) {
+      this.toggle(
+        boards,
+        "kanbanBoards",
+        "Kanban plugin boards",
+        "Shown as boards, and embeddable like Plainsight's own. Without that plugin, Plainsight opens them itself. " +
+          "Off: listed like any other note."
       );
-
-    new Setting(this.containerEl)
-      .setName("Boards in the side menu")
-      .setDesc("A Boards row above Tasks that lists every board in the vault.")
-      .setDisabled(!settings.boards)
-      .addToggle((toggle) =>
-        toggle
-          .setValue(settings.showBoardsRow)
-          .setDisabled(!settings.boards)
-          .onChange(async (value) => {
-            await this.plugin.updateSettings({ showBoardsRow: value });
-          })
+      this.toggle(
+        boards,
+        "taskListBoards",
+        "Task List Kanban boards",
+        "Shown as boards. They gather tasks from other notes, so they have no lists or cards to show or embed. " +
+          "Off: listed like any other note."
       );
+    }
 
-    new Setting(this.containerEl)
-      .setName("List Kanban cards as tasks")
-      .setDesc(
-        "The Kanban plugin saves each card as a checkbox line, so cards look like tasks. " +
-          "Off: cards stay on their board, and show on the Tasks page only when grouped by Kanban board. " +
-          "On: every card is also listed among your tasks."
-      )
-      .setDisabled(!settings.boards)
-      .addToggle((toggle) =>
-        toggle
-          .setValue(settings.boardCardsInTasks)
-          .setDisabled(!settings.boards)
-          .onChange(async (value) => {
-            await this.plugin.updateSettings({ boardCardsInTasks: value });
-          })
-      );
-
-    new Setting(this.containerEl)
-      .setName("Editor (beta)")
-      .setDesc(
-        "The editor is in beta and still being built: some Markdown isn't drawn yet, and you may meet rough edges. " +
-          "It changes how notes look and how keys behave, never what's in your files, " +
-          "so turning it off gives you plain Obsidian back at once."
-      )
-      .setHeading();
-
-    new Setting(this.containerEl)
-      .setName("Enable WYSIWYG editing")
-      .setDesc("Hide Markdown syntax for good and format with shortcuts. Applies to every open note.")
-      .addToggle((toggle) =>
-        toggle.setValue(settings.enabled).onChange(async (value) => {
-          await this.plugin.updateSettings({ enabled: value });
-          this.display();
-        })
-      );
-
-    new Setting(this.containerEl)
-      .setName("Let Plainsight draw everything (Source mode)")
-      .setDesc(
+    const editor = this.group("Editor (beta)");
+    this.toggle(
+      editor,
+      "enabled",
+      "WYSIWYG editing",
+      "Hides Markdown syntax for good and formats with shortcuts, in every open note. Still being built: some Markdown isn't drawn yet. " +
+        "It never changes what's in your files, so turning it off gives you plain Obsidian back at once.",
+      true
+    );
+    if (settings.enabled) {
+      this.toggle(
+        editor,
+        "takeOverRendering",
+        "Let Plainsight draw everything (Source mode)",
         "Switches notes from Live Preview to Source mode, so Plainsight alone draws them. " +
           "Callouts then stay boxed while you edit them instead of turning back into Markdown. " +
           "What Plainsight doesn't draw yet (lists, tables, embeds, properties) shows as plain " +
           "Markdown until it does. Turning this off brings back the mode you had."
-      )
-      .setDisabled(!settings.enabled)
-      .addToggle((toggle) =>
-        toggle
-          .setValue(settings.takeOverRendering)
-          .setDisabled(!settings.enabled)
-          .onChange(async (value) => {
-            await this.plugin.updateSettings({ takeOverRendering: value });
-          })
       );
-
-    new Setting(this.containerEl).setName("Hotkeys").setHeading();
-
-    new Setting(this.containerEl)
-      .setName("Plainsight's commands")
-      .setDesc(
-        "Bold, italic, inline code and headings have keys already. Search everywhere, Open notes sidebar " +
-          "and Toggle WYSIWYG editing have none until you give them one."
-      )
-      .addButton((button) =>
-        button.setButtonText("Set hotkeys").onClick(() => openHotkeys(this.app, "Plainsight"))
-      );
+    }
+    editor((setting) =>
+      setting
+        .setName("Hotkeys")
+        .setDesc(
+          "Bold, italic, inline code and headings have keys already. Search everywhere, Open notes sidebar " +
+            "and Toggle WYSIWYG editing have none until you give them one."
+        )
+        .addButton((button) => button.setButtonText("Set hotkeys").onClick(() => openHotkeys(this.app, "Plainsight")))
+    );
   }
 
   /**
-   * Daily notes or Templates: whether its place shows, then where it stands
-   * with its core plugin (off, no folder yet, or the folder), with a button
-   * to fix or change that.
+   * A titled group of settings: Obsidian's grouped look where it has one
+   * (1.11 on), a heading and plain rows before that.
    */
-  private corePluginPlace(place: {
-    key: "showDailyNotes" | "showTemplates";
-    name: string;
-    plugin: string;
-    desc: string;
-    folder: string | null;
-  }): void {
+  private group(heading: string): Add {
+    if (typeof SettingGroup === "function") {
+      const group = new SettingGroup(this.containerEl).setHeading(heading);
+      return (build) => void group.addSetting(build);
+    }
+    new Setting(this.containerEl).setName(heading).setHeading();
+    return (build) => build(new Setting(this.containerEl));
+  }
+
+  /** An on/off setting. `redraw`: other settings show or hide with it. */
+  private toggle(add: Add, key: ToggleKey, name: string, desc = "", redraw = false): void {
+    add((setting) =>
+      setting
+        .setName(name)
+        .setDesc(desc)
+        .addToggle((toggle) =>
+          toggle.setValue(this.plugin.settings[key]).onChange(async (value) => {
+            await this.plugin.updateSettings({ [key]: value });
+            if (redraw) this.display();
+          })
+        )
+    );
+  }
+
+  /**
+   * Daily notes or Templates: whether its row shows in the side menu, and
+   * where it stands with its core plugin (off, no folder yet, or the
+   * folder), with a button to fix or change that.
+   */
+  private corePluginPlace(
+    add: Add,
+    place: { key: "showDailyNotes" | "showTemplates"; name: string; plugin: string; desc: string; folder: string | null }
+  ): void {
     const { key, name, plugin, desc, folder } = place;
-    new Setting(this.containerEl).setName(name).setHeading();
-
-    new Setting(this.containerEl)
-      .setName("Show in the left column")
-      .setDesc(desc)
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings[key]).onChange(async (value) => {
-          await this.plugin.updateSettings({ [key]: value });
-        })
-      );
-
-    const status = new Setting(this.containerEl);
-    if (!corePluginEnabled(this.app, plugin)) {
-      status
-        .setName("Core plugin is off")
-        .setDesc(`Turn on the ${name} core plugin to see the place.`)
-        .addButton((button) => button.setButtonText("Core plugins").onClick(() => openSettingsTab(this.app, "plugins")));
-    } else if (!folder) {
-      status
-        .setName("No folder set")
-        .setDesc(`Choose a folder in the ${name} core plugin's settings, and its notes are listed in the place.`)
-        .addButton((button) =>
+    add((setting) => {
+      setting.setName(name);
+      if (!corePluginEnabled(this.app, plugin)) {
+        setting
+          .setDesc(`${desc} The ${name} core plugin is off: turn it on to see the row.`)
+          .addButton((button) => button.setButtonText("Core plugins").onClick(() => openSettingsTab(this.app, "plugins")));
+      } else if (!folder) {
+        setting.setDesc(`${desc} No folder is set yet in the ${name} core plugin.`).addButton((button) =>
           button
             .setButtonText("Choose folder")
             .setCta()
             .onClick(() => openSettingsTab(this.app, plugin))
         );
-    } else {
-      status
-        .setName("Folder")
-        .setDesc(`${folder}. It's listed in the place, instead of under Folders.`)
-        .addButton((button) => button.setButtonText("Change").onClick(() => openSettingsTab(this.app, plugin)));
-    }
+      } else {
+        setting
+          .setDesc(`${desc} Folder: ${folder}, listed here instead of under Folders.`)
+          .addButton((button) => button.setButtonText("Change folder").onClick(() => openSettingsTab(this.app, plugin)));
+      }
+      setting.addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings[key]).onChange(async (value) => {
+          await this.plugin.updateSettings({ [key]: value });
+        })
+      );
+    });
   }
 }

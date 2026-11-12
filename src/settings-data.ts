@@ -10,13 +10,19 @@ export interface WysiwygSettings {
   enabled: boolean;
   /** Force Source mode so this plugin is the only renderer. */
   takeOverRendering: boolean;
+  /** Tasks in the sidebar: the Tasks page, the New task buttons, the done counts on cards. */
+  tasks: boolean;
   /** Note that the sidebar's "+" on Tasks appends new tasks to; "" = ask. */
   defaultTaskNote: string;
-  /** Treat Kanban boards as boards; off, they are listed as ordinary notes. */
+  /** Boards at all: Plainsight's own, and the board plugins'. Off, a board is an ordinary note. */
   boards: boolean;
-  /** A Boards row in the places column, above Tasks. */
+  /** Read the Kanban plugin's boards as boards. */
+  kanbanBoards: boolean;
+  /** Read the Task List Kanban plugin's boards as boards. */
+  taskListBoards: boolean;
+  /** A Boards row in the places column, below Tasks. */
   showBoardsRow: boolean;
-  /** List Kanban board cards on the Tasks page (they're `- [ ]` lines too). */
+  /** List board cards on the Tasks page (they're `- [ ]` lines too). */
   boardCardsInTasks: boolean;
   /** Page Preview when the mouse rests on a note card or a task. */
   hoverPreviews: boolean;
@@ -43,8 +49,11 @@ export interface WysiwygSettings {
 export const DEFAULT_SETTINGS: WysiwygSettings = {
   enabled: true,
   takeOverRendering: false,
+  tasks: true,
   defaultTaskNote: "",
   boards: true,
+  kanbanBoards: true,
+  taskListBoards: true,
   showBoardsRow: true,
   boardCardsInTasks: false,
   hoverPreviews: true,

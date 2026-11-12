@@ -11,8 +11,11 @@ describe("parseSettings", () => {
     const stored = {
       enabled: false,
       takeOverRendering: true,
+      tasks: false,
       defaultTaskNote: "Todo list.md",
       boards: false,
+      kanbanBoards: false,
+      taskListBoards: false,
       showBoardsRow: false,
       boardCardsInTasks: true,
       hoverPreviews: false,

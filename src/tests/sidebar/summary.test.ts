@@ -152,10 +152,27 @@ describe("Kanban boards", () => {
   });
 
   test("with boards turned off, a board is an ordinary note and its cards are tasks", () => {
-    const s = summarize(facts({ frontmatter: { "kanban-plugin": "board" } }), BOARD, false);
+    const s = summarize(facts({ frontmatter: { "kanban-plugin": "board" } }), BOARD, null);
     expect(s).toMatchObject({ kind: "note", columns: [], laneCards: [], items: 0, taskListBoard: false });
     expect(s.tasks).toHaveLength(3);
-    expect(summarize(facts({ frontmatter: { kanban_plugin: "{}" } }), "", false).kind).toBe("note");
+    expect(summarize(facts({ frontmatter: { kanban_plugin: "{}" } }), "", null).kind).toBe("note");
+  });
+
+  test("each board plugin's boards can be turned off on their own; Plainsight's stay", () => {
+    const kanban = facts({ frontmatter: { "kanban-plugin": "board" } });
+    const taskList = facts({ frontmatter: { kanban_plugin: "{}" } });
+    const own = facts({ frontmatter: { "plainsight-plugin": "board" } });
+    const noKanban = { kanban: false, taskList: true };
+    expect(summarize(kanban, BOARD, noKanban).kind).toBe("note");
+    expect(summarize(taskList, "", noKanban).kind).toBe("board");
+    expect(summarize(own, BOARD, noKanban).kind).toBe("board");
+    const noTaskList = { kanban: true, taskList: false };
+    expect(summarize(kanban, BOARD, noTaskList).kind).toBe("board");
+    expect(summarize(taskList, "", noTaskList).kind).toBe("note");
+  });
+
+  test("Plainsight's own mark makes a board too", () => {
+    expect(summarize(facts({ frontmatter: { "plainsight-plugin": "board" } }), BOARD)).toMatchObject({ kind: "board", items: 3 });
   });
 
   test("a note with kanban-plugin frontmatter is a board", () => {

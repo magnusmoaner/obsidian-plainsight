@@ -78,6 +78,8 @@ export interface NoteSummary {
    * task line in its file is an ordinary task.
    */
   taskListBoard: boolean;
+  /** A Plainsight board (its own mark), rather than a board plugin's. */
+  ownBoard: boolean;
 }
 
 /** A Kanban plugin board, whose checkbox lines are cards in its lists. */

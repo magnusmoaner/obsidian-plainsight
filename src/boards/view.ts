@@ -1,0 +1,556 @@
+import { localISODate } from "../sidebar/core/format";
+import { tasksToggle } from "../sidebar/internals";
+import { taskDetails } from "../sidebar/core/task-details";
+import { badge, taskBadges } from "../sidebar/task-badges";
+import { CardEditor, openCardEditor } from "./card-editor";
+import { App, Component, Keymap, MarkdownRenderChild, MarkdownRenderer, Menu, Modal, Notice, PaneType, setIcon, Setting, TFile } from "obsidian";
+import {
+  addCard,
+  addLane,
+  Board,
+  cardDisplay,
+  CardRef,
+  deleteCard,
+  deleteLane,
+  editCard,
+  isDone,
+  LaneRef,
+  moveCard,
+  moveLane,
+  parseBoard,
+  renameLane,
+  setCardStatus,
+  setLaneCollapsed,
+  setLaneStatus,
+  StaleBoardError,
+  toggleCard,
+} from "./board";
+
+type Drag = { kind: "card"; ref: CardRef } | { kind: "lane"; ref: LaneRef };
+
+/** Card statuses, as the Tasks plugin names them: character, label, icon. */
+const STATUSES = [
+  [" ", "Open", "circle"],
+  ["/", "In progress", "circle-dot"],
+  ["x", "Done", "check-circle-2"],
+  ["-", "Cancelled", "minus-circle"],
+] as const;
+
+/**
+ * A Kanban board drawn inside a note. It reads the board file, writes each
+ * change straight back to it, and redraws whenever the file changes, from
+ * here, from the Kanban plugin or from anywhere else.
+ */
+export class BoardView extends MarkdownRenderChild {
+  private file: TFile | null = null;
+  private lines: string[] = [];
+  /** Markdown rendered into cards; replaced on every redraw. */
+  private cards = new Component();
+  private drag: Drag | null = null;
+  /** Shows where the dragged card or list would land. */
+  private slot: HTMLElement | null = null;
+  /** A redraw that arrived while something was being typed. */
+  private pending = false;
+  /** The list whose "Add a card" box reopens after the next redraw. */
+  private reopenAdd: number | null = null;
+
+  constructor(
+    private app: App,
+    containerEl: HTMLElement,
+    /** The board: a link as written in an embed block, or the file itself. */
+    private target: string | TFile,
+    private sourcePath: string,
+    /** Open the board on its own page. */
+    private open: (file: TFile, newLeaf: PaneType | boolean) => void
+  ) {
+    super(containerEl);
+  }
+
+  onload(): void {
+    this.containerEl.addClass("psb-board");
+    this.registerEvent(
+      this.app.vault.on("modify", (f) => {
+        if (f.path === this.file?.path) void this.refresh();
+      })
+    );
+    // Covers a board created, renamed or deleted after the note was opened.
+    this.registerEvent(this.app.metadataCache.on("resolved", () => !this.file && void this.refresh()));
+    void this.refresh();
+  }
+
+  onunload(): void {
+    this.cards.unload();
+  }
+
+  /** Completing a card goes through the Tasks plugin when it's there: a done date, and a repeating card's next round. */
+  private viaTasks = (line: string) => tasksToggle(this.app, line, this.file!.path);
+
+  private async refresh(): Promise<void> {
+    if (this.isTyping()) {
+      this.pending = true;
+      return;
+    }
+    this.pending = false;
+    this.file =
+      this.target instanceof TFile ? this.target : this.app.metadataCache.getFirstLinkpathDest(this.target, this.sourcePath);
+    if (!this.file || !this.app.vault.getAbstractFileByPath(this.file.path)) return this.renderMissing();
+    const text = await this.app.vault.cachedRead(this.file);
+    this.lines = text.split(/\r?\n/);
+    this.render(parseBoard(text));
+  }
+
+  private isTyping(): boolean {
+    const active = this.containerEl.ownerDocument.activeElement;
+    return !!active && this.containerEl.contains(active) && active.matches("input, textarea, [contenteditable='true']");
+  }
+
+  /** After typing ends: catch up on a redraw that was held back. */
+  private doneTyping(): void {
+    if (this.pending) void this.refresh();
+  }
+
+  private async write(op: (text: string) => string): Promise<void> {
+    if (!this.file) return;
+    try {
+      await this.app.vault.process(this.file, op);
+    } catch (e) {
+      if (!(e instanceof StaleBoardError)) throw e;
+      new Notice("The board changed while you were working on it. Try again.");
+      void this.refresh();
+    }
+  }
+
+  private renderMissing(): void {
+    this.cards.unload();
+    this.containerEl.empty();
+    const name = this.target instanceof TFile ? this.target.path : this.target;
+    this.containerEl.createDiv({ cls: "psb-missing", text: `Board not found: ${name}` });
+  }
+
+  private render(board: Board): void {
+    const scroll = this.containerEl.querySelector(".psb-lanes")?.scrollLeft ?? 0;
+    this.cards.unload();
+    this.cards = new Component();
+    this.cards.load();
+    this.containerEl.empty();
+
+    const file = this.file!;
+    const head = this.containerEl.createDiv("psb-head");
+    const title = head.createEl("a", { cls: "psb-title internal-link", text: file.basename, href: file.path });
+    title.addEventListener("click", (evt) => {
+      evt.preventDefault();
+      this.open(file, Keymap.isModEvent(evt));
+    });
+    const count = board.lanes.reduce((n, l) => n + l.cards.length, 0);
+    head.createSpan({ cls: "psb-count", text: `${count} card${count === 1 ? "" : "s"}` });
+
+    const lanesEl = this.containerEl.createDiv("psb-lanes");
+    board.lanes.forEach((_, i) => this.renderLane(lanesEl, board, i));
+    // Embedded in a note, a board is for its cards; lists are added on its own page.
+    if (this.target instanceof TFile) this.renderAddLane(lanesEl);
+    this.dropZone(lanesEl, lanesEl, ".psb-lane", "lane", "x", (index) => {
+      // Read now: the drag is over by the time the file is written.
+      const drag = this.drag;
+      if (drag?.kind === "lane") void this.write((t) => moveLane(t, drag.ref, index));
+    });
+    lanesEl.scrollLeft = scroll;
+    if (this.reopenAdd !== null) {
+      lanesEl.children[this.reopenAdd]?.querySelector<HTMLElement>(".psb-add")?.click();
+      this.reopenAdd = null;
+    }
+  }
+
+  private renderLane(parent: HTMLElement, board: Board, i: number): void {
+    const lane = board.lanes[i];
+    const ref: LaneRef = { lane: i, raw: this.lines[lane.line] };
+    const el = parent.createDiv({ cls: "psb-lane" });
+    el.toggleClass("is-collapsed", lane.collapsed);
+
+    const head = el.createDiv({ cls: "psb-lane-head", attr: { draggable: "true" } });
+    head.addEventListener("dragstart", (evt) => this.startDrag(evt, el, { kind: "lane", ref }));
+    head.addEventListener("dragend", () => this.endDrag());
+    setIcon(head.createSpan({ cls: "psb-grip", attr: { "aria-label": "Drag to move the list" } }), "grip-vertical");
+    const name = head.createDiv({ cls: "psb-lane-title", text: lane.title });
+    // A minimized list is a narrow strip with no room for its menu or for
+    // typing a name: a click on it opens it again.
+    if (lane.collapsed) {
+      head.setAttrs({ role: "button", tabindex: "0", "aria-label": `Open the list ${lane.title}` });
+      const open = () => this.write((t) => setLaneCollapsed(t, ref, false));
+      head.addEventListener("click", open);
+      head.addEventListener("keydown", (evt) => evt.key === "Enter" && void open());
+    } else {
+      name.addEventListener("click", () => this.inlineInput(name, lane.title, (v) => this.write((t) => renameLane(t, ref, v))));
+    }
+    const status = STATUSES.find(([char]) => char === lane.status);
+    if (status) {
+      setIcon(head.createSpan({ cls: "psb-lane-status", attr: { "aria-label": `Cards here are marked ${status[1].toLowerCase()}` } }), status[2]);
+    }
+    head.createSpan({ cls: "psb-lane-count", text: lane.limit ? `${lane.cards.length}/${lane.limit}` : String(lane.cards.length) });
+    const more = head.createEl("button", { cls: "psb-icon clickable-icon", attr: { "aria-label": "List actions" } });
+    setIcon(more, "more-horizontal");
+    more.addEventListener("click", (evt) => this.laneMenu(evt, board, ref, name));
+
+    const cardsEl = el.createDiv("psb-cards");
+    lane.cards.forEach((_, c) => this.renderCard(cardsEl, board, i, c));
+    // The whole list takes a dropped card, so an empty list is easy to hit.
+    this.dropZone(el, cardsEl, ".psb-card", "card", "y", (index) => {
+      const drag = this.drag;
+      if (drag?.kind === "card") void this.write((t) => moveCard(t, drag.ref, ref, index, this.viaTasks));
+    });
+
+    const add = el.createEl("button", { cls: "psb-add", text: "Add a card" });
+    add.addEventListener("click", () => this.addCardInput(el, add, ref));
+  }
+
+  private renderCard(parent: HTMLElement, board: Board, lane: number, index: number): void {
+    const card = board.lanes[lane].cards[index];
+    const ref: CardRef = { lane, card: index, raw: this.lines[card.line] };
+    const done = isDone(card.check);
+    const el = parent.createDiv({ cls: "psb-card", attr: { draggable: "true", "data-status": card.check ?? " " } });
+    el.toggleClass("is-done", done || card.check === "-");
+    el.addEventListener("dragstart", (evt) => this.startDrag(evt, el, { kind: "card", ref }));
+    el.addEventListener("dragend", () => this.endDrag());
+
+    const box = el.createEl("button", {
+      cls: "psb-check",
+      attr: { "aria-label": done ? "Mark as not done" : "Mark as done", role: "checkbox", "aria-checked": String(done) },
+    });
+    if (done) setIcon(box, "check");
+    else if (card.check === "-") setIcon(box, "minus");
+    box.addEventListener("click", () => this.write((t) => toggleCard(t, ref, this.viaTasks)));
+
+    // The card's text, with what reads better as badges taken out: Kanban's
+    // date and time, and the first line's Tasks-plugin details and end tags.
+    const { body, date, time } = cardDisplay(card.text);
+    const [first, ...rest] = body.split("\n");
+    const details = taskDetails(first);
+    const content = el.createDiv("psb-card-body");
+    const textEl = content.createDiv("psb-card-text");
+    void MarkdownRenderer.render(this.app, [details.description, ...rest].join("\n"), textEl, this.file!.path, this.cards);
+    textEl.addEventListener("click", (evt) => {
+      const link = (evt.target as HTMLElement).closest("a");
+      if (link) return this.followLink(evt, link);
+      this.editCardInput(content, card.text, ref);
+    });
+
+    const more = el.createEl("button", { cls: "psb-icon clickable-icon", attr: { "aria-label": "Card actions" } });
+    setIcon(more, "more-horizontal");
+    more.addEventListener("click", (evt) => this.cardMenu(evt, board, ref, () => this.editCardInput(content, card.text, ref)));
+
+    // A footer across the card, under the text and the menu button.
+    const foot = el.createDiv("psb-card-foot");
+    if (date) badge(foot, "calendar", date, `Date ${date}`);
+    if (time) badge(foot, "clock", time, `Time ${time}`);
+    taskBadges(foot, details, done || card.check === "-", localISODate());
+    if (!foot.childElementCount) foot.remove();
+  }
+
+  private renderAddLane(parent: HTMLElement): void {
+    const el = parent.createDiv("psb-lane psb-lane-new");
+    const add = el.createEl("button", { cls: "psb-add", text: "Add a list" });
+    add.addEventListener("click", () => {
+      add.hide();
+      const input = el.createEl("input", { cls: "psb-input", attr: { type: "text", placeholder: "List name" } });
+      let closed = false;
+      const close = () => {
+        // Removing a focused input fires its blur, which lands here again.
+        if (closed) return;
+        closed = true;
+        input.remove();
+        add.show();
+        this.doneTyping();
+      };
+      input.addEventListener("keydown", (evt) => {
+        if (evt.key === "Escape") close();
+        if (evt.key !== "Enter" || evt.isComposing) return;
+        const title = input.value.trim();
+        close();
+        if (title) void this.write((t) => addLane(t, title));
+      });
+      input.addEventListener("blur", close);
+      input.focus();
+    });
+  }
+
+  // ---- Editing in place -------------------------------------------------
+
+  /** Swap `el`'s text for a one-line input; Enter or leaving it saves. */
+  private inlineInput(el: HTMLElement, value: string, save: (v: string) => void): void {
+    el.hide();
+    const input = createEl("input", { cls: "psb-input", attr: { type: "text" } });
+    input.value = value;
+    el.after(input);
+    let done = false;
+    const finish = (keep: boolean) => {
+      if (done) return;
+      done = true;
+      const v = input.value.trim();
+      input.remove();
+      el.show();
+      if (keep && v && v !== value) save(v);
+      this.doneTyping();
+    };
+    input.addEventListener("keydown", (evt) => {
+      if (evt.key === "Enter" && !evt.isComposing) finish(true);
+      if (evt.key === "Escape") finish(false);
+    });
+    input.addEventListener("blur", () => finish(true));
+    input.focus();
+    input.select();
+  }
+
+  /**
+   * An editor for card text: Enter saves, Shift+Enter adds a line, Escape
+   * cancels. Obsidian's own editor where it can be had (so the Tasks
+   * plugin's suggestions and link completion work), a text box otherwise.
+   */
+  private cardInput(parent: HTMLElement, value: string, onEnter: (v: string) => void, onClose: (v: string | null) => void): CardEditor {
+    const editor = openCardEditor(this.app, parent, this.file!, value, { enter: onEnter, close: onClose });
+    if (editor) return editor;
+    const area = parent.createEl("textarea", { cls: "psb-input psb-textarea" });
+    area.value = value;
+    const fit = () => {
+      area.style.height = "auto";
+      area.style.height = `${area.scrollHeight}px`;
+    };
+    area.addEventListener("input", fit);
+    area.addEventListener("keydown", (evt) => {
+      if (evt.key === "Escape") {
+        evt.preventDefault();
+        onClose(null);
+      } else if (evt.key === "Enter" && !evt.shiftKey && !evt.isComposing) {
+        evt.preventDefault();
+        onEnter(area.value);
+      }
+    });
+    area.addEventListener("blur", () => onClose(area.value));
+    area.focus();
+    area.setSelectionRange(value.length, value.length);
+    requestAnimationFrame(fit);
+    return area;
+  }
+
+  private editCardInput(content: HTMLElement, text: string, ref: CardRef): void {
+    if (content.querySelector(".psb-input")) return;
+    for (const child of Array.from(content.children)) (child as HTMLElement).hide();
+    let closed = false;
+    const close = (value: string | null) => {
+      if (closed) return;
+      closed = true;
+      area.remove();
+      for (const child of Array.from(content.children)) (child as HTMLElement).show();
+      if (value !== null && value.trim() && value.trim() !== text.trim()) void this.write((t) => editCard(t, ref, value));
+      this.doneTyping();
+    };
+    const area = this.cardInput(content, text, (v) => close(v), close);
+  }
+
+  /** Stays open after Enter, so several cards can be added in a row. */
+  private addCardInput(laneEl: HTMLElement, button: HTMLElement, ref: LaneRef): void {
+    button.hide();
+    let closed = false;
+    const close = (value: string | null) => {
+      if (closed) return;
+      closed = true;
+      area.remove();
+      button.show();
+      if (value?.trim()) void this.write((t) => addCard(t, ref, value));
+      this.doneTyping();
+    };
+    const area = this.cardInput(
+      laneEl,
+      "",
+      (v) => {
+        if (!v.trim()) return;
+        // The new card shows on the redraw, which then opens a fresh box.
+        this.reopenAdd = ref.lane;
+        close(v);
+      },
+      close
+    );
+  }
+
+  // ---- Menus ------------------------------------------------------------
+
+  private cardMenu(evt: MouseEvent, board: Board, ref: CardRef, edit: () => void): void {
+    const menu = new Menu();
+    menu.addItem((i) => i.setTitle("Edit").setIcon("pencil").onClick(edit));
+    const current = (board.lanes[ref.lane].cards[ref.card].check ?? " ").toLowerCase();
+    for (const [char, label, icon] of STATUSES) {
+      if (char === current) continue;
+      menu.addItem((i) =>
+        i
+          .setTitle(`Mark as ${label.toLowerCase()}`)
+          .setIcon(icon)
+          .onClick(() => this.write((t) => setCardStatus(t, ref, char, this.viaTasks)))
+      );
+    }
+    menu.addSeparator();
+    board.lanes.forEach((lane, l) => {
+      if (l === ref.lane) return;
+      const to: LaneRef = { lane: l, raw: this.lines[lane.line] };
+      menu.addItem((i) =>
+        i
+          .setTitle(`Move to ${lane.title}`)
+          .setIcon("arrow-right")
+          .onClick(() => this.write((t) => moveCard(t, ref, to, lane.cards.length, this.viaTasks)))
+      );
+    });
+    menu.addSeparator();
+    menu.addItem((i) =>
+      i
+        .setTitle("Delete card")
+        .setIcon("trash-2")
+        .setWarning(true)
+        .onClick(() => this.write((t) => deleteCard(t, ref)))
+    );
+    menu.showAtMouseEvent(evt);
+  }
+
+  private laneMenu(evt: MouseEvent, board: Board, ref: LaneRef, name: HTMLElement): void {
+    const lane = board.lanes[ref.lane];
+    const menu = new Menu();
+    menu.addItem((i) =>
+      i
+        .setTitle("Rename")
+        .setIcon("pencil")
+        .onClick(() => this.inlineInput(name, lane.title, (v) => this.write((t) => renameLane(t, ref, v))))
+    );
+    menu.addItem((i) =>
+      i
+        .setTitle("Minimize")
+        .setIcon("minimize-2")
+        .onClick(() => this.write((t) => setLaneCollapsed(t, ref, true)))
+    );
+    if (ref.lane > 0) {
+      menu.addItem((i) =>
+        i
+          .setTitle("Move left")
+          .setIcon("arrow-left")
+          .onClick(() => this.write((t) => moveLane(t, ref, ref.lane - 1)))
+      );
+    }
+    if (ref.lane < board.lanes.length - 1) {
+      menu.addItem((i) =>
+        i
+          .setTitle("Move right")
+          .setIcon("arrow-right")
+          .onClick(() => this.write((t) => moveLane(t, ref, ref.lane + 2)))
+      );
+    }
+    // The status cards take when they land here; Kanban knows only "done".
+    menu.addSeparator();
+    for (const [char, label, icon] of [[null, "no status", "circle"], ...STATUSES.slice(1)] as const) {
+      menu.addItem((i) =>
+        i
+          .setTitle(char === null ? "Cards here keep their status" : `Cards here are ${label.toLowerCase()}`)
+          .setIcon(icon)
+          .setChecked(lane.status === char)
+          .onClick(() => this.write((t) => setLaneStatus(t, ref, char)))
+      );
+    }
+    menu.addSeparator();
+    menu.addItem((i) =>
+      i
+        .setTitle("Delete list")
+        .setIcon("trash-2")
+        .setWarning(true)
+        .onClick(() => {
+          const n = lane.cards.length;
+          const remove = () => this.write((t) => deleteLane(t, ref));
+          if (!n) return void remove();
+          new ConfirmModal(this.app, `Delete “${lane.title}” and its ${n} card${n === 1 ? "" : "s"}?`, remove).open();
+        })
+    );
+    menu.showAtMouseEvent(evt);
+  }
+
+  private followLink(evt: MouseEvent, link: HTMLAnchorElement): void {
+    if (!link.hasClass("internal-link")) return; // external links open on their own
+    evt.preventDefault();
+    const target = link.getAttribute("data-href") ?? link.getAttribute("href") ?? "";
+    void this.app.workspace.openLinkText(target, this.file!.path, Keymap.isModEvent(evt));
+  }
+
+  // ---- Drag and drop ----------------------------------------------------
+
+  private startDrag(evt: DragEvent, el: HTMLElement, drag: Drag): void {
+    evt.stopPropagation(); // a card inside a list isn't the list
+    this.drag = drag;
+    evt.dataTransfer?.setData("text/plain", "");
+    if (evt.dataTransfer) evt.dataTransfer.effectAllowed = "move";
+    // The slot: an empty space the size of what's dragged, shown where it would land.
+    const { width, height } = el.getBoundingClientRect();
+    this.slot = createDiv("psb-drop");
+    this.slot.style.width = `${width}px`;
+    this.slot.style.height = `${height}px`;
+    const slot = this.slot;
+    // After the browser has taken its picture of the element: the slot takes its place.
+    requestAnimationFrame(() => {
+      if (this.slot !== slot) return;
+      el.before(slot);
+      el.addClass("is-dragging");
+    });
+  }
+
+  private endDrag(): void {
+    this.drag = null;
+    this.slot?.remove();
+    this.slot = null;
+    this.containerEl.querySelectorAll(".is-dragging").forEach((e) => e.removeClass("is-dragging"));
+  }
+
+  /**
+   * Let a drag of `kind` over `target` place the slot among `zone`'s
+   * `items`, and a drop there report the position: an index among the
+   * items as they were before the drag.
+   */
+  private dropZone(target: HTMLElement, zone: HTMLElement, items: string, kind: Drag["kind"], axis: "x" | "y", drop: (index: number) => void): void {
+    const place = (evt: DragEvent) => {
+      const all = Array.from(zone.querySelectorAll<HTMLElement>(`:scope > ${items}:not(.psb-lane-new)`));
+      const shown = all.filter((e) => !e.hasClass("is-dragging"));
+      const before = shown.filter((e) => {
+        const r = e.getBoundingClientRect();
+        return axis === "y" ? evt.clientY > r.top + r.height / 2 : evt.clientX > r.left + r.width / 2;
+      }).length;
+      // The dragged item is hidden; count it if it sat before this spot.
+      const from = all.findIndex((e) => e.hasClass("is-dragging"));
+      return { next: shown[before] ?? zone.querySelector<HTMLElement>(":scope > .psb-lane-new"), index: from >= 0 && from <= before ? before + 1 : before };
+    };
+    target.addEventListener("dragover", (evt) => {
+      if (this.drag?.kind !== kind || !this.slot) return;
+      evt.preventDefault();
+      evt.stopPropagation();
+      const { next } = place(evt);
+      if (this.slot.parentElement !== zone || this.slot.nextElementSibling !== next) zone.insertBefore(this.slot, next);
+    });
+    target.addEventListener("drop", (evt) => {
+      if (this.drag?.kind !== kind) return;
+      evt.preventDefault();
+      evt.stopPropagation();
+      drop(place(evt).index);
+      this.endDrag();
+    });
+  }
+}
+
+class ConfirmModal extends Modal {
+  constructor(app: App, private question: string, private onYes: () => void) {
+    super(app);
+  }
+
+  onOpen(): void {
+    this.contentEl.createEl("p", { text: this.question });
+    new Setting(this.contentEl)
+      .addButton((b) => b.setButtonText("Cancel").onClick(() => this.close()))
+      .addButton((b) =>
+        b
+          .setButtonText("Delete")
+          .setWarning()
+          .onClick(() => {
+            this.close();
+            this.onYes();
+          })
+      );
+  }
+}

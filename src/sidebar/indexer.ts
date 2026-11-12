@@ -1,7 +1,7 @@
 import { App, EventRef, getAllTags, TAbstractFile, TFile, TFolder } from "obsidian";
 import { fillIndex } from "./core/fill";
 import { NoteIndex } from "./core/note-index";
-import { FileFacts, summarize, summarizeCanvas } from "./core/summary";
+import { BoardKinds, FileFacts, summarize, summarizeCanvas } from "./core/summary";
 import { NoteSummary } from "./core/types";
 
 /** Files the index holds: notes (incl. Kanban boards) and canvases. */
@@ -15,8 +15,8 @@ export class Indexer {
   private filling = false;
   private stopped = false;
 
-  /** `boards`: whether Kanban boards are read as boards (a setting). */
-  constructor(private app: App, private index: NoteIndex, private boards: () => boolean) {}
+  /** `boards`: which boards are read as boards (settings); null while boards are off. */
+  constructor(private app: App, private index: NoteIndex, private boards: () => BoardKinds | null) {}
 
   /**
    * The initial fill. Call once, after start(). Reads the vault in batches,

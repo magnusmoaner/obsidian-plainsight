@@ -10,6 +10,7 @@ import {
   TAbstractFile,
   TFile,
 } from "obsidian";
+import { isBoardFrontmatter } from "../boards/board";
 import { folderNameError, normalizeTag } from "./core/edits";
 import { dueDateLabel } from "./core/format";
 import {
@@ -59,7 +60,7 @@ class ListSuggest extends AbstractInputSuggest<string> {
  */
 export function canHoldTasks(app: App, file: TFile): boolean {
   if (file.extension !== "md") return false;
-  return app.metadataCache.getFileCache(file)?.frontmatter?.["kanban-plugin"] === undefined;
+  return !isBoardFrontmatter(app.metadataCache.getFileCache(file)?.frontmatter);
 }
 
 /** Type-ahead over the vault's notes, for the default-task-note setting. */
