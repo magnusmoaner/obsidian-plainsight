@@ -959,6 +959,32 @@
 .ps-card-lane.is-more .ps-card-lane-count {
   color: var(--text-muted);
 }
+/* A note with an embedded board: the board, then the meta line, span the
+   card below the text and the image. */
+.ps-card.has-board {
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+.ps-card.has-board .ps-card-text {
+  flex-basis: 0;
+}
+.ps-card.has-board > .ps-card-board,
+.ps-card.has-board > .ps-card-meta {
+  flex: 0 0 100%;
+  order: 1;
+  min-width: 0;
+}
+/* A board embedded in a note: slimmer tiles, name and count on one line. */
+.ps-card-board.is-compact .ps-card-lane {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 2px 8px 4px;
+}
+.ps-card-board.is-compact .ps-card-lane-count {
+  font-size: var(--font-ui-smaller);
+}
 .ps-card-tasks {
   flex: 0 0 auto;
   display: inline-flex;
@@ -993,8 +1019,9 @@
   flex: 0 0 auto;
   padding: 1px 6px;
   border-radius: 4px;
-  background: var(--background-modifier-hover);
-  color: var(--text-muted);
+  /* Obsidian's own tag colours, so a card's tags match tags in the note. */
+  background: var(--tag-background);
+  color: var(--tag-color);
 }
 .ps-card-thumb {
   flex: 0 0 64px;
@@ -1173,7 +1200,17 @@
 /* Badge icon and text centred on the same line, not on the text baseline. */
 .ps-card-tasks {
   line-height: 1;
-  padding: 3px 7px;
+}
+/* Task badges and tags: one box, so they're the same height side by side. */
+.ps-card-tasks,
+.ps-card-tag,
+.ps-card-more {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 1.7em;
+  padding: 0 7px;
+  line-height: 1;
 }
 .ps-card-tasks > span {
   display: inline-flex;
@@ -1353,3 +1390,296 @@
   }
 }
 
+
+/* ---- Boards: a board drawn in a note (embed) or on its own page ---- */
+.psb-board {
+  font-size: var(--font-ui-small);
+  line-height: var(--line-height-tight);
+}
+.psb-missing {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+.psb-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.psb-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--font-semibold);
+  text-decoration: none;
+}
+.psb-count {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--text-muted);
+}
+.psb-lanes {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+.psb-lane {
+  flex: 0 0 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+/* Minimized: a narrow strip with the name running down it; cards can still be dropped on it. */
+.psb-lane.is-collapsed {
+  flex-basis: auto;
+}
+.psb-lane.is-collapsed .psb-lane-head {
+  flex-direction: column;
+}
+.psb-lane.is-collapsed .psb-lane-head {
+  cursor: pointer;
+}
+.psb-lane.is-collapsed .psb-lane-title {
+  flex: 0 1 auto;
+  writing-mode: vertical-rl;
+  cursor: pointer;
+}
+.psb-lane.is-collapsed .psb-grip {
+  margin-left: 0;
+}
+.psb-lane.is-collapsed .psb-cards,
+.psb-lane.is-collapsed .psb-add,
+.psb-lane.is-collapsed .psb-lane-status,
+.psb-lane.is-collapsed [aria-label="List actions"] {
+  display: none;
+}
+.psb-lane-new {
+  background: none;
+  border-style: dashed;
+}
+.psb-lane-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: grab;
+}
+.psb-grip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  margin-left: -4px;
+  color: var(--text-faint);
+}
+.psb-grip svg {
+  width: 14px;
+  height: 14px;
+}
+.psb-lane-head:hover .psb-grip {
+  color: var(--text-muted);
+}
+.psb-lane-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--font-bold);
+  cursor: text;
+}
+.psb-lane-status {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+.psb-lane-status svg {
+  width: 14px;
+  height: 14px;
+}
+.psb-lane-count {
+  color: var(--text-muted);
+}
+.psb-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 8px;
+}
+.psb-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  cursor: grab;
+  /* The footer wraps onto its own row. */
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+/* What's being dragged leaves its place; a quiet empty slot shows where it would land. */
+.psb-card.is-dragging,
+.psb-lane.is-dragging {
+  display: none;
+}
+.psb-drop {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  max-width: 100%;
+  border-radius: 8px;
+  background: var(--background-modifier-hover);
+}
+.psb-board button.psb-check {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-faint);
+  background: none;
+  box-shadow: none;
+  color: var(--text-on-accent);
+  cursor: pointer;
+}
+.psb-check svg {
+  width: 12px;
+  height: 12px;
+}
+.psb-card[data-status="x"] .psb-check,
+.psb-card[data-status="X"] .psb-check {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+}
+/* In progress: half filled. */
+.psb-card[data-status="/"] .psb-check {
+  border-color: var(--interactive-accent);
+  background: linear-gradient(to right, var(--interactive-accent) 50%, transparent 50%);
+}
+.psb-card[data-status="-"] .psb-check {
+  background: var(--text-faint);
+}
+.psb-card-body {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.psb-card-text {
+  cursor: text;
+  overflow-wrap: anywhere;
+}
+.psb-card-text > :first-child {
+  margin-top: 0;
+}
+.psb-card-text > :last-child {
+  margin-bottom: 0;
+}
+.psb-card.is-done .psb-card-text {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+/* The card's footer: its dates, priority, recurrence and tags as badges. */
+.psb-card-foot {
+  flex: 0 0 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: var(--font-ui-smaller);
+}
+.psb-card-foot .ps-badge-tag {
+  background: var(--tag-background);
+  color: var(--tag-color);
+}
+/* Doubled class: the theme's own icon-button padding is more specific than one. */
+.psb-board button.psb-icon.psb-icon.clickable-icon {
+  flex: 0 0 auto;
+  height: auto;
+  padding: 2px;
+  background: none;
+  box-shadow: none;
+  color: var(--text-faint);
+}
+.psb-board button.psb-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.psb-board button.psb-add {
+  width: 100%;
+  background: var(--background-modifier-hover);
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.psb-lane-new button.psb-add {
+  background: none;
+}
+.psb-board .psb-input {
+  width: 100%;
+  font: inherit;
+}
+/* Obsidian's editor inside a card: as small as a text box, not a page. */
+.psb-board .psb-editor {
+  padding: 4px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--input-radius);
+  background: var(--background-modifier-form-field);
+  cursor: text;
+}
+.psb-board .psb-editor:focus-within {
+  border-color: var(--interactive-accent);
+}
+.psb-editor .markdown-source-view.mod-cm6 {
+  min-height: 0;
+  height: auto;
+  font-size: inherit;
+}
+.psb-editor .markdown-source-view.mod-cm6 .cm-scroller {
+  padding: 0;
+  overflow: visible;
+}
+.psb-editor .markdown-source-view.mod-cm6 .cm-sizer,
+.psb-editor .markdown-source-view.mod-cm6 .cm-content {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  min-height: 1.5em;
+}
+.psb-editor .cm-editor {
+  background: none;
+}
+.psb-board textarea.psb-input {
+  resize: none;
+  overflow: hidden;
+  min-height: 2.4em;
+}
+/* On its own page the tab already names the board, and the lists fill the
+   pane, so the sideways scrollbar sits at the bottom of it. */
+.psb-page {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* Beats the pane's own padding, which keeps a gap under the content. */
+.workspace-leaf-content .view-content.psb-page {
+  padding: 16px 16px 0;
+}
+.psb-page > .psb-board {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.psb-page .psb-title {
+  visibility: hidden;
+}
+.psb-page .psb-lanes {
+  flex: 1 1 auto;
+  min-height: 0;
+}

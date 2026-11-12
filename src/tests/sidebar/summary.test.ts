@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  embeddedBoard,
   FileFacts,
   fileLinks,
   firstImage,
@@ -121,6 +122,26 @@ const BOARD = [
   "%%",
 ].join("\n");
 
+describe("embedded boards", () => {
+  const embed = (line: string) => ["Intro", "", "```kanban-embed", "title: Plan", line, "```", ""].join("\n");
+
+  test("a kanban-embed block names its board by link or by path", () => {
+    expect(embeddedBoard(embed("board: [[Projects/Garden board|Garden]]"))).toBe("Projects/Garden board");
+    expect(embeddedBoard(embed("board: Projects/Garden board.md"))).toBe("Projects/Garden board.md");
+  });
+
+  test("a board line outside a kanban-embed block is not an embed", () => {
+    expect(embeddedBoard("board: [[Garden board]]")).toBeNull();
+    expect(embeddedBoard("```js\ncode\n```\nboard: [[Garden board]]\n")).toBeNull();
+    expect(embeddedBoard("```kanban-embed\nlanes: Todo\n```\n\nboard: [[Garden board]]\n")).toBeNull();
+  });
+
+  test("a note's summary carries its embedded board; a board's does not", () => {
+    expect(summarize(facts(), embed("board: [[Garden board]]")).embeddedBoard).toBe("Garden board");
+    expect(summarize(facts({ frontmatter: { "kanban-plugin": "board" } }), embed("board: [[Garden board]]")).embeddedBoard).toBeNull();
+  });
+});
+
 describe("Kanban boards", () => {
   test("an empty lane counts 0 cards", () => {
     expect(parseBoard("## Inbox\n\n## Doing\n\n- [ ] Card\n").laneCards).toEqual([0, 1]);
@@ -128,6 +149,30 @@ describe("Kanban boards", () => {
 
   test("parseBoard counts columns and cards, ignoring the settings block", () => {
     expect(parseBoard(BOARD)).toMatchObject({ columns: ["Todo", "Done"], laneCards: [2, 1], cards: 3 });
+  });
+
+  test("with boards turned off, a board is an ordinary note and its cards are tasks", () => {
+    const s = summarize(facts({ frontmatter: { "kanban-plugin": "board" } }), BOARD, null);
+    expect(s).toMatchObject({ kind: "note", columns: [], laneCards: [], items: 0, taskListBoard: false });
+    expect(s.tasks).toHaveLength(3);
+    expect(summarize(facts({ frontmatter: { kanban_plugin: "{}" } }), "", null).kind).toBe("note");
+  });
+
+  test("each board plugin's boards can be turned off on their own; Plainsight's stay", () => {
+    const kanban = facts({ frontmatter: { "kanban-plugin": "board" } });
+    const taskList = facts({ frontmatter: { kanban_plugin: "{}" } });
+    const own = facts({ frontmatter: { "plainsight-plugin": "board" } });
+    const noKanban = { kanban: false, taskList: true };
+    expect(summarize(kanban, BOARD, noKanban).kind).toBe("note");
+    expect(summarize(taskList, "", noKanban).kind).toBe("board");
+    expect(summarize(own, BOARD, noKanban).kind).toBe("board");
+    const noTaskList = { kanban: true, taskList: false };
+    expect(summarize(kanban, BOARD, noTaskList).kind).toBe("board");
+    expect(summarize(taskList, "", noTaskList).kind).toBe("note");
+  });
+
+  test("Plainsight's own mark makes a board too", () => {
+    expect(summarize(facts({ frontmatter: { "plainsight-plugin": "board" } }), BOARD)).toMatchObject({ kind: "board", items: 3 });
   });
 
   test("a note with kanban-plugin frontmatter is a board", () => {

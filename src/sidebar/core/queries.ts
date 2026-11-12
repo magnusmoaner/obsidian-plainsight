@@ -9,6 +9,7 @@ export type Place =
   | { kind: "notebook"; folder: string }
   | { kind: "tag"; tag: string }
   | { kind: "tasks" }
+  | { kind: "boards" }
   | { kind: "daily" }
   | { kind: "templates" }
   | { kind: "attachments" };
@@ -59,6 +60,8 @@ function inPlace(note: NoteSummary, place: Place, templates: string | null, dail
       return isTemplate;
     case "tasks":
       return note.tasks.length > 0;
+    case "boards":
+      return note.kind === "board" && !isTemplate;
     case "attachments":
       return false; // files, not notes: listed by attachmentsFor
   }
@@ -474,10 +477,24 @@ export const TASK_GROUPINGS: TaskGrouping[] = [
   "none",
 ];
 
-export type NoteGrouping = "date" | "folder" | "kind" | "none";
-export const NOTE_GROUPINGS: NoteGrouping[] = ["date", "folder", "kind", "none"];
+/** "embed": the Boards list only, by the note a board is embedded in. */
+export type NoteGrouping = "date" | "folder" | "kind" | "embed" | "none";
+export const NOTE_GROUPINGS: NoteGrouping[] = ["date", "folder", "kind", "embed", "none"];
 
-const KIND_LABELS: Record<NoteKind, string> = { note: "Notes", board: "Kanban boards", canvas: "Canvases" };
+export type BoardType = "plainsight" | "kanban" | "taskList";
+export const BOARD_TYPES: BoardType[] = ["plainsight", "kanban", "taskList"];
+export const BOARD_TYPE_LABELS: Record<BoardType, string> = {
+  plainsight: "Plainsight boards",
+  kanban: "Kanban boards",
+  taskList: "Task List Kanban boards",
+};
+
+/** Which kind of board a board is: Plainsight's own, or one of the plugins'. */
+export function boardType(note: NoteSummary): BoardType {
+  return note.taskListBoard ? "taskList" : note.ownBoard ? "plainsight" : "kanban";
+}
+
+const KIND_LABELS: Record<NoteKind, string> = { note: "Notes", board: "Boards", canvas: "Canvases" };
 const KIND_ORDER: NoteKind[] = ["note", "board", "canvas"];
 
 /** How many of `notes` there are of each kind, for the filter chips. */
@@ -493,20 +510,29 @@ export function kindCounts(notes: NoteSummary[]): Record<NoteKind, number> {
  * folder (vault root first, then alphabetical), by kind (notes, boards,
  * canvases) or not at all. Order within a group is kept.
  */
-export function groupNotesBy(sorted: NoteSummary[], sort: SortKey, by: NoteGrouping): NoteGroup[] {
+export function groupNotesBy(
+  sorted: NoteSummary[],
+  sort: SortKey,
+  by: NoteGrouping,
+  /**
+   * Given for the Boards list: the name of the note a board is embedded in
+   * (null: none). "kind" then groups by type of board, and "embed" by that note.
+   */
+  embeddedIn?: (board: NoteSummary) => string | null
+): NoteGroup[] {
   if (by === "date") return groupNotes(sorted, sort);
   const groups: NoteGroup[] = [];
   const pinned = sorted.filter((n) => n.pinned);
   const rest = sorted.filter((n) => !n.pinned);
   if (pinned.length) groups.push({ label: "Pinned Notes", notes: pinned });
   if (!rest.length) return groups;
-  if (by === "none") {
+  if (by === "none" || (by === "embed" && !embeddedIn)) {
     groups.push({ label: "", notes: rest });
     return groups;
   }
   const buckets = new Map<string, NoteSummary[]>();
   for (const n of rest) {
-    const key = by === "folder" ? n.folder : n.kind;
+    const key = by === "folder" ? n.folder : by === "embed" ? embeddedIn!(n) ?? "" : embeddedIn ? boardType(n) : n.kind;
     const list = buckets.get(key);
     if (list) list.push(n);
     else buckets.set(key, [n]);
@@ -516,11 +542,22 @@ export function groupNotesBy(sorted: NoteSummary[], sort: SortKey, by: NoteGroup
     keys.sort((a, b) =>
       a === "" ? -1 : b === "" ? 1 : compareNames(a, b)
     );
+  } else if (by === "embed") {
+    // Boards that aren't embedded anywhere go last.
+    keys.sort((a, b) => (a === "" ? 1 : b === "" ? -1 : compareNames(a, b)));
   } else {
-    keys.sort((a, b) => KIND_ORDER.indexOf(a as NoteKind) - KIND_ORDER.indexOf(b as NoteKind));
+    const order: string[] = embeddedIn ? BOARD_TYPES : KIND_ORDER;
+    keys.sort((a, b) => order.indexOf(a) - order.indexOf(b));
   }
   for (const key of keys) {
-    const label = by === "folder" ? key || "Vault root" : KIND_LABELS[key as NoteKind];
+    const label =
+      by === "folder"
+        ? key || "Vault root"
+        : by === "embed"
+          ? key || "Not embedded"
+          : embeddedIn
+            ? BOARD_TYPE_LABELS[key as BoardType]
+            : KIND_LABELS[key as NoteKind];
     groups.push({ label, notes: buckets.get(key)! });
   }
   return groups;

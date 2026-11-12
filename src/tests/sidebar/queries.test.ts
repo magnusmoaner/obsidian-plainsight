@@ -29,6 +29,15 @@ const notes = [
 const paths = (list: { path: string }[]) => list.map((n) => n.path);
 
 describe("notesFor", () => {
+  test("Boards = every board, wherever it is, except templates", () => {
+    const withBoards = [
+      ...notes,
+      note("Inbox/Plan.md", { kind: "board" }),
+      note("Templates/Board template.md", { kind: "board" }),
+    ];
+    expect(paths(notesFor(withBoards, { kind: "boards" }, opts))).toEqual(["Inbox/Plan.md"]);
+  });
+
   test("Notes = everything except templates; pinned first, then newest", () => {
     expect(paths(notesFor(notes, { kind: "notes" }, opts))).toEqual([
       "Other/c.md",
@@ -456,7 +465,7 @@ describe("note kinds and grouping", () => {
     expect(labels(groupNotesBy(sorted, "modified", "kind"))).toEqual([
       "Pinned Notes:1",
       "Notes:1",
-      "Kanban boards:1",
+      "Boards:1",
       "Canvases:1",
     ]);
   });
@@ -467,5 +476,36 @@ describe("note kinds and grouping", () => {
 
   test("date grouping is the month grouping", () => {
     expect(groupNotesBy(sorted, "modified", "date")).toEqual(groupNotes(sorted, "modified"));
+  });
+});
+
+describe("the Boards list", () => {
+  const boards = [
+    note("Plan.md", { kind: "board", ownBoard: true }),
+    note("Sprint.md", { kind: "board" }),
+    note("Chores.md", { kind: "board", taskListBoard: true }),
+    note("Garden.md", { kind: "board", ownBoard: true }),
+  ];
+  const shape = (groups: { label: string; notes: { path: string }[] }[]) => groups.map((g) => `${g.label}: ${g.notes.map((n) => n.path).join(", ")}`);
+
+  test("grouped by type, it splits by type of board", () => {
+    expect(shape(groupNotesBy(boards, "title", "kind", () => null))).toEqual([
+      "Plainsight boards: Plan.md, Garden.md",
+      "Kanban boards: Sprint.md",
+      "Task List Kanban boards: Chores.md",
+    ]);
+  });
+
+  test("grouped by note, boards sit under the note that embeds them; the rest go last", () => {
+    const embeddedIn = (b: { path: string }) => ({ "Plan.md": "Trip", "Garden.md": "Allotment" })[b.path] ?? null;
+    expect(shape(groupNotesBy(boards, "title", "embed", embeddedIn))).toEqual([
+      "Allotment: Garden.md",
+      "Trip: Plan.md",
+      "Not embedded: Sprint.md, Chores.md",
+    ]);
+  });
+
+  test("grouping by note means nothing outside the Boards list", () => {
+    expect(shape(groupNotesBy(boards, "title", "embed"))).toEqual([": Plan.md, Sprint.md, Chores.md, Garden.md"]);
   });
 });

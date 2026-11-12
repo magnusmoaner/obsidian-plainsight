@@ -35,6 +35,16 @@ export function fileLinks(text: string): string[] {
   return out;
 }
 
+// A board embed block (Plainsight's or Kanban Embed's): its `board:` line
+// names the board, as a [[link]] or a path.
+const BOARD_EMBED = /^```(?:plainsight-board|kanban-embed)[^\n]*\n(?:(?!```)[^\n]*\n)*?boards?\s*:\s*(?:\[\[([^\]|#]+)|([^\s\[][^\n]*))/m;
+
+/** Link target of the first board embedded in the note, unresolved. */
+export function embeddedBoard(text: string): string | null {
+  const match = BOARD_EMBED.exec(text);
+  return match ? (match[1] ?? match[2]).trim() : null;
+}
+
 export function firstImage(text: string): string | null {
   for (const match of text.matchAll(EMBED)) {
     const target = (match[1] ?? safeDecode(match[2])).trim();
@@ -101,14 +111,27 @@ export function parseBoard(text: string): { columns: string[]; laneCards: number
   return { columns, laneCards, cards, end };
 }
 
-export function summarize(facts: FileFacts, text: string): NoteSummary {
+/** Which of the board plugins' boards are read as boards; Plainsight's own always are. */
+export interface BoardKinds {
+  kanban: boolean;
+  taskList: boolean;
+}
+
+/**
+ * `boards` null: boards are off, and a board file is summarized as the
+ * ordinary note it also is. So is a plugin's board whose kind is off.
+ */
+export function summarize(facts: FileFacts, text: string, boards: BoardKinds | null = { kanban: true, taskList: true }): NoteSummary {
   const tags = normalizeTags(facts.tags);
   const pinned = facts.frontmatter?.pinned;
   const extracted = facts.frontmatter?.type === "extracted-text";
-  const board = facts.frontmatter?.["kanban-plugin"] !== undefined ? parseBoard(text) : null;
+  const isBoard =
+    !!boards &&
+    (facts.frontmatter?.["plainsight-plugin"] !== undefined || (boards.kanban && facts.frontmatter?.["kanban-plugin"] !== undefined));
+  const board = isBoard ? parseBoard(text) : null;
   // Task List Kanban's own test: any truthy kanban_plugin value (its
   // settings, a JSON string, or an empty mapping for a new board).
-  const taskListBoard = !board && Boolean(facts.frontmatter?.kanban_plugin);
+  const taskListBoard = !!boards?.taskList && !board && Boolean(facts.frontmatter?.kanban_plugin);
   return {
     path: facts.path,
     kind: board || taskListBoard ? "board" : "note",
@@ -127,11 +150,13 @@ export function summarize(facts: FileFacts, text: string): NoteSummary {
     // off the Tasks page too.
     tasks: board ? parseTasks(text).filter((t) => t.line < board.end) : parseTasks(text),
     thumbnail: firstImage(text),
+    embeddedBoard: boards && !board ? embeddedBoard(text) : null,
     searchText: `${facts.basename} ${tags.join(" ")} ${text.slice(0, SEARCH_CAP)}`.toLowerCase(),
     extracted,
     sourceLinks: extracted ? fileLinks(text) : [],
     ocrBoxes: board ? [] : ocrBoxes(text),
     taskListBoard,
+    ownBoard: !!board && facts.frontmatter?.["plainsight-plugin"] !== undefined,
   };
 }
 
@@ -168,10 +193,12 @@ export function summarizeCanvas(facts: FileFacts, json: string): NoteSummary {
     snippet: extractSnippet(body),
     tasks: [],
     thumbnail: firstImage(body),
+    embeddedBoard: null,
     searchText: `${facts.basename} ${body.slice(0, SEARCH_CAP)}`.toLowerCase(),
     extracted: false,
     sourceLinks: [],
     ocrBoxes: [],
     taskListBoard: false,
+    ownBoard: false,
   };
 }

@@ -48,6 +48,8 @@ export interface NoteSummary {
   tasks: TaskItem[];
   /** Link target of the first embedded image, unresolved. */
   thumbnail: string | null;
+  /** Link target of the first Kanban board embedded in the note, unresolved. */
+  embeddedBoard: string | null;
   /** Lower-cased title, tags and body for search, capped in length. */
   searchText: string;
   /**
@@ -76,6 +78,8 @@ export interface NoteSummary {
    * task line in its file is an ordinary task.
    */
   taskListBoard: boolean;
+  /** A Plainsight board (its own mark), rather than a board plugin's. */
+  ownBoard: boolean;
 }
 
 /** A Kanban plugin board, whose checkbox lines are cards in its lists. */

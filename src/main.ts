@@ -20,6 +20,8 @@ import {
   toggleEm,
   toggleStrong,
 } from "./editor/commands";
+import { boardPages } from "./boards/page";
+import { registerBoards } from "./boards/register";
 import { wysiwyg } from "./editor/extension";
 import { treeOf } from "./editor/parser";
 import { parseSettings, serializeSettings } from "./settings-data";
@@ -167,7 +169,12 @@ export default class WysiwygPlugin extends Plugin {
         }),
     });
 
-    this.indexer = new Indexer(this.app, this.index);
+    this.applyBoardPages();
+    registerBoards(this, () => this.settings.boards);
+    this.indexer = new Indexer(this.app, this.index, () => {
+      const s = this.settings;
+      return s.boards ? { kanban: s.kanbanBoards, taskList: s.taskListBoards } : null;
+    });
     this.registerView(SIDEBAR_VIEW, (leaf: WorkspaceLeaf) => new SidebarView(leaf, this));
     // Listed in Page Preview's settings, where Cmd/Ctrl can be made required.
     this.registerHoverLinkSource(SIDEBAR_VIEW, { display: "Plainsight", defaultMod: false });
@@ -335,6 +342,11 @@ export default class WysiwygPlugin extends Plugin {
     }, 5000);
   }
 
+  private applyBoardPages(): void {
+    boardPages.enabled = this.settings.boards;
+    boardPages.kanban = this.settings.kanbanBoards;
+  }
+
   /** Act on what changed between two versions of the settings. */
   private applySettings(before: WysiwygSettings): void {
     const now = this.settings;
@@ -355,7 +367,17 @@ export default class WysiwygPlugin extends Plugin {
       "showDailyNotes",
       "showTemplates",
     ] as const;
+    // Which boards are on changes what every board file is: read them all again.
+    const boardKinds = ["boards", "kanbanBoards", "taskListBoards"] as const;
+    const boardsChanged = boardKinds.some((key) => before[key] !== now[key]);
+    if (boardsChanged) {
+      this.applyBoardPages();
+      void this.indexer.build();
+    }
     if (
+      boardsChanged ||
+      before.tasks !== now.tasks ||
+      before.showBoardsRow !== now.showBoardsRow ||
       before.boardCardsInTasks !== now.boardCardsInTasks ||
       buttons.some((key) => before[key] !== now[key])
     ) {

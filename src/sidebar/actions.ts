@@ -4,6 +4,8 @@ import { addTag, appendLine } from "./core/edits";
 import { setPinned } from "./core/pin";
 import { matchTaskLine, toggleTaskLine } from "./core/tasks";
 import { TaskItem } from "./core/types";
+import { NEW_BOARD } from "../boards/board";
+import { openBoardPage, ownsBoard } from "../boards/page";
 import { templateOptions, tasksToggle } from "./internals";
 
 // Obsidian types its moment export as the namespace, which isn't callable
@@ -101,6 +103,16 @@ export async function createCanvas(app: App, folder: string | null): Promise<voi
 }
 
 /**
+ * Create a Plainsight board in `folder` (null = Obsidian's default
+ * location): lists and cards as the Kanban plugin writes them, under
+ * Plainsight's own mark.
+ */
+export async function createBoard(app: App, folder: string | null, name = "Untitled board"): Promise<TFile> {
+  const parent = folder ?? app.fileManager.getNewFileParent("").path;
+  return app.vault.create(availablePath(app, parent === "/" ? "" : parent, name), NEW_BOARD);
+}
+
+/**
  * Create a Task List Kanban board in `folder` (null = Obsidian's default
  * location) and open it, as that plugin's own "New kanban" folder action
  * does: a note holding only an empty kanban_plugin property. The plugin
@@ -154,6 +166,10 @@ export async function openFile(
   line?: number
 ): Promise<WorkspaceLeaf> {
   const leaf = app.workspace.getLeaf(mode);
-  await leaf.openFile(file, line === undefined ? undefined : { eState: { line } });
+  // A Plainsight board, or a Kanban one with no Kanban plugin to show it:
+  // Plainsight's own board page. (A task on a board still opens its line in
+  // the Markdown.)
+  if (line === undefined && ownsBoard(app, app.metadataCache.getFileCache(file)?.frontmatter)) await openBoardPage(leaf, file);
+  else await leaf.openFile(file, line === undefined ? undefined : { eState: { line } });
   return leaf;
 }

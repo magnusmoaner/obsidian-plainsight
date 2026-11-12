@@ -18,11 +18,13 @@ export function note(path: string, over: Partial<NoteSummary> = {}): NoteSummary
     snippet: "",
     tasks: [],
     thumbnail: null,
+    embeddedBoard: null,
     searchText: path.toLowerCase(),
     extracted: false,
     sourceLinks: [],
     ocrBoxes: [],
     taskListBoard: false,
+    ownBoard: false,
     ...over,
   };
 }
