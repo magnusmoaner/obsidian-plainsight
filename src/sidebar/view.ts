@@ -1734,9 +1734,13 @@ export class SidebarView extends ItemView implements HoverParent {
     const board = parent.createDiv("ps-card-board");
     const shown = note.columns.length > MAX ? MAX - 1 : MAX;
     note.columns.slice(0, shown).forEach((name, i) => {
-      const lane = board.createDiv({ cls: "ps-card-lane", attr: { title: name } });
+      const total = note.laneCards[i] ?? 0;
+      // min(): two lists with the same name share their checked cards.
+      const done = Math.min(total, note.tasks.filter((t) => t.section === name && isClosed(t)).length);
+      const lane = board.createDiv({ cls: "ps-card-lane", attr: { title: done ? `${name}: ${done} of ${total} done` : name } });
       lane.createDiv({ cls: "ps-card-lane-name", text: name });
-      lane.createDiv({ cls: "ps-card-lane-count", text: String(note.laneCards[i] ?? 0) });
+      lane.createDiv({ cls: "ps-card-lane-count", text: String(total) });
+      if (done) lane.createDiv("ps-card-lane-done").style.width = `${(done / total) * 100}%`;
     });
     const rest = note.columns.length - shown;
     if (rest > 0) {
