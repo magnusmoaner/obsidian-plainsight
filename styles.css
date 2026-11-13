@@ -1428,7 +1428,9 @@
   padding-bottom: 6px;
 }
 .psb-lane {
-  flex: 0 0 240px;
+  /* Lists give a little before they scroll, so three fit the width of a note. */
+  flex: 0 1 240px;
+  min-width: 190px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1439,7 +1441,8 @@
 }
 /* Minimized: a narrow strip with the name running down it; cards can still be dropped on it. */
 .psb-lane.is-collapsed {
-  flex-basis: auto;
+  flex: 0 0 auto;
+  min-width: 0;
 }
 .psb-lane.is-collapsed .psb-lane-head {
   flex-direction: column;
