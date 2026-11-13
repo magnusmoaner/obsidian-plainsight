@@ -436,9 +436,10 @@ export class SidebarView extends ItemView implements HoverParent {
       key.startsWith("notebook:") ? `notebook:${renamedPath(key.slice("notebook:".length), from, to)}` : key
     );
     if (renamed.some((key, i) => key !== collapsed[i])) this.plugin.viewState.update({ collapsed: renamed });
-    const taskNote = this.plugin.settings.defaultTaskNote;
-    if (taskNote && renamedPath(taskNote, from, to) !== taskNote) {
-      void this.plugin.updateSettings({ defaultTaskNote: renamedPath(taskNote, from, to) });
+    // Settings that name a note follow it.
+    for (const key of ["defaultTaskNote", "boardTemplate"] as const) {
+      const path = this.plugin.settings[key];
+      if (path && renamedPath(path, from, to) !== path) void this.plugin.updateSettings({ [key]: renamedPath(path, from, to) });
     }
     this.queueRender();
   }
@@ -620,7 +621,7 @@ export class SidebarView extends ItemView implements HoverParent {
     return this.plugin.settings.boards && this.plugin.settings.showBoardsRow;
   }
 
-  /** Make a board: at once with one board plugin, from a menu with both. */
+  /** Make a board, or a template: at once when there's one kind, from a menu with more. */
   private newBoard(evt: MouseEvent, boards = this.boardMakers()): void {
     if (boards.length === 1) return boards[0].make();
     const menu = new Menu();
@@ -640,8 +641,12 @@ export class SidebarView extends ItemView implements HoverParent {
     return folder && this.plugin.indexer.folders().includes(folder) ? folder : null;
   }
 
-  private newFromTemplate(template: TFile): void {
-    void createNote(this.app, this.templateTarget(), template);
+  /** A new note from a template; from a board template, a new board, opened as one. */
+  private newFromTemplate(template: TFile, board = false): void {
+    if (!board) return void createNote(this.app, this.templateTarget(), template);
+    void createBoard(this.app, this.templateTarget(), template.path)
+      .then((made) => openBoardPage(this.app.workspace.getLeaf(false), made))
+      .catch((err: Error) => new Notice(`Couldn't create the board: ${err.message}`));
   }
 
   /** Every template, for the Note button's "New note from template…". */
@@ -665,11 +670,26 @@ export class SidebarView extends ItemView implements HoverParent {
     ).open();
   }
 
-  /** A new template in the templates folder; without one, where to set it. */
-  private newTemplate(): void {
+  /**
+   * Ways to make a template in the templates folder: a note first, then a
+   * board (with the default lists) while boards are on. Without a templates
+   * folder, the one way leads to where to set it.
+   */
+  private templateMakers(): Array<{ label: string; icon: string; make: () => void }> {
     const folder = templateOptions(this.app).folder;
-    if (folder) void createNote(this.app, folder);
-    else this.setPlace({ kind: "templates" });
+    if (!folder) return [{ label: "New template", icon: "file-plus-2", make: () => this.setPlace({ kind: "templates" }) }];
+    const makers = [{ label: "New template", icon: "file-plus-2", make: () => void createNote(this.app, folder) }];
+    if (this.plugin.settings.boards) {
+      makers.push({
+        label: "New board template",
+        icon: "kanban",
+        make: () =>
+          void createBoard(this.app, folder, "", "Untitled board template")
+            .then((board) => openBoardPage(this.app.workspace.getLeaf(false), board))
+            .catch((err: Error) => new Notice(`Couldn't create the board template: ${err.message}`)),
+      });
+    }
+    return makers;
   }
 
   private openToday(): void {
@@ -813,7 +833,7 @@ export class SidebarView extends ItemView implements HoverParent {
     }
     this.placeRow(nav, "Attachments", "paperclip", { kind: "attachments" }, 0, attachmentCount);
     if (showsTemplates) {
-      this.placeRow(nav, "Templates", "layout-template", { kind: "templates" }, 0, templateCount, () => this.newTemplate());
+      this.placeRow(nav, "Templates", "layout-template", { kind: "templates" }, 0, templateCount, (evt) => this.newBoard(evt, this.templateMakers()));
     }
 
     if (this.navHeading(nav, "Folders", "folder", "section:notebooks", () => this.newNotebook(isAttachmentFolder))) {
@@ -908,7 +928,7 @@ export class SidebarView extends ItemView implements HoverParent {
         label: "New board",
         icon: "kanban",
         // Straight to the board page: Obsidian hasn't read the new file's properties yet.
-        make: run(async () => openBoardPage(this.app.workspace.getLeaf(false), await createBoard(this.app, folder))),
+        make: run(async () => openBoardPage(this.app.workspace.getLeaf(false), await createBoard(this.app, folder, this.plugin.settings.boardTemplate))),
       },
     ];
     if (this.plugin.settings.kanbanBoards && hasCommand(this.app, KANBAN_NEW_BOARD)) {
@@ -1964,15 +1984,15 @@ export class SidebarView extends ItemView implements HoverParent {
       const templates = this.place.kind === "templates";
       const add = actions.createDiv({ cls: "ps-action", attr: { "aria-label": templates ? "New template" : "New note" } });
       setIcon(add, "file-plus-2");
-      add.addEventListener("click", () => (templates ? this.newTemplate() : void createNote(this.app, this.currentFolder())));
+      add.addEventListener("click", () => (templates ? this.templateMakers()[0].make() : void createNote(this.app, this.currentFolder())));
     }
 
     // New board: only for board plugins that are enabled. With one, a click
     // creates that kind; with both, it asks which.
     // Daily notes and Templates: none, nor a choice of grouping; they're
-    // grouped by date.
+    // grouped by date. On Templates the button makes a board template.
     const datedOnly = this.place.kind === "daily" || this.place.kind === "templates";
-    let boards = datedOnly ? [] : this.boardMakers();
+    let boards = this.place.kind === "templates" ? this.templateMakers().slice(1) : datedOnly ? [] : this.boardMakers();
     if (this.place.kind === "boards" && boards.length) {
       // On Boards the first button makes a Plainsight board; the board
       // plugins' kinds follow in the next one.
@@ -2276,16 +2296,18 @@ export class SidebarView extends ItemView implements HoverParent {
     }
 
     // Templates: the card opens the template; this button makes a note from
-    // it. Only Markdown can seed a note; a canvas "template" just opens.
-    if (this.place.kind === "templates" && note.kind === "note") {
+    // it, or a board from a Plainsight board. Only Markdown can seed a note;
+    // a canvas "template" just opens.
+    if (this.place.kind === "templates" && (note.kind === "note" || note.ownBoard)) {
+      const board = note.ownBoard;
       card.addClass("is-template");
-      const use = card.createDiv({ cls: "ps-card-use", attr: { "aria-label": "New note from template" } });
-      setIcon(use.createSpan(), "file-plus-2");
-      use.createSpan({ text: "New note" });
+      const use = card.createDiv({ cls: "ps-card-use", attr: { "aria-label": board ? "New board from template" : "New note from template" } });
+      setIcon(use.createSpan(), board ? "kanban" : "file-plus-2");
+      use.createSpan({ text: board ? "New board" : "New note" });
       use.addEventListener("click", (evt) => {
         evt.stopPropagation();
         const file = this.app.vault.getAbstractFileByPath(note.path);
-        if (file instanceof TFile) this.newFromTemplate(file);
+        if (file instanceof TFile) this.newFromTemplate(file, board);
       });
     }
 
@@ -2361,9 +2383,9 @@ export class SidebarView extends ItemView implements HoverParent {
       if (this.place.kind === "templates" && file.extension === "md") {
         menu.addItem((item) =>
           item
-            .setTitle("New note from template")
-            .setIcon("file-plus-2")
-            .onClick(() => this.newFromTemplate(file))
+            .setTitle(note.ownBoard ? "New board from template" : "New note from template")
+            .setIcon(note.ownBoard ? "kanban" : "file-plus-2")
+            .onClick(() => this.newFromTemplate(file, note.ownBoard))
         );
       }
     });

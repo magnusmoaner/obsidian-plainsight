@@ -13,7 +13,7 @@ const EMBEDDED_IN = "embedded-in";
 const isBoard = (app: App, file: TFile) => isBoardFrontmatter(app.metadataCache.getFileCache(file)?.frontmatter);
 
 /** Boards in notes and on their own page: the views, the commands, and keeping the two-way link. */
-export function registerBoards(plugin: Plugin, boardsOn: () => boolean, index: NoteIndex): void {
+export function registerBoards(plugin: Plugin, boardsOn: () => boolean, template: () => string, index: NoteIndex): void {
   const { app } = plugin;
   const open = (file: TFile, newLeaf: Parameters<typeof openFile>[2]) => void openFile(app, file, newLeaf);
 
@@ -88,7 +88,7 @@ export function registerBoards(plugin: Plugin, boardsOn: () => boolean, index: N
       const note = ctx.file;
       if (!note || !boardsOn()) return false;
       if (!checking) {
-        void createBoard(app, note.parent?.path ?? "", `${note.basename} board`)
+        void createBoard(app, note.parent?.path ?? "", template(), `${note.basename} board`)
           .then((board) => insert(editor, note, board))
           .catch(failed);
       }

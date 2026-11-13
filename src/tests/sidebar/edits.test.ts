@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { addListItem, addTag, appendLine, folderNameError, movedPath, normalizeTag, setTextProperty } from "../../sidebar/core/edits";
+import { addListItem, addTag, appendLine, folderNameError, markAsBoard, movedPath, normalizeTag, setTextProperty } from "../../sidebar/core/edits";
 
 describe("normalizeTag", () => {
   test("strips #, spaces at the ends and stray slashes", () => {
@@ -166,6 +166,15 @@ describe("addListItem", () => {
     expect(addListItem('---\nembedded-in: ["[[Trip]]"]\n---\nB', "embedded-in", item)).toBeNull();
     expect(addListItem("---\nembedded-in:\n  - a # note\n---\nB", "embedded-in", item)).toBeNull();
     expect(addListItem("---\nembedded-in:\n  nested: 1\n---\nB", "embedded-in", item)).toBeNull();
+  });
+});
+
+describe("markAsBoard", () => {
+  test("adds the board mark to a template's properties, once", () => {
+    expect(markAsBoard("## Ideas\n")).toBe("---\nplainsight-plugin: board\n---\n## Ideas\n");
+    expect(markAsBoard("---\ntags: [plan]\n---\n## Ideas\n")).toBe("---\ntags: [plan]\nplainsight-plugin: board\n---\n## Ideas\n");
+    const marked = "---\nplainsight-plugin: board\n---\n## Ideas\n";
+    expect(markAsBoard(marked)).toBe(marked);
   });
 });
 
