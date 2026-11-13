@@ -177,10 +177,15 @@ describe("Kanban boards", () => {
 
   test("a board's summary carries its lists' colours", () => {
     const coloured = BOARD.replace('{"kanban-plugin":"board"}', '{"kanban-plugin":"board","plainsight-list-colour":{"Done":"green"}}');
-    const board = facts({ frontmatter: { "kanban-plugin": "board" } });
+    const board = facts({ frontmatter: { "plainsight-plugin": "board" } });
     expect(summarize(board, coloured).laneColours).toEqual([null, "green"]);
     expect(summarize(board, BOARD).laneColours).toEqual([null, null]);
     expect(summarize(facts(), coloured).laneColours).toEqual([]);
+  });
+
+  test("a Kanban plugin board shows no list colours, even if its file holds some", () => {
+    const coloured = BOARD.replace('{"kanban-plugin":"board"}', '{"kanban-plugin":"board","plainsight-list-colour":{"Done":"green"}}');
+    expect(summarize(facts({ frontmatter: { "kanban-plugin": "board" } }), coloured).laneColours).toEqual([null, null]);
   });
 
   test("a note with kanban-plugin frontmatter is a board", () => {

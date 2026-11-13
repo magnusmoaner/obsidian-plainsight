@@ -956,8 +956,16 @@
   font-size: var(--font-ui-medium);
   font-weight: var(--font-semibold);
 }
-.ps-card-lane.is-more .ps-card-lane-count {
+/* The lists that don't fit: a narrow tile with their number, as tall as the others. */
+.ps-card-lane.is-more {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
   color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-semibold);
 }
 /* A note with an embedded board: the board, then the meta line, span the
    card below the text and the image. */
@@ -974,16 +982,47 @@
   order: 1;
   min-width: 0;
 }
-/* A board embedded in a note: slimmer tiles, name and count on one line. */
-.ps-card-board.is-compact .ps-card-lane {
+/* A board embedded in a note: slimmer tiles, name and count on one line.
+   A board's own card has that line too, with its first cards named under it. */
+.ps-card-board.is-compact .ps-card-lane-head,
+.ps-card-board.has-titles .ps-card-lane-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 6px;
+}
+.ps-card-board.is-compact .ps-card-lane {
   padding: 2px 8px 4px;
 }
-.ps-card-board.is-compact .ps-card-lane-count {
+.ps-card-board.is-compact .ps-card-lane-count,
+.ps-card-board.has-titles .ps-card-lane-count {
   font-size: var(--font-ui-smaller);
+}
+.ps-card-board.has-titles .ps-card-lane {
+  padding-bottom: 6px;
+}
+/* Each card as a small white card of its own, as on the board. */
+.ps-card-lane-card {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 3px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--background-primary);
+  font-size: calc(var(--font-ui-smaller) * 0.92);
+  line-height: 1.5;
+  color: var(--text-normal);
+}
+.ps-card-lane-card.is-done {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+.ps-card-lane-card.is-more {
+  padding: 1px 2px;
+  background: none;
+  color: var(--text-faint);
+  text-align: right;
 }
 .ps-card-tasks {
   flex: 0 0 auto;
@@ -1428,9 +1467,10 @@
   padding-bottom: 6px;
 }
 .psb-lane {
-  /* Lists give a little before they scroll, so three fit the width of a note. */
-  flex: 0 1 240px;
-  min-width: 190px;
+  /* Lists give a little before they scroll, so three fit the width of a note:
+     from 240 wide down to the narrowest the settings allow. */
+  flex: 0 1 max(240px, var(--psb-list-min, 190px));
+  min-width: var(--psb-list-min, 190px);
   display: flex;
   flex-direction: column;
   gap: 6px;

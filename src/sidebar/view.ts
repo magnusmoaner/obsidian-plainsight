@@ -56,7 +56,7 @@ import {
 import type { OcrBox } from "./core/ocr-boxes";
 import { openBoardPage } from "../boards/page";
 import { extractSnippet } from "./core/snippet";
-import { taskDetails } from "./core/task-details";
+import { cardTitle, taskDetails } from "./core/task-details";
 import { taskBadges } from "./task-badges";
 import { PRIORITIES } from "./core/task-line";
 import { taskTextColumn } from "./core/tasks";
@@ -1827,13 +1827,15 @@ export class SidebarView extends ItemView implements HoverParent {
   }
 
   /**
-   * A Kanban board's lists as tiles: name and card count; past 4, a "+N"
-   * tile. `compact`: one line per tile, for a board embedded in a note.
+   * A board's lists as tiles: name and card count; past 4, a "+N" tile.
+   * `compact`: one line per tile, for a board embedded in a note. A board's
+   * own card also names its first cards under each list.
    */
   private renderMiniBoard(parent: HTMLElement, note: NoteSummary, compact = false): void {
     const MAX = 4;
     const board = parent.createDiv("ps-card-board");
     board.toggleClass("is-compact", compact);
+    board.toggleClass("has-titles", !compact);
     const shown = note.columns.length > MAX ? MAX - 1 : MAX;
     note.columns.slice(0, shown).forEach((name, i) => {
       const total = note.laneCards[i] ?? 0;
@@ -1842,15 +1844,28 @@ export class SidebarView extends ItemView implements HoverParent {
       const lane = board.createDiv({ cls: "ps-card-lane", attr: { title: done ? `${name}: ${done} of ${total} done` : name } });
       const colour = note.laneColours[i];
       if (colour) lane.dataset.colour = colour;
-      lane.createDiv({ cls: "ps-card-lane-name", text: name });
-      lane.createDiv({ cls: "ps-card-lane-count", text: String(total) });
+      const head = lane.createDiv("ps-card-lane-head");
+      head.createDiv({ cls: "ps-card-lane-name", text: name });
+      head.createDiv({ cls: "ps-card-lane-count", text: String(total) });
+      if (!compact) {
+        // Up to three cards by name; with more, two and how many are left.
+        const cards = note.tasks.filter((t) => t.section === name);
+        for (const card of cards.slice(0, cards.length > 3 ? 2 : 3)) {
+          lane.createDiv({ cls: "ps-card-lane-card", text: cardTitle(card.text) }).toggleClass("is-done", isClosed(card));
+        }
+        if (cards.length > 3) lane.createDiv({ cls: "ps-card-lane-card is-more", text: `+${cards.length - 2} more` });
+      }
       if (done) lane.createDiv("ps-card-lane-done").style.width = `${(done / total) * 100}%`;
     });
     const rest = note.columns.length - shown;
     if (rest > 0) {
-      const lane = board.createDiv({ cls: "ps-card-lane is-more", attr: { title: note.columns.slice(shown).join(", ") } });
-      lane.createDiv({ cls: "ps-card-lane-name", text: "More lists" });
-      lane.createDiv({ cls: "ps-card-lane-count", text: `+${rest}` });
+      // The lists that don't fit: a narrow tile saying how many, naming them on hover.
+      const names = note.columns.slice(shown).join(", ");
+      board.createDiv({
+        cls: "ps-card-lane is-more",
+        text: `+${rest}`,
+        attr: { title: `${rest} more list${rest === 1 ? "" : "s"}: ${names}`, "aria-label": `${rest} more list${rest === 1 ? "" : "s"}: ${names}` },
+      });
     }
   }
 

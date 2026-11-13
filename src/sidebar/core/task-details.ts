@@ -1,3 +1,5 @@
+import { cardDisplay } from "../../boards/board";
+import { extractSnippet } from "./snippet";
 import { PRIORITIES, Priority } from "./task-line";
 
 /**
@@ -94,4 +96,17 @@ export function recurrenceDays(rule: string): number {
   }
   if (/every\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i.test(rule)) return 7;
   return Number.POSITIVE_INFINITY;
+}
+
+/**
+ * A board card's title alone, for its tile in the note list: without the
+ * Kanban date and time, the Tasks plugin's details, Dataview fields, tags,
+ * or Markdown and link syntax.
+ */
+export function cardTitle(text: string): string {
+  const { body } = cardDisplay(text);
+  // A [key:: value] field is data about the card, not part of its name.
+  const line = body.split("\n")[0].replace(/[[(][^[\]()]*::[^[\]()]*[\])]/g, "");
+  const title = extractSnippet(taskDetails(line).description);
+  return title.replace(/(^|\s)#[^\s#]+/g, "").replace(/\s+/g, " ").trim() || "Untitled";
 }

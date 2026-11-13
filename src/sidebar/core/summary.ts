@@ -133,7 +133,9 @@ export function summarize(facts: FileFacts, text: string, boards: BoardKinds | n
   // Task List Kanban's own test: any truthy kanban_plugin value (its
   // settings, a JSON string, or an empty mapping for a new board).
   const taskListBoard = !!boards?.taskList && !board && Boolean(facts.frontmatter?.kanban_plugin);
-  const colours = board ? listColours(text) : {};
+  // List colours are a Plainsight board's; on a Kanban plugin board they're not shown.
+  const ownBoard = !!board && facts.frontmatter?.["plainsight-plugin"] !== undefined;
+  const colours = ownBoard ? listColours(text) : {};
   return {
     path: facts.path,
     kind: board || taskListBoard ? "board" : "note",
@@ -159,7 +161,7 @@ export function summarize(facts: FileFacts, text: string, boards: BoardKinds | n
     sourceLinks: extracted ? fileLinks(text) : [],
     ocrBoxes: board ? [] : ocrBoxes(text),
     taskListBoard,
-    ownBoard: !!board && facts.frontmatter?.["plainsight-plugin"] !== undefined,
+    ownBoard,
   };
 }
 

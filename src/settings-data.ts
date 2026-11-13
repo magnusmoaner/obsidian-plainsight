@@ -20,6 +20,8 @@ export interface WysiwygSettings {
   kanbanBoards: boolean;
   /** Read the Task List Kanban plugin's boards as boards. */
   taskListBoards: boolean;
+  /** The narrowest a list on a board gets before the board scrolls sideways, in px. */
+  boardListMinWidth: number;
   /** A Boards row in the places column, below Tasks. */
   showBoardsRow: boolean;
   /** List board cards on the Tasks page (they're `- [ ]` lines too). */
@@ -54,6 +56,7 @@ export const DEFAULT_SETTINGS: WysiwygSettings = {
   boards: true,
   kanbanBoards: true,
   taskListBoards: true,
+  boardListMinWidth: 190,
   showBoardsRow: true,
   boardCardsInTasks: false,
   hoverPreviews: true,
@@ -70,6 +73,15 @@ export const DEFAULT_SETTINGS: WysiwygSettings = {
   showDailyNotes: true,
   showTemplates: true,
 };
+
+/** The range the settings offer for a list's narrowest width. */
+export const LIST_MIN_WIDTH = { min: 150, max: 400, step: 10 };
+
+/** The setting as a usable width: within the range, whatever the file holds. */
+export function listMinWidth(settings: WysiwygSettings): number {
+  const value = Number.isFinite(settings.boardListMinWidth) ? settings.boardListMinWidth : DEFAULT_SETTINGS.boardListMinWidth;
+  return Math.min(LIST_MIN_WIDTH.max, Math.max(LIST_MIN_WIDTH.min, Math.round(value)));
+}
 
 const KNOWN = new Set<string>(Object.keys(DEFAULT_SETTINGS));
 
