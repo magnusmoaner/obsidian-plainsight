@@ -1,6 +1,6 @@
 # Plainsight
 
-An Obsidian plugin for a calm, document-like note experience: Markdown that reads like a page instead of syntax, and a two-column notes sidebar that shows what's in a note before you open it.
+An Obsidian plugin for a calm, document-like note experience: Markdown that reads like a page instead of syntax, a two-column notes sidebar that shows what's in a note before you open it, and boards you can keep inside a note.
 
 Your files stay ordinary Markdown. Plainsight hides syntax and adds browsing on top; it never converts your notes into another format.
 
@@ -8,7 +8,7 @@ Your files stay ordinary Markdown. Plainsight hides syntax and adds browsing on 
 
 ## The editor (beta, work in progress)
 
-> **Beta, work in progress.** The editor draws only part of Markdown so far, more is being added (see below), and you may meet rough edges. It changes how notes look and how keys behave, never what's in your files, so switching it off (**Enable WYSIWYG editing** in settings, or the *Toggle WYSIWYG editing* command) gives you plain Obsidian back at once. The sidebar works the same either way.
+> **Beta, work in progress.** The editor draws only part of Markdown so far, more is being added (see below), and you may meet rough edges. It changes how notes look and how keys behave, never what's in your files, so switching it off (**WYSIWYG editing** in settings, or the *Toggle WYSIWYG editing* command) gives you plain Obsidian back at once. The sidebar works the same either way.
 
 Formatting renders as you type, and the syntax never comes back: there's no "reveal the markup when the cursor gets close". Typing Markdown still works, because a construct converts the moment it's complete.
 
@@ -35,16 +35,17 @@ Evernote-style browsing for your vault. The sidebar is its own tab in Obsidian's
 | Place | What you get |
 | --- | --- |
 | **Bookmarks** | Obsidian's own bookmarks, with their bookmark group on the right. Bookmarks to deleted notes are crossed out; click one to remove it. |
-| **Notes** | Every note, pinned notes first. Group by month, folder or type, or not at all. Chips filter to Notes, Boards ([Kanban](https://github.com/mgmeyers/obsidian-kanban) and [Task List Kanban](https://github.com/erikars/task-list-kanban)) or Canvases. |
+| **Notes** | Every note, pinned notes first. Group by month, folder or type, or not at all. Chips filter to Notes, Boards or Canvases. |
 | **Daily notes** | The core Daily notes folder. The `+` opens today's note. |
 | **Tasks** | Tasks from all your notes. See below. |
+| **Boards** | Every board in the vault: Plainsight's own, and those of the [Kanban](https://github.com/mgmeyers/obsidian-kanban) and [Task List Kanban](https://github.com/erikars/task-list-kanban) plugins. Chips filter by type of board; group by type, or by the note a board is embedded in. See [Boards](#boards). |
 | **Attachments** | PDFs, images and other files, with thumbnails, searchable by the text inside them. Group by month, folder or file type, or not at all. See below. |
 | **Templates** | The core Templates folder. The `+` makes a new template. Click a template to open it; its **New note from template** button (also on right-click) makes a note from it in the folder you last viewed. Right-click the **Note** button to pick a template from anywhere. |
 | **Folders** and **Tags** | Collapsible trees with counts. Folders Obsidian uses for attachments are left out, and so are the daily notes and templates folders while they have a place of their own. |
 
-Daily notes and Templates show while their core plugin is on, and each can be turned off in settings. Until its folder is set, the place offers **Choose folder**, which opens that core plugin's settings.
+Daily notes and Templates show while their core plugin is on. They, Tasks and Boards can each be turned off in settings. Until its folder is set, the place offers **Choose folder**, which opens that core plugin's settings.
 
-**Tasks.** Filter by Open, Overdue or Done, or by a single note. Each task shows its note, plus badges for priority, due and scheduled dates ("Tomorrow"; overdue in red), recurrence and tags. Group by due date, scheduled date (done tasks by the day they were done), priority, recurrence, tag, folder, note or Kanban board ("Board › List", in the board's order). The task under your cursor in a note is highlighted in the list. Ticking a task goes through the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) plugin when it's installed, so done dates and recurring tasks behave exactly as inside a note.
+**Tasks.** Filter by Open, Overdue or Done, or by a single note. Each task shows its note, plus badges for priority, due and scheduled dates ("Tomorrow"; overdue in red), recurrence and tags. Group by due date, scheduled date (done tasks by the day they were done), priority, recurrence, tag, folder, note or board ("Board › List", in the board's order). The task under your cursor in a note is highlighted in the list. Ticking a task goes through the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) plugin when it's installed, so done dates and recurring tasks behave exactly as inside a note.
 
 **Attachments.** A file's extracted text is its card's preview and makes it findable by what it says. The text comes from [OCR Extractor](https://github.com/jritzi/ocr-extractor)'s *Extracted text* boxes under the file's embeds, or from extracted-text notes (frontmatter `type: extracted-text` with a link to the file), which are listed with the file and kept out of your note lists. Right-click a file for:
 - **Open extracted text**, which jumps to the box or note holding its text;
@@ -52,7 +53,7 @@ Daily notes and Templates show while their core plugin is on, and each can be tu
 
 ### Note cards
 
-Each card shows the title, the first useful line of text, task progress (`3/6`), the date, tags and a thumbnail. Canvases and boards get their own icons; a Kanban board shows how many cards it holds (archived ones aren't counted), and a Task List Kanban board is labelled as one, since its cards are tasks from your other notes.
+Each card shows the title, the first useful line of text, task progress (`3/6`), the date, tags and a thumbnail. Canvases and boards get their own icons. A board shows its lists as tiles, each with its card count and a line for how many are done (archived cards aren't counted); a Task List Kanban board is labelled as one, since its cards are tasks from your other notes. A note with a board embedded in it shows that board's lists under its text, and counts its cards in the task progress.
 
 Right-click a card to open it in a new tab or to the right, pin or unpin it, rename or delete it, plus whatever other plugins add (such as *Move file to…*). Right-click a folder for New note, New folder, Rename and Delete.
 
@@ -66,8 +67,8 @@ Rest the mouse on a card to preview the note or file beside the list; rest it on
 ### Creating things
 
 - **The button row** at the top of the left column: the **Note** pill, then round buttons for **Search**, **Daily note** (today's note, while the Daily notes core plugin is on), **New folder**, **New task** and **⋯**. Settings can hide the whole row, or any of the round buttons; a hidden Search, Daily note, New folder or New task button (and, one at a time as the column narrows, New folder, New task and Daily note) moves into the **⋯** menu. Right-click the **Note** pill for **New note from template…**.
-- **A `+`** appears when you hover Notes, Daily notes (today's note), Tasks, Templates (a new template), Folders or Tags (not on touch screens).
-- **The list header** has a button for a new note (a new task on Tasks, today's note on Daily notes, a new template on Templates). Outside Daily notes and Templates, a second one makes a new [Kanban](https://github.com/mgmeyers/obsidian-kanban) or [Task List Kanban](https://github.com/erikars/task-list-kanban) board in the folder you're viewing (with both plugins enabled, it asks which).
+- **A `+`** appears when you hover Notes, Daily notes (today's note), Tasks, Boards (a new board), Templates (a new template), Folders or Tags (not on touch screens).
+- **The list header** has a button for a new note (a new task on Tasks, today's note on Daily notes, a new template on Templates). Outside Daily notes and Templates, a second one makes a new board in the folder you're viewing: Plainsight's own, or, with the [Kanban](https://github.com/mgmeyers/obsidian-kanban) or [Task List Kanban](https://github.com/erikars/task-list-kanban) plugin enabled, a choice of kinds. On Boards, the first button makes a Plainsight board and the second the plugins' kinds.
 - **The ⋯ menu** creates tags, canvases and boards, inserts a template into the open note, opens Obsidian's search, quick switcher, graph view and the Importer, and has expand/collapse all, bookmark cleanup and settings.
 
 Buttons and menu items for plugins that aren't enabled are hidden.
@@ -103,7 +104,50 @@ In a list of notes, a task query keeps the notes that have a matching task.
 
 - **Fast start.** The sidebar opens at once and reads your most recently changed notes first, so they show almost straight away. A thin bar under the list header runs until the rest are read.
 - **Out of the way while you type.** Changes to the note you're typing in reach the sidebar when you pause, and only the cards, tasks and counts that changed are redrawn, so the sidebar never slows typing down.
-- **Per device.** Folded sections, column width, grouping and the filter chips are remembered on each device and don't sync, so your phone and computer can each keep their own (Obsidian 1.8.7 or later).
+- **Per device.** Folded sections, column width, grouping and the filter chips are remembered on each device and don't sync, so your phone and computer can each keep their own (Obsidian 1.8.7 or later). The Boards list's filter by type of board isn't remembered; it starts on All.
+
+## Boards
+
+A board is a set of lists holding cards, for a project, a trip or a week. Plainsight has its own, and they live where your notes do.
+
+- **On a page of its own, or inside a note.** A board opens as a board from the sidebar, the file explorer or a link. To put one inside a note, run **Insert new board** (it makes `<note name> board` next to the note and embeds it) or **Embed existing board**. An embedded board is worked on in place, without leaving the note.
+- **Cards.** Add, edit, tick, drag and delete them. A card is edited in Obsidian's own editor, so links and tags complete as you type, and with the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) plugin its suggestions for dates, priority and recurrence come up too. Those details, and tags at the start or end of the card, show as badges along the bottom of the card.
+- **Statuses.** A card is open `[ ]`, in progress `[/]`, done `[x]` or cancelled `[-]`, set from its menu. Ticking a card goes through the Tasks plugin when it's installed, so the card gets its done date and a repeating card leaves its next round behind.
+- **Lists.** Rename, drag to reorder, minimize or delete a list from its header and menu. A list can give a status to the cards that land in it (in progress, done or cancelled); a card that leaves for a plain list is open again. New lists are added on the board's own page.
+
+**A board is a Markdown note.** Each list is a `## ` heading and each card a checkbox line under it, which is the Kanban plugin's file format. A Plainsight board is marked `plainsight-plugin: board` in its properties; one made by the Kanban plugin is marked `kanban-plugin`, and that plugin keeps opening it. Every edit changes only the lines of the cards or lists involved.
+
+```markdown
+---
+plainsight-plugin: board
+---
+
+## To do
+
+- [ ] Order the tiles 📅 2026-11-15 ⏫
+- [ ] Pick a tap #shopping
+
+## Done
+
+**Complete**
+- [x] Choose the worktop ✅ 2026-11-06
+```
+
+**The embed** is a code block naming the board. A board embedded with one of the two commands lists that note in turn, in an `embedded-in` property, so when the board is renamed the block follows. (A block you type yourself works too; it just isn't followed on a rename.)
+
+````markdown
+```plainsight-board
+board: [[Kitchen renovation board]]
+```
+````
+
+Good to know:
+
+- **Kanban plugin boards** can be embedded and edited the same way. Without that plugin, Plainsight opens them on its own board page. A list's done status and its minimized state are stored the way the Kanban plugin stores them, so both agree; in-progress and cancelled lists are Plainsight's own and are kept in the board's settings block, which Kanban leaves alone.
+- **`kanban-embed` blocks**, from the Kanban Embed plugin, are drawn too while that plugin is off (reload Plainsight after switching it).
+- **Open as Markdown**, a button on the board page, shows the note behind a board.
+- **With "Let Plainsight draw everything (Source mode)" on**, an embedded board shows as its code block for now.
+- **Task List Kanban boards** gather tasks from other notes, so they have no lists of their own to embed.
 
 ## Commands and hotkeys
 
@@ -128,6 +172,8 @@ Heading shortcuts use `Opt/Alt` because Obsidian already binds `Cmd + 1…8` to 
 | **Toggle WYSIWYG editing** | Switches between Plainsight's editor and plain Markdown, handy for a quick look at the raw text while the editor is in beta. |
 | **Remove bookmarks to deleted notes** | Tidies Bookmarks. Rarely needed, so the palette is usually enough. |
 
+The board commands, **Insert new board**, **Embed existing board** and **Open this note as a board**, are in the palette too.
+
 To set one, open **Settings → Hotkeys** and search for *Plainsight*, or click **Set hotkeys** at the bottom of Plainsight's settings, which opens that list for you. Click the `+` next to a command and press the keys. Obsidian warns you if they're already in use. The editor shortcuts above can be changed there too.
 
 ## How Plainsight treats your notes
@@ -135,33 +181,36 @@ To set one, open **Settings → Hotkeys** and search for *Plainsight*, or click 
 - **Markdown stays the source of truth.** No database and no separate copy. Everything shown comes from your files.
 - **Edits are as small as possible.** Pinning edits one property line. Adding a tag edits only the `tags` property, keeping its existing formatting. Ticking a task changes one line, and only if that line is still the task that was shown. Nothing is ever re-saved through a YAML serializer that could drop comments or reformat the file.
 - **If an edit can't be made safely, nothing is written.** For example, adding a tag to a `tags` property written in a format Plainsight doesn't recognise. You get a message explaining why instead.
+- **Boards are edited line by line.** Moving a card moves its lines; nothing else in the file is rewritten, so the archive and settings block of a Kanban board stay as they were. An edit on a card that changed underneath is refused, not guessed.
 - **Canvases are never written to.** They're JSON, and Plainsight's edits are line-based.
 - **Other plugins keep working.** Plainsight never intercepts other plugins' edits, so formatting inserted by tools such as Better Edit or Editing Toolbar renders normally.
 
 ## Settings
 
-The settings are grouped under eight headings.
+The settings are in five groups. A setting that depends on another shows only while that one is on.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| ***Action buttons*** | | |
-| Show action buttons | On | The Note button and the round buttons beside it, at the top of the left column. Everything they do stays reachable without it, through the `+` on Notes, Tasks, Folders and Tags and through the commands |
-| Search, Daily note, New folder, New task and ⋯ buttons | On | Each round button (greyed out while the action buttons are off). Daily note shows only while the Daily notes core plugin is on. Search, Daily note, New folder or New task turned off moves into the **⋯** menu |
-| ***Daily notes*** and ***Templates*** | | |
-| Show in the left column | On | The place, while its core plugin is on. Its folder is listed there instead of under Folders |
-| Core plugin is off / No folder set / Folder | — | Where that place stands, with a button to turn the core plugin on, choose its folder or change it |
-| ***Previews*** | | |
+| ***Sidebar*** | | |
+| Action buttons | On | The Note button and the round buttons beside it, at the top of the left column. Everything they do stays reachable without it, through the `+` on Notes, Tasks, Folders and Tags and through the commands |
+| Search, Daily note, New folder, New task and ⋯ buttons | On | Each round button. Daily note shows only while the Daily notes core plugin is on. Search, Daily note, New folder or New task turned off moves into the **⋯** menu |
 | Preview on hover | On | Resting the mouse on a note card or a task previews the note (needs the core Page preview plugin) |
-| ***Gaps*** | | |
-| Top, Bottom, Left, Right | Bottom only | A gap between the white list panel and the window edge on each chosen side; corners round on sides with a gap |
+| Gaps around the note list | Bottom only | Four switches, for top, bottom, left and right: a gap between the white list panel and the window edge on each chosen side; corners round on sides with a gap |
+| ***Side menu*** | | |
+| Daily notes, Templates | On | The place, while its core plugin is on. Its folder is listed there instead of under Folders. The row says where the place stands, with a button to turn the core plugin on, choose its folder or change it |
+| Boards | On | The Boards place, below Tasks |
 | ***Tasks*** | | |
-| Default note for new tasks | (asked the first time) | Where the sidebar's New task button and the `+` on Tasks add tasks (any note except a Kanban board) |
-| List Kanban cards as tasks | Off | The Kanban plugin saves cards as checkbox lines. Off: they show on the Tasks page only when grouped by Kanban board. On: every card is listed among your tasks |
+| Tasks | On | The Tasks place, the New task buttons, the task progress on note cards and tasks in Search everywhere. Off hides them; your tasks stay in your notes |
+| Default note for new tasks | (asked the first time) | Where the sidebar's New task button and the `+` on Tasks add tasks (any note except a board) |
+| Board cards as tasks | Off | A board saves cards as checkbox lines. Off: they show on the Tasks page only when grouped by board. On: every card is listed among your tasks |
+| ***Boards*** | | |
+| Boards | On | Plainsight's boards, and the look of boards in the sidebar. Off: a board is listed like any other note, its cards are ordinary tasks, and an embedded board shows as its code block |
+| Kanban plugin boards | On | Boards made with the Kanban plugin count as boards. Off: they're listed like any other note |
+| Task List Kanban boards | On | The same, for the Task List Kanban plugin |
 | ***Editor (beta)*** | | |
-| Enable WYSIWYG editing | On | Hides syntax and enables the editor shortcuts |
-| Let Plainsight draw everything (Source mode) | Off | Switches notes from Live Preview to Source mode, so Plainsight alone draws them. Greyed out while the editor is off |
-| ***Hotkeys*** | | |
-| Set hotkeys | — | Opens Settings → Hotkeys, showing only Plainsight's commands |
+| WYSIWYG editing | On | Hides syntax and enables the editor shortcuts |
+| Let Plainsight draw everything (Source mode) | Off | Switches notes from Live Preview to Source mode, so Plainsight alone draws them |
+| Hotkeys | — | **Set hotkeys** opens Settings → Hotkeys, showing only Plainsight's commands |
 
 Settings live in the plugin's `data.json`, which syncs with your vault. If a sync service hasn't delivered that file yet when Obsidian starts, Plainsight uses the defaults and doesn't write over it: a change you make while the file can't be read, or within a minute of starting while it's missing, waits and is applied on top of your real settings once they arrive. A file that's still missing after that minute is treated as a fresh install, and your change is saved.
 
@@ -171,8 +220,8 @@ Plainsight needs no other plugin. These add to it when they're installed and ena
 
 | Plugin | What it adds | Without it |
 | --- | --- | --- |
-| [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) | Ticking a task goes through Tasks, so done dates and recurring tasks work as in a note. New tasks use its format and global filter. Search can insert a ` ```tasks ` query. | Tasks are ticked by Plainsight itself; no recurrence handling and no query insert |
-| [Kanban](https://github.com/mgmeyers/obsidian-kanban) | Its boards are listed with their card counts, tasks can be grouped by board, and new boards can be created | No Kanban boards |
+| [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) | Ticking a task or a board card goes through Tasks, so done dates and recurring tasks work as in a note. New tasks use its format and global filter. Its suggestions come up while you type a card. Search can insert a ` ```tasks ` query. | Tasks and cards are ticked by Plainsight itself; no done dates or recurrence handling, and no query insert |
+| [Kanban](https://github.com/mgmeyers/obsidian-kanban) | Its boards are listed with their lists and card counts, can be embedded in notes, and open in Kanban's own view. New Kanban boards can be created | Plainsight opens Kanban boards on its own board page |
 | [Task List Kanban](https://github.com/erikars/task-list-kanban) | Its boards are listed as boards, and new ones can be created | No Task List Kanban boards |
 | [Omnisearch](https://github.com/scambier/obsidian-omnisearch) | Typo-tolerant ranking and excerpts in Search everywhere | Plainsight's own ranking |
 | [OCR Extractor](https://github.com/jritzi/ocr-extractor) | Writes a file's text into the note under its embed; Plainsight shows and searches that text with the file under Attachments | Attachments are found by name only (or by extracted-text notes) |
@@ -211,12 +260,13 @@ npm run deploy    # build and copy into a vault
 
 **Layout**
 - `src/editor/`: the CodeMirror 6 extension. Plainsight runs its own incremental Lezer Markdown parse and builds the decorations, hidden delimiters and edit behaviour from that syntax tree.
+- `src/boards/`: boards. `board.ts` is pure TypeScript: it reads a board file and makes every edit, line by line. The rest draws a board (in a note or on its page), embeds Obsidian's editor in a card, and registers the commands.
 - `src/sidebar/core/`: pure TypeScript (no `obsidian` import), tested in Node. This covers note summaries, the index, queries, task parsing and grouping, and the safe text edits.
 - `src/sidebar/`: the Obsidian side. The view, the indexer that follows vault events, the dialogs, the write actions, and `internals.ts`, which isolates every undocumented Obsidian API in one place.
 
 ## Roadmap
 
-In progress for the editor: link editing (a link toolbar, an Edit dialog and Cmd+K) and embeds (images, file chips, note previews). After that: frontmatter/properties, lists and task checkboxes, and tables. For the sidebar, Spaces are planned (folders grouped into named spaces).
+In progress for the editor: link editing (a link toolbar, an Edit dialog and Cmd+K) and embeds (images, file chips, note previews). After that: frontmatter/properties, lists and task checkboxes, and tables. Embedded boards aren't drawn yet with Source mode on. For the sidebar, Spaces are planned (folders grouped into named spaces).
 
 ## License
 
