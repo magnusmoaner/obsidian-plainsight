@@ -1464,14 +1464,12 @@
 .psb-lane.is-collapsed [aria-label="List actions"] {
   display: none;
 }
-/* "Add list", after the last list: a narrow outlined strip with its words
-   running down it, the shape of a minimized list. */
+/* Add a list, after the last list: a small outlined +. */
 .psb-board button.psb-lane-new {
   flex: 0 0 auto;
   display: inline-flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
   height: auto;
   padding: 8px;
   border-radius: 10px;
@@ -1479,19 +1477,11 @@
   box-shadow: none;
   border: 1px dashed var(--background-modifier-border-hover);
   color: var(--text-muted);
-  white-space: nowrap;
   cursor: pointer;
-}
-.psb-lane-new-text {
-  writing-mode: vertical-rl;
-  font-weight: var(--font-bold);
 }
 .psb-board button.psb-lane-new:hover {
   border-style: solid;
   color: var(--text-normal);
-}
-.psb-lane-new span:first-child {
-  display: inline-flex;
 }
 .psb-lane-new svg {
   width: 14px;

@@ -370,11 +370,10 @@ export class BoardView extends MarkdownRenderChild {
     if (!foot.childElementCount) foot.remove();
   }
 
-  /** After the last list, on the board's own page: a narrow strip, like a minimized list. */
+  /** After the last list, on the board's own page: a small outlined +. */
   private renderAddLane(parent: HTMLElement): void {
-    const add = parent.createEl("button", { cls: "psb-lane-new" });
-    setIcon(add.createSpan(), "plus");
-    add.createSpan({ cls: "psb-lane-new-text", text: "Add list" });
+    const add = parent.createEl("button", { cls: "psb-lane-new", attr: { "aria-label": "Add a list" } });
+    setIcon(add, "plus");
     add.addEventListener("click", () => this.addList());
   }
 
