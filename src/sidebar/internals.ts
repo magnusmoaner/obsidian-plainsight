@@ -1,4 +1,4 @@
-import { App, HoverPopover, normalizePath, TFolder } from "obsidian";
+import { App, HoverPopover, normalizePath, TAbstractFile, TFolder } from "obsidian";
 
 /**
  * Undocumented Obsidian and plugin APIs, isolated so they're easy to audit.
@@ -316,4 +316,70 @@ export function placePopover(
   };
   internal.position = position;
   position();
+}
+
+/*
+ * Dragging files and folders goes through Obsidian's own drag manager, the
+ * one File explorer uses. A drag started here can then be dropped anywhere
+ * Obsidian takes files (a note, a tab, File explorer), and files dragged
+ * from there can be dropped here. It isn't in the public API: without it
+ * nothing is draggable, and nothing else changes.
+ */
+interface Draggable {
+  type?: string;
+  file?: TAbstractFile;
+  files?: TAbstractFile[];
+}
+interface DragManager {
+  onDragStart(evt: DragEvent, draggable: object): void;
+  dragFile(evt: DragEvent, file: TAbstractFile): object;
+  dragFolder(evt: DragEvent, folder: TFolder): object;
+  handleDrop(el: HTMLElement, handler: (evt: DragEvent, draggable: Draggable | null, over: boolean) => object | null): void;
+  actionEl?: HTMLElement | null;
+}
+
+function dragManager(app: App): DragManager | null {
+  const manager = (app as unknown as { dragManager?: Partial<DragManager> }).dragManager;
+  const has = (name: keyof DragManager) => typeof manager?.[name] === "function";
+  return manager && has("onDragStart") && has("dragFile") && has("dragFolder") && has("handleDrop") ? (manager as DragManager) : null;
+}
+
+/**
+ * Start dragging `file`. `ghost` is what follows the pointer, held where it
+ * was grabbed (`anchor`, from its top left); `action`, inside it, is where
+ * Obsidian writes what a drop would do. False if dragging isn't available.
+ */
+export function startFileDrag(
+  app: App,
+  evt: DragEvent,
+  file: TAbstractFile,
+  ghost: { el: HTMLElement; anchor: { x: number; y: number }; action: HTMLElement }
+): boolean {
+  const manager = dragManager(app);
+  if (!manager || !evt.dataTransfer) return false;
+  const data = file instanceof TFolder ? manager.dragFolder(evt, file) : manager.dragFile(evt, file);
+  manager.onDragStart(evt, { ...data, ghostEl: ghost.el, ghostAnchor: ghost.anchor });
+  // With a ghost of our own, the manager makes no line for the action: it gets ours.
+  manager.actionEl = ghost.action;
+  return true;
+}
+
+/**
+ * Let `el` take dropped files and folders. `accept` says what dropping them
+ * would do, in a few words, or null to refuse; `drop` does it. While they're
+ * over `el` it has the class "is-drop-target".
+ */
+export function onFilesDropped(
+  app: App,
+  el: HTMLElement,
+  accept: (files: TAbstractFile[]) => string | null,
+  drop: (files: TAbstractFile[]) => void
+): void {
+  dragManager(app)?.handleDrop(el, (_evt, draggable, over) => {
+    const files = draggable?.type === "files" ? draggable.files ?? [] : draggable?.file ? [draggable.file] : [];
+    const action = files.length ? accept(files) : null;
+    if (!action) return null;
+    if (!over) drop(files);
+    return { action, dropEffect: "move", hoverEl: el, hoverClass: "is-drop-target" };
+  });
 }
