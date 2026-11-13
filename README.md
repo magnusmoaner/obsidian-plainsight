@@ -34,7 +34,7 @@ Evernote-style browsing for your vault. The sidebar is its own tab in Obsidian's
 
 | Place | What you get |
 | --- | --- |
-| **Bookmarks** | Obsidian's own bookmarks, with their bookmark group on the right. Bookmarks to deleted notes are crossed out; click one to remove it. |
+| **Bookmarks** | Obsidian's own bookmarks, with their bookmark group on the right. Bookmarks to deleted notes are crossed out; click one to remove it. The filters you save are listed after them (see [Search](#search)). |
 | **Notes** | Every note, pinned notes first. Group by month, folder or type, or not at all. Chips filter to Notes, Boards or Canvases. |
 | **Daily notes** | The core Daily notes folder. The `+` opens today's note. |
 | **Tasks** | Tasks from all your notes. See below. |
@@ -53,7 +53,7 @@ Daily notes and Templates show while their core plugin is on. They, Tasks and Bo
 
 ### Note cards
 
-Each card shows the title, the first useful line of text, task progress (`3/6`), the date, tags and a thumbnail. Canvases and boards get their own icons. A board shows its lists as tiles, each with its card count and a line for how many are done (archived cards aren't counted); a Task List Kanban board is labelled as one, since its cards are tasks from your other notes. A note with a board embedded in it shows that board's lists under its text, and counts its cards in the task progress.
+Each card shows the title, the first useful line of text, task progress (`3/6`), the date, tags and a thumbnail. Canvases and boards get their own icons. A board shows its lists as tiles: each has the list's name and card count, the names of its first cards (three, or two and "+N more" when there are more), the list's colour if it has one, and a line for how many cards are done. Archived cards aren't counted. A board with more than four lists shows three, and a narrow "+N" tile that names the rest when you hover it. A Task List Kanban board is labelled as one, since its cards are tasks from your other notes. A note with a board embedded in it shows that board's lists under its text, as slimmer tiles with name and count, and counts its cards in the task progress.
 
 Right-click a card to open it in a new tab or to the right, pin or unpin it, rename or delete it, plus whatever other plugins add (such as *Move file to…*). Right-click a folder for New note, New folder, Rename and Delete.
 
@@ -81,10 +81,9 @@ Buttons and menu items for plugins that aren't enabled are hidden.
 
 - **Search everywhere** (the round **Search** button, or the command, which is worth a hotkey) looks through tasks, boards, notes, attachments (by name and by their text), folders and tags at once. The best matches come first, with excerpts, grouped by kind: filters, folders and tags, tasks, boards, notes, then attachments. Choosing a result shows it in the sidebar too. **Show in Obsidian search** hands the query to Obsidian's own search. With [Omnisearch](https://github.com/scambier/obsidian-omnisearch) installed, its typo-tolerant ranking orders the notes and attachments. With Tasks installed, **Insert as Tasks query** puts the search into your note as a ` ```tasks ` block.
 - **The search field above the list** narrows the list you're looking at, keeping its order and grouping. It's cleared when you switch to another list.
+- **Filters.** A filter is a search you save. With something typed in a list's search field, a **Save as a filter** button appears beside the list's other buttons; give the filter a name (the dialog lists what it will hold). It's kept in the left column at the end of the Bookmarks section, which is then headed **Bookmarks & filters**, with a filter icon and the list it belongs to. Click it to open that list with the search filled in, and grouped, sorted and with the same chip chosen as when you saved it (on Tasks, the tab it was saved on). To change one, open it, change what's typed and save it again under the same name. Right-click one to rename or remove it. Search everywhere finds filters by name, first in its results. They're stored in Plainsight's settings, so they sync with the vault.
 
-- **Filters.** A filter is a search you save. With something typed in a list's search field, a **Save as a filter** button appears beside the list's other buttons; give the filter a name. It's kept in the left column at the end of the Bookmarks section, which is then headed **Bookmarks & filters**, with a filter icon and the list it belongs to. Click it to open that list with the search filled in, and grouped, sorted and with the same chip chosen as when you saved it (on Tasks, the tab it was saved on). To change one, open it, change what's typed and save it again under the same name. Right-click one to rename or remove it. Search everywhere finds filters by name, first in its results. They're stored in Plainsight's settings, so they sync with the vault.
-
-Both understand the same queries:
+Search everywhere and the search field understand the same queries:
 
 | Query | Finds |
 | --- | --- |
@@ -112,11 +111,11 @@ In a list of notes, a task query keeps the notes that have a matching task.
 
 A board is a set of lists holding cards, for a project, a trip or a week. Plainsight has its own, and they live where your notes do.
 
+- **A new board** starts with three lists: Inbox, Doing (blue) and Done (green), with Done marking its cards done.
 - **On a page of its own, or inside a note.** A board opens as a board from the sidebar, the file explorer or a link. To put one inside a note, run **Insert new board** (it makes `<note name> board` next to the note and embeds it) or **Embed existing board**. An embedded board is worked on in place, without leaving the note.
-- **Cards.** Add, edit, tick, drag and delete them. A card is edited in Obsidian's own editor, so links and tags complete as you type, and with the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) plugin its suggestions for dates, priority and recurrence come up too. Those details, and tags at the start or end of the card, show as badges along the bottom of the card.
+- **Cards.** Add, edit, tick, drag and delete them. A dragged card leaves an empty slot where it would land. A card is edited in Obsidian's own editor, so links and tags complete as you type, and with the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) plugin its suggestions for dates, priority and recurrence come up too. Those details, and tags at the start or end of the card, show as badges along the bottom of the card.
 - **Statuses.** A card is open `[ ]`, in progress `[/]`, done `[x]` or cancelled `[-]`, set from its menu. Ticking a card goes through the Tasks plugin when it's installed, so the card gets its done date and a repeating card leaves its next round behind.
-- **Lists.** Rename, drag to reorder, minimize or delete a list from its header and menu. On a Plainsight board a list can also have a colour, shown on the board and on its tile in the note list. A list can give a status to the cards that land in it (in progress, done or cancelled); a card that leaves for a plain list is open again. New lists are added on the board's own page, with the **+** after the last list or the one at the page's top right; the new list's name is ready to type over.
-
+- **Lists.** Rename, drag to reorder, minimize or delete a list from its header and menu. On a Plainsight board a list can also have a colour, one of eight that follow your theme, shown on the board and on its tile in the note list. A list can give a status to the cards that land in it (in progress, done or cancelled); a card that leaves for a plain list is open again. New lists are added on the board's own page, with the **+** after the last list or the one at the page's top right; the new list's name is ready to type over.
 - **About the board.** On its own page a board starts with its name, a description, its tags and the notes it's embedded in, each a link. Click the name to rename the board, or the description to write or change it; **Tag** adds a tag. Both are ordinary properties of the board's note (`description` and `tags`), so the tags also show on the board's card and under Tags.
 
 **A board is a Markdown note.** Each list is a `## ` heading and each card a checkbox line under it, which is the Kanban plugin's file format. A Plainsight board is marked `plainsight-plugin: board` in its properties; one made by the Kanban plugin is marked `kanban-plugin`, and that plugin keeps opening it. Every edit changes only the lines of the cards or lists involved.
@@ -147,7 +146,7 @@ board: [[Kitchen renovation board]]
 
 Good to know:
 
-- **Kanban plugin boards** can be embedded and edited the same way. Without that plugin, Plainsight opens them on its own board page. A list's done status and its minimized state are stored the way the Kanban plugin stores them, so both agree; in-progress and cancelled lists are Plainsight's own and are kept in the board's settings block, which Kanban leaves alone.
+- **Kanban plugin boards** can be embedded and edited the same way. Without that plugin, Plainsight opens them on its own board page. A list's done status and its minimized state are stored the way the Kanban plugin stores them, so both agree; in-progress and cancelled lists are Plainsight's own and are kept in the board's settings block, which Kanban leaves alone. List colours are kept there too, and are for Plainsight boards only: a Kanban plugin board shows none.
 - **`kanban-embed` blocks**, from the Kanban Embed plugin, are drawn too while that plugin is off (reload Plainsight after switching it).
 - **Open as Markdown**, a button on the board page, shows the note behind a board.
 - **With "Let Plainsight draw everything (Source mode)" on**, an embedded board shows as its code block for now.
