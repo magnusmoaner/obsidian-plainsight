@@ -57,7 +57,9 @@ import {
 import type { OcrBox } from "./core/ocr-boxes";
 import { openBoardPage } from "../boards/page";
 import { extractSnippet } from "./core/snippet";
+import { dragCopy, draggedTask, moveTaskOut, setDraggedTask } from "../drag";
 import { movedPath } from "./core/edits";
+import { appendTask } from "./core/task-move";
 import { cardTitle, taskDetails } from "./core/task-details";
 import { listChips, listGrouping, listSorts } from "../settings-data";
 import type { KindFilter } from "./core/view-state";
@@ -65,7 +67,7 @@ import type { SavedSearch } from "../settings-data";
 import { taskBadges } from "./task-badges";
 import { PRIORITIES } from "./core/task-line";
 import { taskTextColumn } from "./core/tasks";
-import { holdsCards, inFolder, isClosed, NoteSummary, renamedPath } from "./core/types";
+import { holdsCards, inFolder, isClosed, NoteSummary, renamedPath, TaskItem } from "./core/types";
 import { NAV_WIDTH } from "./core/view-state";
 import { SearchModal, SearchSource } from "./search-modal";
 import {
@@ -103,7 +105,9 @@ import {
   hasTasksPlugin,
   KANBAN_NEW_BOARD,
   onFilesDropped,
+  onTaskDropped,
   startFileDrag,
+  startTaskDrag,
   newKanbanBoard,
   readBookmarks,
   removeBookmark,
@@ -1101,64 +1105,69 @@ export class SidebarView extends ItemView implements HoverParent {
 
   // ---------- drag and drop ----------
 
-  /**
-   * Make a card or a folder row draggable. What follows the pointer is a
-   * copy of it, turned a little, as on the boards.
-   */
+  /** Make a card or a folder row draggable. */
   private draggable(el: HTMLElement, path: string): void {
     el.draggable = true;
     el.addEventListener("dragstart", (evt) => {
       const file = this.app.vault.getAbstractFileByPath(path);
-      if (!file) return;
-      const box = el.getBoundingClientRect();
-      const ghost = createDiv("ps-drag-ghost");
-      const copy = ghost.appendChild(el.cloneNode(true) as HTMLElement);
-      copy.addClass("ps-drag-copy");
-      copy.removeClasses(["is-active", "is-drop-target"]);
-      copy.style.width = `${box.width}px`;
-      // The copy hangs from the pointer by its top left corner, so what's
-      // under the pointer stays in view. It starts where the card is and
-      // slides there (the styles do the sliding once it's marked settled).
-      const hang = { x: 12, y: 18 };
-      copy.style.setProperty("--ps-from-x", `${box.left - evt.clientX - hang.x}px`);
-      copy.style.setProperty("--ps-from-y", `${box.top - evt.clientY - hang.y}px`);
-      // What a drop would do, in words: beside the pointer, above the copy, and always inside the window.
-      const { doc, win } = el;
-      const action = doc.body.createDiv("ps-drag-action");
-      const started = startFileDrag(this.app, evt, file, { el: ghost, anchor: { x: -hang.x, y: -hang.y }, action });
-      if (!started) {
-        action.remove();
-        return void evt.preventDefault();
-      }
-      let settled = false;
-      const follow = (move: DragEvent) => {
-        if (move.clientX === 0 && move.clientY === 0) return;
-        if (!settled) {
-          settled = true;
-          // Two frames on: Obsidian has put the copy on the page, drawn where the card is.
-          win.requestAnimationFrame(() => win.requestAnimationFrame(() => copy.addClass("is-settled")));
-        }
-        // To the right of the pointer, level with it and so just above the copy; held inside the window.
-        const x = Math.min(Math.max(move.clientX + 18, 8), win.innerWidth - action.offsetWidth - 8);
-        const y = Math.min(Math.max(move.clientY - action.offsetHeight / 2, 8), win.innerHeight - action.offsetHeight - 8);
-        action.style.translate = `${x}px ${y}px`;
-      };
-      const done = () => {
-        doc.removeEventListener("dragover", follow, true);
-        doc.removeEventListener("dragend", done, true);
-        doc.removeEventListener("drop", later, true);
-        action.remove();
-        el.removeClass("is-dragging");
-      };
-      // After the drop itself has been handled.
-      const later = () => win.setTimeout(done);
-      doc.addEventListener("dragover", follow, true);
-      doc.addEventListener("dragend", done, true);
-      doc.addEventListener("drop", later, true);
-      // A source that a redraw has taken off the page still gets its own dragend.
-      el.addEventListener("dragend", done, { once: true });
-      el.addClass("is-dragging");
+      if (file) dragCopy(evt, el, (ghost) => startFileDrag(this.app, evt, file, ghost));
     });
+  }
+
+  /**
+   * Make a task's row draggable: into a note, onto a bookmarked note, or onto
+   * a board, where it becomes a card. Over a board, the copy that follows the
+   * pointer turns into a card of that board's width.
+   */
+  private draggableTask(el: HTMLElement, note: NoteSummary, task: TaskItem, today: string): void {
+    el.draggable = true;
+    el.addEventListener("dragstart", (evt) => {
+      const details = taskDetails(task.text);
+      let card: HTMLElement | null = null;
+      dragCopy(
+        evt,
+        el,
+        (ghost) => {
+          if (!startTaskDrag(this.app, evt, details.description || task.text, ghost)) return false;
+          setDraggedTask({ path: note.path, ref: { line: task.line, status: task.status, text: task.text } });
+          // The same task as a board card, shown in the copy's place over a board.
+          card = ghost.el.createDiv("psb-board ps-drag-card").createDiv({ cls: "psb-card", attr: { "data-status": task.status } });
+          card.createEl("button", { cls: "psb-check" });
+          card.createDiv("psb-card-body").createDiv({ cls: "psb-card-text", text: cardTitle(task.text) });
+          const foot = card.createDiv("psb-card-foot");
+          taskBadges(foot, details, isClosed(task), today, { due: task.due, done: task.done });
+          if (!foot.childElementCount) foot.remove();
+          return true;
+        },
+        (move, ghost) => {
+          const under = move.target instanceof Element ? move.target : null;
+          const cards = under?.closest(".psb-lane")?.querySelector<HTMLElement>(".psb-cards") ?? null;
+          ghost.toggleClass("is-over-board", !!cards);
+          if (cards && card) card.parentElement!.style.width = `${cards.clientWidth}px`;
+        },
+        () => setDraggedTask(null)
+      );
+    });
+  }
+
+  /**
+   * Let a bookmarked note's row take a task dropped on it: the task moves to
+   * the end of that note, without opening it. (Note cards can't be targets:
+   * they're never on screen with the Tasks list.)
+   */
+  private dropTaskOnNote(row: HTMLElement, file: TFile): void {
+    onTaskDropped(
+      this.app,
+      row,
+      () => (draggedTask() && draggedTask()!.path !== file.path ? `Move to the end of “${file.basename}”` : null),
+      () => {
+        const task = draggedTask();
+        if (!task) return;
+        void moveTaskOut(this.app, task, async (block) => {
+          await this.app.vault.process(file, (text) => appendTask(text, block));
+        }).then((moved) => moved && new Notice(`Moved the task to “${file.basename}”.`));
+      }
+    );
   }
 
   /** A folded folder a drag has rested on, and since when: it opens after a moment. */
@@ -1318,6 +1327,8 @@ export class SidebarView extends ItemView implements HoverParent {
     if (bookmark.group) row.createSpan({ cls: "ps-nav-count ps-nav-group", text: bookmark.group });
     row.toggleClass("is-missing", missing);
     if (missing) row.setAttribute("aria-label", `Deleted: ${bookmark.target}. Click to remove the bookmark.`);
+    // A bookmarked note (not a board) takes a task dropped on it.
+    if (bookmark.kind === "file" && target instanceof TFile && canHoldTasks(this.app, target)) this.dropTaskOnNote(row, target);
     const menu = (evt: MouseEvent) => {
       evt.preventDefault();
       const m = new Menu();
@@ -2794,6 +2805,7 @@ export class SidebarView extends ItemView implements HoverParent {
   private renderTaskRow(item: TaskRow, today: string): HTMLElement {
     const { note, task } = item;
     const row = this.bodyEl.createDiv("ps-task");
+    this.draggableTask(row, note, task, today);
     const key = `${note.path}\u0000${task.line}`;
     this.taskRowEls.set(key, row);
     const active = this.plugin.activeTask;

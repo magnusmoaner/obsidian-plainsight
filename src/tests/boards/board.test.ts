@@ -10,6 +10,7 @@ import {
   editCard,
   embedBlock,
   embedTarget,
+  insertCard,
   LaneRef,
   moveCard,
   moveLane,
@@ -406,5 +407,28 @@ describe("list colours", () => {
     const both = setLaneStatus(blue, laneRef(blue, 0), "/");
     expect(parseBoard(both).lanes[0]).toMatchObject({ colour: "blue", status: "/" });
     expect(deleteLane(blue, laneRef(blue, 0))).not.toContain("plainsight-list-colour");
+  });
+});
+
+describe("insertCard", () => {
+  test("a card from elsewhere goes where it's dropped, with its status and its other lines", () => {
+    const out = insertCard(BOARD, laneRef(BOARD, 0), 1, "Call the plumber\nask about Friday", "/");
+    expect(shape(out)[0].map((c) => c.split("\n")[0])).toEqual(["To do", "[ ] Buy paint @{2026-01-31}", "[/] Call the plumber", "[/] Fix the gate"]);
+    expect(out).toContain("- [/] Call the plumber\n    ask about Friday\n- [/] Fix the gate");
+    expect(shape(insertCard(BOARD, laneRef(BOARD, 0), 0, "First", " "))[0][1]).toBe("[ ] First");
+    expect(shape(insertCard(PLAIN, laneRef(PLAIN, 1), 0, "Into an empty list", " "))[1]).toEqual(["Doing", "[ ] Into an empty list"]);
+  });
+
+  test("a list's status is given to it; a done list completes it, through the Tasks plugin when it's there", () => {
+    const doing = setLaneStatus(PLAIN, laneRef(PLAIN, 1), "/");
+    expect(shape(insertCard(doing, laneRef(doing, 1), 0, "Sand the door", " "))[1][1]).toBe("[/] Sand the door");
+    expect(shape(insertCard(BOARD, laneRef(BOARD, 1), 0, "Old job", " "))[1][1]).toBe("[x] Old job");
+    const dated = insertCard(BOARD, laneRef(BOARD, 1), 0, "Old job", " ", (line) => line.replace("[ ]", "[x]") + " ✅ 2026-01-02");
+    expect(shape(dated)[1][1]).toBe("[x] Old job ✅ 2026-01-02");
+    expect(shape(insertCard(BOARD, laneRef(BOARD, 1), 0, "Done before", "x", () => "never asked"))[1][1]).toBe("[x] Done before");
+  });
+
+  test("a list that changed since the board was drawn takes nothing", () => {
+    expect(() => insertCard(BOARD.replace("## To do (3)", "## Later (3)"), laneRef(BOARD, 0), 0, "x", " ")).toThrow(StaleBoardError);
   });
 });

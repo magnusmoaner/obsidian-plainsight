@@ -28,6 +28,7 @@ import { listMinWidth, parseSettings, serializeSettings } from "./settings-data"
 import { NoteIndex } from "./sidebar/core/note-index";
 import { legacyViewState } from "./sidebar/core/view-state";
 import { cursorTracker } from "./sidebar/cursor";
+import { taskDrop } from "./sidebar/task-drop";
 import { Indexer } from "./sidebar/indexer";
 import { SIDEBAR_VIEW, SidebarView } from "./sidebar/view";
 import { readBookmarks, removeBookmark } from "./sidebar/internals";
@@ -87,6 +88,8 @@ export default class WysiwygPlugin extends Plugin {
     this.refreshExtensions();
     this.applyRenderingMode();
     this.registerEditorExtension(this.extensions);
+    // Always on, like the sidebar: a task dragged from the Tasks list can be dropped into any open note.
+    this.registerEditorExtension(taskDrop(this.app));
     this.addSettingTab(new WysiwygSettingTab(this.app, this));
 
     this.addCommand({

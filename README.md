@@ -61,7 +61,7 @@ Right-click a card to open it in a new tab or to the right, pin or unpin it, ren
 
 ### Drag and drop
 
-Cards and folders can be dragged. A copy of what you're dragging follows the pointer, with a line under it saying what a drop would do.
+Cards, folders and tasks can be dragged. A copy of what you're dragging follows the pointer, with a line beside the pointer saying what a drop would do.
 
 | Drag | Onto | What happens |
 | --- | --- | --- |
@@ -70,8 +70,11 @@ Cards and folders can be dragged. A copy of what you're dragging follows the poi
 | A note's card | **Templates** | It moves into the templates folder |
 | A folder | Another folder, or the **Folders** heading | It moves inside that folder, or to the top level |
 | A card or a folder | An open note, a tab or File explorer | What Obsidian does with a file dragged from File explorer: a link in the note, the file opened in the tab, a move in File explorer |
+| A task in the Tasks list | An open note | The task moves to the line you drop it on (a mark shows where), with its subtasks, and leaves the note it was in |
+| A task in the Tasks list | A list on an open board | The task becomes a card where you drop it and leaves its note. Over the board the copy turns into a card, and an empty slot shows where it would land. In a list with a status, it takes that status |
+| A task in the Tasks list | A bookmarked note in the left column | The task moves to the end of that note |
 
-A folded folder opens when a drag rests on it. Nothing is overwritten: a move that would land on something with the same name is refused, with a message. Files dragged out of File explorer can be dropped on Plainsight's folders and tags too. Dragging uses Obsidian's own drag handling, on desktop.
+A folded folder opens when a drag rests on it. Nothing is overwritten: a move that would land on something with the same name is refused, with a message. Files dragged out of File explorer can be dropped on Plainsight's folders and tags too. A task is always moved, never copied: it is written to its new place first and only then taken out of the old one, so it can't get lost on the way. Dragging uses Obsidian's own drag handling, on desktop.
 
 ### Previews
 
@@ -129,9 +132,9 @@ A board is a set of lists holding cards, for a project, a trip or a week. Plains
 
 - **A new board** starts with three lists: Inbox, Doing (blue) and Done (green), with Done marking its cards done.
 - **On a page of its own, or inside a note.** A board opens as a board from the sidebar, the file explorer or a link. To put one inside a note, run **Insert new board** (it makes `<note name> board` next to the note and embeds it) or **Embed existing board**. An embedded board is worked on in place, without leaving the note.
-- **Cards.** Add, edit, tick, drag and delete them. A dragged card leaves an empty slot where it would land. A card is edited in Obsidian's own editor, so links and tags complete as you type, and with the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) plugin its suggestions for dates, priority and recurrence come up too. Those details, and tags at the start or end of the card, show as badges along the bottom of the card.
+- **Cards.** Add, edit, tick, drag and delete them. A dragged card hangs from the pointer, with a line beside it naming the list a drop would put it in, and leaves an empty slot where it would land. A card is edited in Obsidian's own editor, so links and tags complete as you type, and with the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) plugin its suggestions for dates, priority and recurrence come up too. Those details, and tags at the start or end of the card, show as badges along the bottom of the card.
 - **Statuses.** A card is open `[ ]`, in progress `[/]`, done `[x]` or cancelled `[-]`, set from its menu. Ticking a card goes through the Tasks plugin when it's installed, so the card gets its done date and a repeating card leaves its next round behind.
-- **Lists.** Rename, drag to reorder, minimize or delete a list from its header and menu. On a Plainsight board a list can also have a colour, one of eight that follow your theme, shown on the board and on its tile in the note list. A list can give a status to the cards that land in it (in progress, done or cancelled); a card that leaves for a plain list is open again. New lists are added on the board's own page, with the **+** after the last list or the one at the page's top right; the new list's name is ready to type over.
+- **Lists.** Rename, drag to reorder (by its header, with the same hanging copy and empty slot), minimize or delete a list from its header and menu. On a Plainsight board a list can also have a colour, one of eight that follow your theme, shown on the board and on its tile in the note list. A list can give a status to the cards that land in it (in progress, done or cancelled); a card that leaves for a plain list is open again. New lists are added on the board's own page, with the **+** after the last list or the one at the page's top right; the new list's name is ready to type over.
 - **About the board.** On its own page a board starts with its name, a description, its tags and the notes it's embedded in, each a link. Click the name to rename the board, or the description to write or change it; **Tag** adds a tag. A board that isn't in any note yet offers **Embed in note**, which puts it at the end of a note you pick. Both are ordinary properties of the board's note (`description` and `tags`), so the tags also show on the board's card and under Tags.
 
 **A board is a Markdown note.** Each list is a `## ` heading and each card a checkbox line under it, which is the Kanban plugin's file format. A Plainsight board is marked `plainsight-plugin: board` in its properties; one made by the Kanban plugin is marked `kanban-plugin`, and that plugin keeps opening it. Every edit changes only the lines of the cards or lists involved.

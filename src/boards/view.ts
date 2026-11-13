@@ -1,8 +1,10 @@
 import { folderNameError, setTextProperty } from "../sidebar/core/edits";
 import { localISODate } from "../sidebar/core/format";
-import { tasksToggle } from "../sidebar/internals";
 import { taskDetails } from "../sidebar/core/task-details";
 import { badge, taskBadges } from "../sidebar/task-badges";
+import { dragCopy, draggedTask, moveTaskOut } from "../drag";
+import { taskAsCard } from "../sidebar/core/task-move";
+import { dragAction, startBoardDrag, tasksToggle } from "../sidebar/internals";
 import { CardEditor, openCardEditor } from "./card-editor";
 import {
   App,
@@ -31,6 +33,7 @@ import {
   deleteCard,
   deleteLane,
   editCard,
+  insertCard,
   isDone,
   LaneRef,
   LIST_COLOURS,
@@ -128,6 +131,17 @@ export class BoardView extends MarkdownRenderChild {
         })
       );
     }
+    // The slot shown for a task dragged in from outside is taken away when
+    // the pointer leaves the board, and when that drag ends anywhere.
+    const doc = this.containerEl.doc;
+    const leave = (evt: Event) => {
+      if (this.drag || !this.slot) return;
+      if (evt.type !== "dragover" || !(evt.target instanceof Node) || !this.containerEl.contains(evt.target)) this.endDrag();
+    };
+    for (const type of ["dragover", "dragend", "drop"] as const) {
+      doc.addEventListener(type, leave, true);
+      this.register(() => doc.removeEventListener(type, leave, true));
+    }
     // Covers a board created, renamed or deleted after the note was opened.
     this.registerEvent(this.app.metadataCache.on("resolved", () => !this.file && void this.refresh()));
     void this.refresh();
@@ -164,14 +178,17 @@ export class BoardView extends MarkdownRenderChild {
     if (this.pending) void this.refresh();
   }
 
-  private async write(op: (text: string) => string): Promise<void> {
-    if (!this.file) return;
+  /** Change the board's file. False if the board had changed underneath, and nothing was written. */
+  private async write(op: (text: string) => string): Promise<boolean> {
+    if (!this.file) return false;
     try {
       await this.app.vault.process(this.file, op);
+      return true;
     } catch (e) {
       if (!(e instanceof StaleBoardError)) throw e;
       new Notice("The board changed while you were working on it. Try again.");
       void this.refresh();
+      return false;
     }
   }
 
@@ -211,7 +228,7 @@ export class BoardView extends MarkdownRenderChild {
     board.lanes.forEach((_, i) => this.renderLane(lanesEl, board, i));
     // Lists are added on the board's own page: here, or with the button in its header.
     if (this.host) this.renderAddLane(lanesEl);
-    this.dropZone(lanesEl, lanesEl, ".psb-lane", "lane", "x", (index) => {
+    this.dropZone(lanesEl, lanesEl, ".psb-lane", "lane", "x", "Move the list here", (index) => {
       // Read now: the drag is over by the time the file is written.
       const drag = this.drag;
       if (drag?.kind === "lane") void this.write((t) => moveLane(t, drag.ref, index));
@@ -349,10 +366,20 @@ export class BoardView extends MarkdownRenderChild {
     const cardsEl = el.createDiv("psb-cards");
     lane.cards.forEach((_, c) => this.renderCard(cardsEl, board, i, c));
     // The whole list takes a dropped card, so an empty list is easy to hit.
-    this.dropZone(el, cardsEl, ".psb-card", "card", "y", (index) => {
-      const drag = this.drag;
-      if (drag?.kind === "card") void this.write((t) => moveCard(t, drag.ref, ref, index, this.viaTasks));
-    });
+    this.dropZone(
+      el,
+      cardsEl,
+      ".psb-card",
+      "card",
+      "y",
+      `Move to “${lane.title}”`,
+      (index) => {
+        const drag = this.drag;
+        if (drag?.kind === "card") void this.write((t) => moveCard(t, drag.ref, ref, index, this.viaTasks));
+      },
+      // A task dragged in from the Tasks list becomes a card here.
+      (index) => this.takeTask(ref, index)
+    );
 
     const add = el.createEl("button", { cls: "psb-add", text: "Add a card" });
     add.addEventListener("click", () => this.addCardInput(el, add, ref));
@@ -641,25 +668,16 @@ export class BoardView extends MarkdownRenderChild {
   private startDrag(evt: DragEvent, el: HTMLElement, drag: Drag): void {
     evt.stopPropagation(); // a card inside a list isn't the list
     this.drag = drag;
-    evt.dataTransfer?.setData("text/plain", "");
+    // Something that isn't text, so a drop in a note types nothing.
+    evt.dataTransfer?.setData("application/x-plainsight-board", "1");
+    const { width, height } = el.getBoundingClientRect();
+    // A copy hangs from the pointer, as in the sidebar. Without Obsidian's
+    // drag manager the drag still works, with the browser's own picture.
+    dragCopy(evt, el, (ghost) => {
+      ghost.el.addClass("psb-board");
+      return startBoardDrag(this.app, evt, ghost) || true;
+    });
     if (evt.dataTransfer) evt.dataTransfer.effectAllowed = "move";
-    const { left, top, width, height } = el.getBoundingClientRect();
-    // What follows the pointer: a copy of the card or list, turned a little,
-    // on a see-through backing so its rounded corners stay round. (The
-    // browser's own picture of the element is a square-cornered cut-out.)
-    if (evt.dataTransfer) {
-      // Room around the copy for its turned corners and its shadow: the
-      // browser's picture is cut at the backing's edge.
-      const pad = 32;
-      const ghost = el.ownerDocument.body.createDiv("psb-board psb-ghost");
-      ghost.style.padding = `${pad}px`;
-      const copy = ghost.appendChild(el.cloneNode(true) as HTMLElement);
-      copy.style.width = `${width}px`;
-      copy.style.height = `${height}px`;
-      evt.dataTransfer.setDragImage(ghost, evt.clientX - left + pad, evt.clientY - top + pad);
-      // The browser takes its picture at once; the copy has done its job.
-      window.setTimeout(() => ghost.remove());
-    }
     // The slot: an empty space the size of what's dragged, shown where it would land.
     this.slot = createDiv("psb-drop");
     this.slot.style.width = `${width}px`;
@@ -670,6 +688,17 @@ export class BoardView extends MarkdownRenderChild {
       if (this.slot !== slot) return;
       el.before(slot);
       el.addClass("is-dragging");
+    });
+  }
+
+  /** A task dragged in from the Tasks list lands in a list as a card, and leaves its note. */
+  private takeTask(to: LaneRef, index: number): void {
+    const task = draggedTask();
+    if (!task || !this.file) return;
+    if (task.path === this.file.path) return void new Notice("That card is already on this board. Drag the card itself to move it.");
+    void moveTaskOut(this.app, task, async (block) => {
+      const { check, body } = taskAsCard(block);
+      if (!(await this.write((t) => insertCard(t, to, index, body, check, this.viaTasks)))) throw new Error("the board changed");
     });
   }
 
@@ -685,7 +714,18 @@ export class BoardView extends MarkdownRenderChild {
    * `items`, and a drop there report the position: an index among the
    * items as they were before the drag.
    */
-  private dropZone(target: HTMLElement, zone: HTMLElement, items: string, kind: Drag["kind"], axis: "x" | "y", drop: (index: number) => void): void {
+  private dropZone(
+    target: HTMLElement,
+    zone: HTMLElement,
+    items: string,
+    kind: Drag["kind"],
+    axis: "x" | "y",
+    /** What a drop here would do, said beside the pointer. */
+    hint: string,
+    drop: (index: number) => void,
+    /** Also take a task dragged in from outside the board: what to do with it. */
+    task?: (index: number) => void
+  ): void {
     const place = (evt: DragEvent) => {
       const all = Array.from(zone.querySelectorAll<HTMLElement>(`:scope > ${items}:not(.psb-lane-new)`));
       const shown = all.filter((e) => !e.hasClass("is-dragging"));
@@ -697,18 +737,31 @@ export class BoardView extends MarkdownRenderChild {
       const from = all.findIndex((e) => e.hasClass("is-dragging"));
       return { next: shown[before] ?? zone.querySelector<HTMLElement>(":scope > .psb-lane-new"), index: from >= 0 && from <= before ? before + 1 : before };
     };
+    // Nothing of the board's own is being dragged, and a task is on its way in.
+    const incoming = () => !!task && !this.drag && !!draggedTask();
     target.addEventListener("dragover", (evt) => {
-      if (this.drag?.kind !== kind || !this.slot) return;
+      if (incoming()) {
+        // The slot it would take: the height of a one-line card.
+        if (!this.slot) {
+          this.slot = createDiv("psb-drop");
+          this.slot.style.height = "36px";
+        }
+      } else if (this.drag?.kind !== kind || !this.slot) {
+        return;
+      }
+      dragAction(this.app, hint);
+      if (evt.dataTransfer) evt.dataTransfer.dropEffect = "move";
       evt.preventDefault();
-      evt.stopPropagation();
+      // Not stopped: Obsidian's drag manager, further up, moves the copy that follows the pointer.
       const { next } = place(evt);
-      if (this.slot.parentElement !== zone || this.slot.nextElementSibling !== next) zone.insertBefore(this.slot, next);
+      if (this.slot!.parentElement !== zone || this.slot!.nextElementSibling !== next) zone.insertBefore(this.slot!, next);
     });
     target.addEventListener("drop", (evt) => {
-      if (this.drag?.kind !== kind) return;
+      const taking = incoming();
+      if (!taking && this.drag?.kind !== kind) return;
       evt.preventDefault();
       evt.stopPropagation();
-      drop(place(evt).index);
+      (taking ? task! : drop)(place(evt).index);
       this.endDrag();
     });
   }
