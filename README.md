@@ -4,6 +4,8 @@ An Obsidian plugin for a calm, document-like note experience: Markdown that read
 
 Your files stay ordinary Markdown. Plainsight hides syntax and adds browsing on top; it never converts your notes into another format.
 
+For a tour with screenshots, see [plainsight.kodepartiet.dk](https://plainsight.kodepartiet.dk).
+
 > **Status:** early and in active development. Not yet in the Community Plugins directory, and only tested on desktop (macOS). The editor is in beta and a work in progress; the notes sidebar is in daily use.
 
 ## The editor (beta, work in progress)
@@ -237,10 +239,12 @@ From Obsidian's core plugins, Plainsight uses **Bookmarks** (the Bookmarks place
 
 ### Good companions
 
-Plainsight doesn't talk to these plugins, but together they make Obsidian feel more like a proper visual note editor:
+Plainsight doesn't talk to these plugins, but they go well with it:
 
 - **[Editing Toolbar](https://github.com/PKM-er/obsidian-editing-toolbar)** puts bold, headings, lists and colours on buttons above the note, for when you'd rather click than remember a shortcut. Whatever it inserts, Plainsight draws like anything you type.
 - **[Advanced Tables](https://github.com/tgrosinger/advanced-tables-obsidian)** keeps tables tidy while you type: columns line up, and Tab and Enter move between cells. Plainsight doesn't draw tables yet, so this makes the Markdown pleasant in the meantime.
+- **[Tasks Kanban](https://github.com/Djiit/obsidian-tasks-kanban)** shows the tasks in your notes as a board, with a column for each status. It reads the same task lines Plainsight lists, so it's another view of them, not a copy.
+- **[QuickAdd](https://github.com/chhoumann/quickadd)** adds a note or a line of text to your vault from a hotkey: capture a thought into your inbox, or start a note from a template, without leaving what you're doing. What it adds shows up in Plainsight like anything else.
 
 **Pick one of the two:** [Notebook Navigator](https://github.com/johansan/notebook-navigator) is another notes sidebar, built for the same job as Plainsight's. Both can be on together, but you'd use one.
 
