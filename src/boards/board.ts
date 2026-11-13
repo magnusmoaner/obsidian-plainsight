@@ -440,13 +440,17 @@ export function isBoardFrontmatter(frontmatter: Record<string, unknown> | undefi
   return frontmatter?.["plainsight-plugin"] !== undefined || frontmatter?.["kanban-plugin"] !== undefined;
 }
 
-/** A new Plainsight board, with three lists; "Done" marks its cards complete. */
+/**
+ * A new Plainsight board: Inbox, Doing and Done. Inbox is left the plain
+ * grey of a list without a colour; Doing is blue and Done green. "Done"
+ * marks its cards complete.
+ */
 export const NEW_BOARD = [
   "---",
   "plainsight-plugin: board",
   "---",
   "",
-  "## To do",
+  "## Inbox",
   "",
   "",
   "",
@@ -459,7 +463,11 @@ export const NEW_BOARD = [
   "**Complete**",
   "",
   "",
-  "",
+  "%% kanban:settings",
+  "```",
+  JSON.stringify({ "kanban-plugin": "board", [COLOUR_KEY]: { Doing: "blue", Done: "green" } }),
+  "```",
+  "%%",
 ].join("\n");
 
 function edit(text: string, fn: (lines: string[], board: Board) => void): string {

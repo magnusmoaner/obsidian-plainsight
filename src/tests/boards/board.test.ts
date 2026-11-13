@@ -24,6 +24,28 @@ import {
   toggleCard,
 } from "../../boards/board";
 
+/** A board with three empty lists and no settings block. */
+const PLAIN = [
+  "---",
+  "plainsight-plugin: board",
+  "---",
+  "",
+  "## To do",
+  "",
+  "",
+  "",
+  "## Doing",
+  "",
+  "",
+  "",
+  "## Done",
+  "",
+  "**Complete**",
+  "",
+  "",
+  "",
+].join("\n");
+
 const SETTINGS = ["%% kanban:settings", "```", '{"kanban-plugin":"board"}', "```", "%%"];
 
 const BOARD = [
@@ -87,9 +109,26 @@ describe("parseBoard", () => {
     ]);
   });
 
-  test("a new board has three empty lists", () => {
-    expect(shape(NEW_BOARD)).toEqual([["To do"], ["Doing"], ["Done"]]);
-    expect(parseBoard(NEW_BOARD).lanes[2].marker).not.toBeNull();
+  test("a plain board with three empty lists reads as such", () => {
+    expect(shape(PLAIN)).toEqual([["To do"], ["Doing"], ["Done"]]);
+    expect(parseBoard(PLAIN).lanes[2].marker).not.toBeNull();
+  });
+
+  test("a new board has Inbox, Doing and Done, coloured, and Done completes its cards", () => {
+    const lanes = parseBoard(NEW_BOARD).lanes;
+    expect(lanes.map((l) => [l.title, l.colour, l.status, l.cards.length])).toEqual([
+      ["Inbox", null, null, 0],
+      ["Doing", "blue", null, 0],
+      ["Done", "green", "x", 0],
+    ]);
+  });
+
+  test("a new board takes cards and lists like any other, keeping its colours", () => {
+    const card = addCard(NEW_BOARD, laneRef(NEW_BOARD, 0), "Buy paint");
+    expect(card).toContain("## Inbox\n\n- [ ] Buy paint\n");
+    expect(shape(addCard(NEW_BOARD, laneRef(NEW_BOARD, 2), "Old job"))[2]).toEqual(["Done", "[x] Old job"]);
+    const more = addLane(card, "Later");
+    expect(parseBoard(more).lanes.map((l) => `${l.title}:${l.colour}`)).toEqual(["Inbox:null", "Doing:blue", "Done:green", "Later:null"]);
   });
 });
 
@@ -112,9 +151,9 @@ describe("card edits", () => {
   });
 
   test("add to an empty list leaves Kanban's blank line under the heading", () => {
-    const out = addCard(NEW_BOARD, laneRef(NEW_BOARD, 1), "First");
+    const out = addCard(PLAIN, laneRef(PLAIN, 1), "First");
     expect(out).toContain("## Doing\n\n- [ ] First\n");
-    expect(addCard(NEW_BOARD, laneRef(NEW_BOARD, 2), "Done one")).toContain("**Complete**\n- [x] Done one\n");
+    expect(addCard(PLAIN, laneRef(PLAIN, 2), "Done one")).toContain("**Complete**\n- [x] Done one\n");
   });
 
   test("delete removes every line of the card", () => {
@@ -174,8 +213,8 @@ describe("list edits", () => {
 
   test("move reorders lists, both directions", () => {
     const titles = (t: string) => shape(t).map((l) => l[0]);
-    expect(titles(moveLane(NEW_BOARD, laneRef(NEW_BOARD, 0), 3))).toEqual(["Doing", "Done", "To do"]);
-    expect(titles(moveLane(NEW_BOARD, laneRef(NEW_BOARD, 2), 0))).toEqual(["Done", "To do", "Doing"]);
+    expect(titles(moveLane(PLAIN, laneRef(PLAIN, 0), 3))).toEqual(["Doing", "Done", "To do"]);
+    expect(titles(moveLane(PLAIN, laneRef(PLAIN, 2), 0))).toEqual(["Done", "To do", "Doing"]);
     const moved = moveLane(BOARD, laneRef(BOARD, 1), 0);
     expect(shape(moved)[0]).toEqual(["Done", "[x] Pick colours"]);
     expect(parseBoard(moved).lanes[0].marker).not.toBeNull();
@@ -203,7 +242,7 @@ describe("statuses", () => {
   });
 
   test("a list's done status is Kanban's Complete line; other statuses go in the settings block", () => {
-    const done = setLaneStatus(NEW_BOARD, laneRef(NEW_BOARD, 0), "x");
+    const done = setLaneStatus(PLAIN, laneRef(PLAIN, 0), "x");
     expect(done).toContain("## To do\n\n**Complete**\n");
     const doing = setLaneStatus(BOARD, laneRef(BOARD, 0), "/");
     expect(doing).toContain('{"kanban-plugin":"board","plainsight-list-status":{"To do":"/"}}');
@@ -211,7 +250,7 @@ describe("statuses", () => {
   });
 
   test("a board without a settings block gets one when a list needs it", () => {
-    const out = setLaneStatus(NEW_BOARD, laneRef(NEW_BOARD, 1), "-");
+    const out = setLaneStatus(PLAIN, laneRef(PLAIN, 1), "-");
     expect(out.endsWith('%% kanban:settings\n```\n{"kanban-plugin":"board","plainsight-list-status":{"Doing":"-"}}\n```\n%%')).toBe(true);
     expect(parseBoard(out).lanes.map((l) => l.status)).toEqual([null, "-", "x"]);
   });
@@ -230,7 +269,7 @@ describe("statuses", () => {
   });
 
   test("cards take the status of the list they land in, and lose it when they leave", () => {
-    const doing = setLaneStatus(NEW_BOARD, laneRef(NEW_BOARD, 1), "/");
+    const doing = setLaneStatus(PLAIN, laneRef(PLAIN, 1), "/");
     const added = addCard(doing, laneRef(doing, 1), "Paint the shed");
     expect(shape(added)[1][1]).toBe("[/] Paint the shed");
     const back = moveCard(added, cardRef(added, 1, 0), laneRef(added, 0), 0);
@@ -275,7 +314,7 @@ describe("minimized lists", () => {
   });
 
   test("a minimized list stays minimized when lists move or go", () => {
-    const one = setLaneCollapsed(NEW_BOARD, laneRef(NEW_BOARD, 0), true);
+    const one = setLaneCollapsed(PLAIN, laneRef(PLAIN, 0), true);
     expect(collapsed(moveLane(one, laneRef(one, 0), 3))).toEqual(["Doing:false", "Done:false", "To do:true"]);
     expect(collapsed(moveLane(one, laneRef(one, 2), 0))).toEqual(["Done:false", "To do:true", "Doing:false"]);
     expect(collapsed(deleteLane(one, laneRef(one, 1)))).toEqual(["To do:true", "Done:false"]);
@@ -283,7 +322,7 @@ describe("minimized lists", () => {
   });
 
   test("moving or deleting lists on a board with none minimized stores nothing", () => {
-    expect(moveLane(NEW_BOARD, laneRef(NEW_BOARD, 0), 3)).not.toContain("kanban:settings");
+    expect(moveLane(PLAIN, laneRef(PLAIN, 0), 3)).not.toContain("kanban:settings");
     expect(deleteLane(BOARD, laneRef(BOARD, 0))).toContain('{"kanban-plugin":"board"}');
   });
 });
@@ -308,7 +347,7 @@ describe("through the Tasks plugin", () => {
   });
 
   test("a repeating card leaves its next round behind", () => {
-    const board = addCard(NEW_BOARD, laneRef(NEW_BOARD, 0), "Water plants 🔁 every week");
+    const board = addCard(PLAIN, laneRef(PLAIN, 0), "Water plants 🔁 every week");
     expect(shape(toggleCard(board, cardRef(board, 0, 0), tasks))[0]).toEqual([
       "To do",
       "[ ] Water plants 🔁 every week",
@@ -341,7 +380,7 @@ describe("list colours", () => {
   });
 
   test("a board without a settings block gets one for its first colour", () => {
-    const out = setLaneColour(NEW_BOARD, laneRef(NEW_BOARD, 1), "green");
+    const out = setLaneColour(PLAIN, laneRef(PLAIN, 1), "green");
     expect(colours(out)).toEqual(["To do:null", "Doing:green", "Done:null"]);
     expect(out).toContain('"plainsight-list-colour":{"Doing":"green"}');
   });
@@ -353,7 +392,7 @@ describe("list colours", () => {
   });
 
   test("the colour follows a rename, a move and a status, and goes with a delete", () => {
-    const blue = setLaneColour(NEW_BOARD, laneRef(NEW_BOARD, 0), "blue");
+    const blue = setLaneColour(PLAIN, laneRef(PLAIN, 0), "blue");
     expect(colours(renameLane(blue, laneRef(blue, 0), "Next"))).toEqual(["Next:blue", "Doing:null", "Done:null"]);
     expect(colours(moveLane(blue, laneRef(blue, 0), 3))).toEqual(["Doing:null", "Done:null", "To do:blue"]);
     const both = setLaneStatus(blue, laneRef(blue, 0), "/");
