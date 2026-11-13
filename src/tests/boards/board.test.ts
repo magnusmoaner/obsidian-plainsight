@@ -18,6 +18,7 @@ import {
   retargetEmbeds,
   setCardStatus,
   setLaneCollapsed,
+  setLaneColour,
   setLaneStatus,
   StaleBoardError,
   toggleCard,
@@ -326,5 +327,37 @@ describe("through the Tasks plugin", () => {
 
   test("without the Tasks plugin a card is just ticked", () => {
     expect(shape(toggleCard(BOARD, cardRef(BOARD, 0, 0), () => null))[0][1]).toBe("[x] Buy paint @{2026-01-31}");
+  });
+});
+
+describe("list colours", () => {
+  const colours = (t: string) => parseBoard(t).lanes.map((l) => `${l.title}:${l.colour}`);
+
+  test("a list's colour is kept by its name in the settings block, and can be taken away", () => {
+    const blue = setLaneColour(BOARD, laneRef(BOARD, 0), "blue");
+    expect(blue).toContain('{"kanban-plugin":"board","plainsight-list-colour":{"To do":"blue"}}');
+    expect(colours(blue)).toEqual(["To do:blue", "Done:null"]);
+    expect(setLaneColour(blue, laneRef(blue, 0), null)).toBe(BOARD);
+  });
+
+  test("a board without a settings block gets one for its first colour", () => {
+    const out = setLaneColour(NEW_BOARD, laneRef(NEW_BOARD, 1), "green");
+    expect(colours(out)).toEqual(["To do:null", "Doing:green", "Done:null"]);
+    expect(out).toContain('"plainsight-list-colour":{"Doing":"green"}');
+  });
+
+  test("a colour that isn't one of the list is not stored, and one written by hand is not read", () => {
+    expect(setLaneColour(BOARD, laneRef(BOARD, 0), "#ff0000")).toBe(BOARD);
+    const odd = BOARD.replace('{"kanban-plugin":"board"}', '{"kanban-plugin":"board","plainsight-list-colour":{"To do":"url(x)"}}');
+    expect(colours(odd)).toEqual(["To do:null", "Done:null"]);
+  });
+
+  test("the colour follows a rename, a move and a status, and goes with a delete", () => {
+    const blue = setLaneColour(NEW_BOARD, laneRef(NEW_BOARD, 0), "blue");
+    expect(colours(renameLane(blue, laneRef(blue, 0), "Next"))).toEqual(["Next:blue", "Doing:null", "Done:null"]);
+    expect(colours(moveLane(blue, laneRef(blue, 0), 3))).toEqual(["Doing:null", "Done:null", "To do:blue"]);
+    const both = setLaneStatus(blue, laneRef(blue, 0), "/");
+    expect(parseBoard(both).lanes[0]).toMatchObject({ colour: "blue", status: "/" });
+    expect(deleteLane(blue, laneRef(blue, 0))).not.toContain("plainsight-list-colour");
   });
 });

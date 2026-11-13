@@ -1,3 +1,4 @@
+import { listColours } from "../../boards/board";
 import { extractSnippet } from "./snippet";
 import { ocrBoxes } from "./ocr-boxes";
 import { parseTasks } from "./tasks";
@@ -132,11 +133,13 @@ export function summarize(facts: FileFacts, text: string, boards: BoardKinds | n
   // Task List Kanban's own test: any truthy kanban_plugin value (its
   // settings, a JSON string, or an empty mapping for a new board).
   const taskListBoard = !!boards?.taskList && !board && Boolean(facts.frontmatter?.kanban_plugin);
+  const colours = board ? listColours(text) : {};
   return {
     path: facts.path,
     kind: board || taskListBoard ? "board" : "note",
     columns: board?.columns ?? [],
     laneCards: board?.laneCards ?? [],
+    laneColours: board?.columns.map((name) => colours[name] ?? null) ?? [],
     items: board?.cards ?? 0,
     title: facts.basename,
     folder: facts.folder,
@@ -183,6 +186,7 @@ export function summarizeCanvas(facts: FileFacts, json: string): NoteSummary {
     kind: "canvas",
     columns: [],
     laneCards: [],
+    laneColours: [],
     items: nodes,
     title: facts.basename,
     folder: facts.folder,

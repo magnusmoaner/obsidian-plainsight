@@ -33,12 +33,14 @@ import {
   editCard,
   isDone,
   LaneRef,
+  LIST_COLOURS,
   moveCard,
   moveLane,
   parseBoard,
   renameLane,
   setCardStatus,
   setLaneCollapsed,
+  setLaneColour,
   setLaneStatus,
   StaleBoardError,
   toggleCard,
@@ -290,6 +292,7 @@ export class BoardView extends MarkdownRenderChild {
     const ref: LaneRef = { lane: i, raw: this.lines[lane.line] };
     const el = parent.createDiv({ cls: "psb-lane" });
     el.toggleClass("is-collapsed", lane.collapsed);
+    if (lane.colour) el.dataset.colour = lane.colour;
 
     const head = el.createDiv({ cls: "psb-lane-head", attr: { draggable: "true" } });
     head.addEventListener("dragstart", (evt) => this.startDrag(evt, el, { kind: "lane", ref }));
@@ -549,6 +552,26 @@ export class BoardView extends MarkdownRenderChild {
           .onClick(() => this.write((t) => moveLane(t, ref, ref.lane + 2)))
       );
     }
+    // The list's colour, in a submenu where Obsidian has them (it does, though
+    // not in its typings); listed in this menu otherwise.
+    const colours = (to: Menu) => {
+      for (const colour of [null, ...LIST_COLOURS]) {
+        to.addItem((i) =>
+          i
+            .setTitle(colour ? colour[0].toUpperCase() + colour.slice(1) : "No colour")
+            .setChecked(lane.colour === colour)
+            .onClick(() => this.write((t) => setLaneColour(t, ref, colour)))
+        );
+      }
+    };
+    let listed = false;
+    menu.addItem((i) => {
+      i.setTitle("Colour").setIcon("palette");
+      const sub = (i as unknown as { setSubmenu?(): Menu }).setSubmenu?.();
+      if (sub) colours(sub);
+      else listed = true;
+    });
+    if (listed) colours(menu);
     // The status cards take when they land here; Kanban knows only "done".
     menu.addSeparator();
     for (const [char, label, icon] of [[null, "no status", "circle"], ...STATUSES.slice(1)] as const) {

@@ -175,6 +175,14 @@ describe("Kanban boards", () => {
     expect(summarize(facts({ frontmatter: { "plainsight-plugin": "board" } }), BOARD)).toMatchObject({ kind: "board", items: 3 });
   });
 
+  test("a board's summary carries its lists' colours", () => {
+    const coloured = BOARD.replace('{"kanban-plugin":"board"}', '{"kanban-plugin":"board","plainsight-list-colour":{"Done":"green"}}');
+    const board = facts({ frontmatter: { "kanban-plugin": "board" } });
+    expect(summarize(board, coloured).laneColours).toEqual([null, "green"]);
+    expect(summarize(board, BOARD).laneColours).toEqual([null, null]);
+    expect(summarize(facts(), coloured).laneColours).toEqual([]);
+  });
+
   test("a note with kanban-plugin frontmatter is a board", () => {
     const s = summarize(facts({ frontmatter: { "kanban-plugin": "board" } }), BOARD);
     expect(s.kind).toBe("board");
