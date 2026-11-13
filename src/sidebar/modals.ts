@@ -185,6 +185,36 @@ function dialogChip(row: HTMLElement, icon: string, onClick: (evt: MouseEvent) =
   };
 }
 
+/** Ask for a name: a title, the name to start from, and a line saying what it's for. */
+export class NameModal extends Modal {
+  constructor(
+    app: App,
+    private options: { title: string; cta: string; value: string; about: string },
+    private onSubmit: (name: string) => void
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    let name = this.options.value;
+    const submit = () => {
+      if (!name.trim()) return void d.error.setText("Enter a name.");
+      this.close();
+      this.onSubmit(name.trim());
+    };
+    const d = dialog(this, this.options.title, this.options.cta, submit);
+    dialogInput(d, { placeholder: "Name", value: name, select: true }, (v) => {
+      name = v;
+      d.cta.disabled = !v.trim();
+    }, submit);
+    d.body.createDiv({ cls: "ps-dialog-about", text: this.options.about });
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
 export class NotebookModal extends Modal {
   private name = "";
   private parent: string;

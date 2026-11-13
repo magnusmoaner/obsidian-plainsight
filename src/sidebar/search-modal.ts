@@ -3,6 +3,7 @@ import type { AttachmentFile } from "./core/attachments";
 import { formatSize } from "./core/attachments";
 import { cardDate, dueDateLabel, localISODate } from "./core/format";
 import type { TaskRow } from "./core/queries";
+import type { SavedSearch } from "../settings-data";
 import { omnisearch } from "./internals";
 import {
   excerpt,
@@ -17,6 +18,7 @@ import {
   toObsidianQuery,
   toOmnisearchQuery,
   toTasksQuery,
+  savedSearchMatches,
 } from "./core/search";
 import { taskDetails } from "./core/task-details";
 import { PRIORITIES } from "./core/task-line";
@@ -25,6 +27,9 @@ import { isClosed, NoteSummary } from "./core/types";
 /** What Search everywhere searches, and how it opens what's found; the sidebar provides it. */
 export interface SearchSource {
   notes(): NoteSummary[];
+  /** The saved searches, each with the name of the list it searches. */
+  savedSearches(): Array<{ saved: SavedSearch; where: string }>;
+  openSavedSearch(saved: SavedSearch): void;
   /** Every task (open and done), as the Tasks page would list them. */
   taskRows(): TaskRow[];
   /** Attachments with their extracted text (lower-cased) and the note holding it. */
@@ -38,7 +43,7 @@ export interface SearchSource {
   openFolder(path: string): void;
   openTag(tag: string): void;
   /** Show a place in the sidebar with this text in its Filter. */
-  showInList(list: "notes" | "tasks" | "attachments", filter: string): void;
+  showInList(list: "notes" | "tasks" | "boards" | "attachments", filter: string): void;
   obsidianSearch(query: string): void;
   /** Whether the Tasks plugin is enabled, so a query block would work. */
   tasksAvailable(): boolean;
@@ -53,12 +58,13 @@ type Item = { group?: string } & (
   | { kind: "attachment"; file: AttachmentFile; excerpt: Excerpt }
   | { kind: "folder"; path: string }
   | { kind: "tag"; tag: string }
-  | { kind: "more"; list: "notes" | "tasks" | "attachments"; count: number }
+  | { kind: "saved"; saved: SavedSearch; where: string }
+  | { kind: "more"; list: "notes" | "tasks" | "boards" | "attachments"; count: number }
   | { kind: "obsidian"; query: string }
   | { kind: "tasks-query"; block: string }
 );
 
-const SHOWN = { notes: 8, tasks: 5, attachments: 5, places: 3 };
+const SHOWN = { notes: 8, boards: 3, tasks: 5, attachments: 5, places: 3 };
 
 /**
  * Search everywhere: tasks, notes, attachments (by name and extracted text),
@@ -111,10 +117,36 @@ export class SearchModal extends SuggestModal<Item> {
     const today = localISODate();
     const items: Item[] = [];
     /** A labelled group, and a link to the full list when it holds more. */
-    const group = (label: string, list: Item[], total: number, fullList?: "notes" | "tasks" | "attachments") => {
+    const group = (label: string, list: Item[], total: number, fullList?: "notes" | "tasks" | "boards" | "attachments") => {
       list.forEach((item, i) => items.push(i === 0 ? { ...item, group: `${label} · ${total}` } : item));
       if (fullList && total > list.length) items.push({ kind: "more", list: fullList, count: total });
     };
+
+    // Filters (saved searches) come first, found by their name: asking for
+    // one by name is asking for that filter, not for notes that mention the words.
+    const saved = this.source
+      .savedSearches()
+      .filter((s) => savedSearchMatches(s.saved.name, input))
+      .sort((a, b) => Number(b.saved.name.toLowerCase().startsWith(input.trim().toLowerCase())) - Number(a.saved.name.toLowerCase().startsWith(input.trim().toLowerCase())));
+    group("Filters", saved.map((s) => ({ kind: "saved" as const, ...s })), saved.length);
+
+    // Folders and tags by name, for words (and #tags) typed.
+    const words = [...q.words, ...q.phrases];
+    const places: Item[] = [];
+    if (words.length) {
+      for (const path of this.source.folders()) {
+        if (words.every((w) => path.toLowerCase().includes(w))) places.push({ kind: "folder", path });
+      }
+    }
+    for (const tag of this.source.tags()) {
+      const t = tag.toLowerCase();
+      if ((words.length && words.every((w) => t.includes(w))) || q.tags.some((w) => t === w || t.startsWith(w))) {
+        places.push({ kind: "tag", tag });
+      }
+    }
+    const placeName = (p: Item) => (p.kind === "folder" ? p.path.split("/").pop()! : p.kind === "tag" ? p.tag : "");
+    places.sort((a, b) => nameScore(placeName(b), q) - nameScore(placeName(a), q));
+    group("Folders and tags", places.slice(0, SHOWN.places), places.length);
 
     const rankedTasks = rankTasks(this.source.taskRows(), q, today);
     group("Tasks", rankedTasks.slice(0, SHOWN.tasks).map((row) => ({ kind: "task" as const, row })), rankedTasks.length, "tasks");
@@ -134,14 +166,19 @@ export class SearchModal extends SuggestModal<Item> {
           ...ours.filter((n) => !omni.rank.has(n.path)),
         ]
       : ours;
-    const noteItems = await Promise.all(
-      rankedNotes.slice(0, SHOWN.notes).map(async (note) => ({
-        kind: "note" as const,
-        note,
-        excerpt: (await this.excerptOf(note.path, q)) ?? omni?.excerpt(note.path) ?? null,
-      }))
-    );
-    group(omni ? "Notes, ranked by Omnisearch" : "Notes", noteItems, rankedNotes.length, "notes");
+    const noteItems = (list: NoteSummary[], shown: number) =>
+      Promise.all(
+        list.slice(0, shown).map(async (note) => ({
+          kind: "note" as const,
+          note,
+          excerpt: (await this.excerptOf(note.path, q)) ?? omni?.excerpt(note.path) ?? null,
+        }))
+      );
+    // Boards have a group of their own, ahead of the other notes.
+    const boards = rankedNotes.filter((n) => n.kind === "board");
+    const others = rankedNotes.filter((n) => n.kind !== "board");
+    group("Boards", await noteItems(boards, SHOWN.boards), boards.length, "boards");
+    group(omni ? "Notes, ranked by Omnisearch" : "Notes", await noteItems(others, SHOWN.notes), others.length, "notes");
 
     const files = this.source
       .attachments()
@@ -166,23 +203,6 @@ export class SearchModal extends SuggestModal<Item> {
     );
     group("Attachments", fileItems, files.length, "attachments");
 
-    // Folders and tags by name, for words (and #tags) typed.
-    const words = [...q.words, ...q.phrases];
-    const places: Item[] = [];
-    if (words.length) {
-      for (const path of this.source.folders()) {
-        if (words.every((w) => path.toLowerCase().includes(w))) places.push({ kind: "folder", path });
-      }
-    }
-    for (const tag of this.source.tags()) {
-      const t = tag.toLowerCase();
-      if ((words.length && words.every((w) => t.includes(w))) || q.tags.some((w) => t === w || t.startsWith(w))) {
-        places.push({ kind: "tag", tag });
-      }
-    }
-    const placeName = (p: Item) => (p.kind === "folder" ? p.path.split("/").pop()! : p.kind === "tag" ? p.tag : "");
-    places.sort((a, b) => nameScore(placeName(b), q) - nameScore(placeName(a), q));
-    group("Folders and tags", places.slice(0, SHOWN.places), places.length);
 
     // Elsewhere: Obsidian's own search, and the query saved as a Tasks block.
     const elsewhere: Item[] = [];
@@ -309,6 +329,11 @@ export class SearchModal extends SuggestModal<Item> {
         setIcon(icon, "tag");
         title(`#${item.tag}`);
         break;
+      case "saved":
+        setIcon(icon, "list-filter");
+        title(item.saved.name);
+        meta([item.where, item.saved.name === item.saved.query ? "" : item.saved.query]);
+        break;
       case "more":
         // A compact link under its group, lined up with the titles above.
         el.addClass("ps-search-more", "is-compact");
@@ -345,6 +370,8 @@ export class SearchModal extends SuggestModal<Item> {
         return this.source.openFolder(item.path);
       case "tag":
         return this.source.openTag(item.tag);
+      case "saved":
+        return this.source.openSavedSearch(item.saved);
       case "more":
         return this.source.showInList(item.list, this.input);
       case "obsidian":

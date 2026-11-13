@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { DEFAULT_SETTINGS, listMinWidth, parseSettings, serializeSettings } from "../settings-data";
+import { DEFAULT_SETTINGS, listMinWidth, parseSavedSearches, parseSettings, serializeSettings } from "../settings-data";
 
 describe("parseSettings", () => {
   test("nothing stored gives the defaults", () => {
@@ -32,6 +32,8 @@ describe("parseSettings", () => {
       showMoreButton: false,
       showDailyNotes: false,
       showTemplates: true,
+      savedSearches: [{ name: "Late reports", place: { kind: "tasks" }, query: "is:overdue report", taskFilter: "open" }],
+      showSavedSearches: false,
     };
     expect(parseSettings(stored).settings).toEqual(stored);
   });
@@ -70,5 +72,44 @@ describe("listMinWidth", () => {
     expect(listMinWidth({ ...DEFAULT_SETTINGS, boardListMinWidth: 20 })).toBe(150);
     expect(listMinWidth({ ...DEFAULT_SETTINGS, boardListMinWidth: 9000 })).toBe(400);
     expect(listMinWidth({ ...DEFAULT_SETTINGS, boardListMinWidth: NaN })).toBe(190);
+  });
+});
+
+describe("parseSavedSearches", () => {
+  test("keeps whole searches for every kind of list, in order", () => {
+    const stored = [
+      { name: "Urgent", place: { kind: "tasks" }, query: "priority:high", taskFilter: "overdue" },
+      { name: "Client invoices", place: { kind: "notebook", folder: "Work/Clients" }, query: "invoice" },
+      { name: "paint", place: { kind: "tag", tag: "home" }, query: "paint" },
+      { name: "Kitchen boards", place: { kind: "boards" }, query: "kitchen" },
+    ];
+    expect(parseSavedSearches(stored)).toEqual(stored);
+  });
+
+  test("a search without a name is called by its query", () => {
+    expect(parseSavedSearches([{ place: { kind: "tasks" }, query: " in:work " }, { name: "  ", place: { kind: "notes" }, query: "plan" }])).toEqual([
+      { name: "in:work", place: { kind: "tasks" }, query: " in:work " },
+      { name: "plan", place: { kind: "notes" }, query: "plan" },
+    ]);
+  });
+
+  test("drops what isn't a whole search, and a tab on anything but Tasks", () => {
+    expect(
+      parseSavedSearches([
+        null,
+        "tasks",
+        { place: { kind: "tasks" }, query: "  " },
+        { place: { kind: "nowhere" }, query: "x" },
+        { place: { kind: "notebook" }, query: "x" },
+        { query: "x" },
+        { place: { kind: "notes", extra: 1 }, query: "plan", taskFilter: "done" },
+        { place: { kind: "tasks" }, query: "x", taskFilter: "someday" },
+      ])
+    ).toEqual([
+      { name: "plan", place: { kind: "notes" }, query: "plan" },
+      { name: "x", place: { kind: "tasks" }, query: "x" },
+    ]);
+    expect(parseSavedSearches("nope")).toEqual([]);
+    expect(parseSettings({ savedSearches: { a: 1 } }).settings.savedSearches).toEqual([]);
   });
 });

@@ -57,6 +57,7 @@ import type { OcrBox } from "./core/ocr-boxes";
 import { openBoardPage } from "../boards/page";
 import { extractSnippet } from "./core/snippet";
 import { cardTitle, taskDetails } from "./core/task-details";
+import type { SavedSearch } from "../settings-data";
 import { taskBadges } from "./task-badges";
 import { PRIORITIES } from "./core/task-line";
 import { taskTextColumn } from "./core/tasks";
@@ -80,6 +81,7 @@ import {
   RenameModal,
   NotePickerModal,
   PickerModal,
+  NameModal,
   TagModal,
   QuickTaskModal,
 } from "./modals";
@@ -424,6 +426,12 @@ export class SidebarView extends ItemView implements HoverParent {
   }
 
   private setPlace(place: Place): void {
+    // A search belongs to the list it was typed in: another list starts without one.
+    if (!this.isActive(place)) {
+      this.filterInput.setValue("");
+      this.search = "";
+      this.openedSearch = null;
+    }
     this.place = place;
     if (place.kind === "notebook") this.lastNotebook = place.folder;
     this.taskNoteFilter = null;
@@ -655,6 +663,7 @@ export class SidebarView extends ItemView implements HoverParent {
     const dailyCount = showsDaily && dailyFolder ? notesFor(notes, { kind: "daily" }, unfiltered).length : null;
     const templateCount = showsTemplates && templates ? notesFor(notes, { kind: "templates" }, unfiltered).length : null;
     const showsBoards = this.showsBoards();
+    const saved = s.showSavedSearches ? s.savedSearches : [];
     const boardCount = showsBoards ? notesFor(notes, { kind: "boards" }, unfiltered).length : null;
     const canMakeBoard = this.boardMakers().length > 0;
     const notebooks = folderRows(this.plugin.indexer.folders(), notes, this.ownPlaceFolders(), isAttachmentFolder);
@@ -668,6 +677,7 @@ export class SidebarView extends ItemView implements HoverParent {
       bookmarks?.map((b) => [b.kind, b.title, b.target, b.group, b.kind === "search" || !!this.app.vault.getAbstractFileByPath(b.target)]) ?? null,
       [noteCount, openTasks, attachmentCount, templateCount, templates, dailyCount, dailyFolder, showsDaily, showsTemplates, dailyPlugin],
       [showsBoards, boardCount, canMakeBoard, s.tasks],
+      saved,
       tree(notebooks),
       tree(tags),
     ]);
@@ -729,8 +739,12 @@ export class SidebarView extends ItemView implements HoverParent {
       )
     );
 
-    if (bookmarks && bookmarks.length && this.navHeading(nav, "Bookmarks", "bookmark", "section:bookmarks")) {
-      for (const b of bookmarks) this.bookmarkRow(nav, b);
+    // Bookmarks and filters (saved searches) share one section, the filters last.
+    const marks = bookmarks ?? [];
+    const kept = marks.length ? (saved.length ? "Bookmarks & filters" : "Bookmarks") : "Filters";
+    if ((marks.length || saved.length) && this.navHeading(nav, kept, "bookmark", "section:bookmarks")) {
+      for (const b of marks) this.bookmarkRow(nav, b);
+      for (const search of saved) this.savedSearchRow(nav, search);
     }
 
     this.placeRow(nav, "Notes", "file-text", { kind: "notes" }, 0, noteCount, () => void createNote(this.app, null));
@@ -1285,6 +1299,11 @@ export class SidebarView extends ItemView implements HoverParent {
     for (const note of notes) for (const tag of note.tags) if (!tags.has(tag.toLowerCase())) tags.set(tag.toLowerCase(), tag);
     return {
       notes: () => notes,
+      savedSearches: () => {
+        const { showSavedSearches, savedSearches } = this.plugin.settings;
+        return showSavedSearches ? savedSearches.map((saved) => ({ saved, where: this.placeTitle(saved.place) })) : [];
+      },
+      openSavedSearch: (saved) => this.openSavedSearch(saved),
       // Tasks turned off: none to find.
       taskRows: () =>
         this.plugin.settings.tasks
@@ -1763,6 +1782,7 @@ export class SidebarView extends ItemView implements HoverParent {
       const group = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "Group by" } });
       setIcon(group, "group");
       group.addEventListener("click", (evt) => this.groupMenu(evt));
+      this.saveSearchButton(actions);
       return;
     }
     if (!datedOnly) {
@@ -1795,10 +1815,11 @@ export class SidebarView extends ItemView implements HoverParent {
       }
       menu.showAtMouseEvent(evt);
     });
+    this.saveSearchButton(actions);
   }
 
-  private placeTitle(): string {
-    switch (this.place.kind) {
+  private placeTitle(place: Place = this.place): string {
+    switch (place.kind) {
       case "notes":
         return "Notes";
       case "tasks":
@@ -1812,10 +1833,97 @@ export class SidebarView extends ItemView implements HoverParent {
       case "attachments":
         return "Attachments";
       case "notebook":
-        return this.place.folder.split("/").pop()!;
+        return place.folder.split("/").pop()!;
       case "tag":
-        return `#${this.place.tag}`;
+        return `#${place.tag}`;
     }
+  }
+
+  // ---------- filters: saved searches, as the interface calls them ----------
+
+  /** The current list and what's typed in its search field, without a name yet. */
+  private currentSearch(): Omit<SavedSearch, "name"> | null {
+    const query = this.search.trim();
+    if (!query) return null;
+    return this.place.kind === "tasks"
+      ? { place: this.place, query, taskFilter: this.plugin.viewState.state.taskFilter }
+      : { place: this.place, query };
+  }
+
+  /** The saved search last opened from the side menu, while its list is still the one shown. */
+  private openedSearch: SavedSearch | null = null;
+
+  /**
+   * In a list's header, while its search field holds something not saved
+   * yet. Saving asks for a name; the name of a search this list already has
+   * replaces that search, which is how one is edited: open it, change what's
+   * typed, save it again.
+   */
+  private saveSearchButton(actions: HTMLElement): void {
+    const { showSavedSearches, savedSearches } = this.plugin.settings;
+    const current = this.currentSearch();
+    if (!showSavedSearches || !current) return;
+    const here = (s: SavedSearch) => JSON.stringify(s.place) === JSON.stringify(current.place);
+    if (savedSearches.some((s) => here(s) && s.query.trim() === current.query && s.taskFilter === current.taskFilter)) return;
+    const opened = this.openedSearch && savedSearches.includes(this.openedSearch) && here(this.openedSearch) ? this.openedSearch : null;
+    const save = actions.createDiv({ cls: "ps-action", attr: { "aria-label": opened ? `Save as a filter (updates “${opened.name}”)` : "Save as a filter" } });
+    setIcon(save, "bookmark-plus");
+    save.addEventListener("click", () => {
+      new NameModal(
+        this.app,
+        { title: "Save as a filter", cta: "Save", value: opened?.name ?? current.query, about: `${this.placeTitle(current.place)}: ${current.query}` },
+        (name) => {
+          const kept: SavedSearch = { name, ...current };
+          const list = this.plugin.settings.savedSearches;
+          const at = list.findIndex((s) => here(s) && s.name === name);
+          this.openedSearch = kept;
+          void this.plugin.updateSettings({ savedSearches: at === -1 ? [...list, kept] : list.map((s, i) => (i === at ? kept : s)) });
+        }
+      ).open();
+    });
+  }
+
+  /** Show the saved search's list with its query in the search field (on Tasks, on its tab). */
+  private openSavedSearch(saved: SavedSearch): void {
+    if (saved.taskFilter) this.plugin.viewState.update({ taskFilter: saved.taskFilter });
+    this.showPlace(saved.place);
+    this.openedSearch = saved;
+    this.filterInput.setValue(saved.query);
+    this.search = saved.query;
+    this.resetScroll();
+    this.renderList();
+  }
+
+  private savedSearchRow(parent: HTMLElement, saved: SavedSearch): void {
+    // A filter icon: an Obsidian search bookmark, which opens Obsidian's own search, has the magnifier.
+    const row = this.navRow(parent, saved.name, "list-filter", 1, null, false);
+    if (saved.name !== saved.query) row.setAttribute("aria-label", saved.query);
+    // Which list it searches, where a bookmark shows its group.
+    row.createSpan({ cls: "ps-nav-count ps-nav-group", text: this.placeTitle(saved.place) });
+    row.addEventListener("click", () => this.openSavedSearch(saved));
+    row.addEventListener("contextmenu", (evt) => {
+      evt.preventDefault();
+      const replace = (next: SavedSearch | null) => {
+        const list = this.plugin.settings.savedSearches;
+        if (this.openedSearch === saved) this.openedSearch = next;
+        void this.plugin.updateSettings({ savedSearches: next ? list.map((s) => (s === saved ? next : s)) : list.filter((s) => s !== saved) });
+      };
+      const menu = new Menu();
+      menu.addItem((item) =>
+        item
+          .setTitle("Rename…")
+          .setIcon("pencil-line")
+          .onClick(() =>
+            new NameModal(
+              this.app,
+              { title: "Rename filter", cta: "Rename", value: saved.name, about: `${this.placeTitle(saved.place)}: ${saved.query}` },
+              (name) => replace({ ...saved, name })
+            ).open()
+          )
+      );
+      menu.addItem((item) => item.setTitle("Remove filter").setIcon("bookmark-minus").onClick(() => replace(null)));
+      menu.showAtMouseEvent(evt);
+    });
   }
 
   /** The board a note embeds, if it resolves to a Kanban board with lists. */
