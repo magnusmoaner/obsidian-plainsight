@@ -1840,8 +1840,8 @@
   align-items: center;
   gap: 6px;
 }
-/* "Tag" is shaped like the tag badges beside it. */
-.psb-board button.psb-tag-add {
+/* "Tag" and "Embed in note" are shaped like the tag badges beside them. */
+.psb-board button.psb-about-add {
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -1856,15 +1856,15 @@
   font-size: inherit;
   cursor: pointer;
 }
-.psb-board button.psb-tag-add:hover {
+.psb-board button.psb-about-add:hover {
   border-style: solid;
   color: var(--text-normal);
 }
-.psb-tag-add span:first-child,
+.psb-about-add span:first-child,
 .psb-embedded-icon {
   display: inline-flex;
 }
-.psb-tag-add svg {
+.psb-about-add svg {
   width: 12px;
   height: 12px;
 }

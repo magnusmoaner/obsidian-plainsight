@@ -3,7 +3,7 @@ import { addTagToNote, createBoard, openFile } from "../sidebar/actions";
 import { addListItem } from "../sidebar/core/edits";
 import { NoteIndex } from "../sidebar/core/note-index";
 import { NotePickerModal, TagModal } from "../sidebar/modals";
-import { embedBlock, embedTarget, isBoardFrontmatter, retargetEmbeds } from "./board";
+import { appendEmbed, embedBlock, embedTarget, isBoardFrontmatter, retargetEmbeds } from "./board";
 import { BOARD_VIEW, BoardPage, keptAsMarkdown, openBoardPage, ownsBoard } from "./page";
 import { BoardHost, BoardView } from "./view";
 
@@ -16,6 +16,11 @@ const isBoard = (app: App, file: TFile) => isBoardFrontmatter(app.metadataCache.
 export function registerBoards(plugin: Plugin, boardsOn: () => boolean, index: NoteIndex): void {
   const { app } = plugin;
   const open = (file: TFile, newLeaf: Parameters<typeof openFile>[2]) => void openFile(app, file, newLeaf);
+
+  // The other half of an embed: the board names the note. Written as one
+  // new line; a property in a shape that can't take one is left alone.
+  const linkBack = (board: TFile, note: TFile) =>
+    app.vault.process(board, (text) => addListItem(text, EMBEDDED_IN, `"[[${app.metadataCache.fileToLinktext(note, board.path)}]]"`) ?? text);
 
   const host: BoardHost = {
     // From the notes themselves, so it's true whoever wrote the embed block.
@@ -39,6 +44,18 @@ export function registerBoards(plugin: Plugin, boardsOn: () => boolean, index: N
         });
       }).open();
     },
+    embedIn: (board) => {
+      // Any note but a board; the block goes after everything in it.
+      new NotePickerModal(app, "Note to embed the board in", (note) => {
+        const link = app.metadataCache.fileToLinktext(board, note.path);
+        void app.vault
+          .process(note, (text) => appendEmbed(text, link))
+          .then(() => linkBack(board, note))
+          .then(() => new Notice(`Embedded at the end of “${note.basename}”.`))
+          .catch((err: Error) => new Notice(`Couldn't embed the board: ${err.message}`));
+      }).open();
+    },
+    onChange: (listener) => index.subscribe(listener),
   };
 
   plugin.registerView(BOARD_VIEW, (leaf) => new BoardPage(leaf, open, host));
@@ -60,10 +77,7 @@ export function registerBoards(plugin: Plugin, boardsOn: () => boolean, index: N
     const cursor = editor.getCursor();
     const prefix = editor.getLine(cursor.line).trim() ? "\n" : "";
     editor.replaceSelection(prefix + embedBlock(app.metadataCache.fileToLinktext(board, note.path)));
-    // The other half of the link: the board names the note. Written as one
-    // new line; a property in a shape that can't take one is left alone.
-    const back = `"[[${app.metadataCache.fileToLinktext(note, board.path)}]]"`;
-    await app.vault.process(board, (text) => addListItem(text, EMBEDDED_IN, back) ?? text);
+    await linkBack(board, note);
   };
   const failed = (err: Error) => new Notice(`Couldn't insert the board: ${err.message}`);
 
