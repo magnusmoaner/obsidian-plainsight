@@ -24,7 +24,7 @@ import { boardPages } from "./boards/page";
 import { registerBoards } from "./boards/register";
 import { wysiwyg } from "./editor/extension";
 import { treeOf } from "./editor/parser";
-import { parseSettings, serializeSettings } from "./settings-data";
+import { listMinWidth, parseSettings, serializeSettings } from "./settings-data";
 import { NoteIndex } from "./sidebar/core/note-index";
 import { legacyViewState } from "./sidebar/core/view-state";
 import { cursorTracker } from "./sidebar/cursor";
@@ -345,6 +345,9 @@ export default class WysiwygPlugin extends Plugin {
   private applyBoardPages(): void {
     boardPages.enabled = this.settings.boards;
     boardPages.kanban = this.settings.kanbanBoards;
+    // Read by the boards' styles.
+    // shortcut: set on the main window only; a board in a pop-out window keeps the default width until boards there need it.
+    document.body.style.setProperty("--psb-list-min", `${listMinWidth(this.settings)}px`);
   }
 
   /** Act on what changed between two versions of the settings. */
@@ -370,10 +373,8 @@ export default class WysiwygPlugin extends Plugin {
     // Which boards are on changes what every board file is: read them all again.
     const boardKinds = ["boards", "kanbanBoards", "taskListBoards"] as const;
     const boardsChanged = boardKinds.some((key) => before[key] !== now[key]);
-    if (boardsChanged) {
-      this.applyBoardPages();
-      void this.indexer.build();
-    }
+    if (boardsChanged || before.boardListMinWidth !== now.boardListMinWidth) this.applyBoardPages();
+    if (boardsChanged) void this.indexer.build();
     if (
       boardsChanged ||
       before.tasks !== now.tasks ||
@@ -510,6 +511,7 @@ export default class WysiwygPlugin extends Plugin {
     if (this.settingsRetry !== null) window.clearTimeout(this.settingsRetry);
     this.onunloadCursor();
     this.restoreLivePreview();
+    document.body.style.removeProperty("--psb-list-min");
   }
 
   /** Source mode is the only state in which we are the sole renderer: Live

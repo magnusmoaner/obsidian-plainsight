@@ -3,6 +3,7 @@ import { corePluginEnabled, dailyNotesFolder, openHotkeys, openSettingsTab, temp
 import { NoteSuggest } from "./sidebar/modals";
 import type WysiwygPlugin from "./main";
 
+import { LIST_MIN_WIDTH, listMinWidth } from "./settings-data";
 import type { WysiwygSettings } from "./settings-data";
 
 export { DEFAULT_SETTINGS } from "./settings-data";
@@ -139,6 +140,23 @@ export class WysiwygSettingTab extends PluginSettingTab {
         "Task List Kanban boards",
         "Shown as boards. They gather tasks from other notes, so they have no lists or cards to show or embed. " +
           "Off: listed like any other note."
+      );
+      boards((setting) =>
+        setting
+          .setName("Narrowest list")
+          .setDesc(
+            "How narrow a list on a board may get, in pixels, before the board scrolls sideways. " +
+              "Lists are up to 240 wide when there's room, or this width if it's more."
+          )
+          .addSlider((slider) =>
+            slider
+              .setLimits(LIST_MIN_WIDTH.min, LIST_MIN_WIDTH.max, LIST_MIN_WIDTH.step)
+              .setValue(listMinWidth(settings))
+              .setDynamicTooltip()
+              .onChange(async (value) => {
+                await this.plugin.updateSettings({ boardListMinWidth: value });
+              })
+          )
       );
     }
 

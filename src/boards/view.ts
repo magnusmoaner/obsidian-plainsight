@@ -81,6 +81,8 @@ export class BoardView extends MarkdownRenderChild {
   private pending = false;
   /** The list whose "Add a card" box reopens after the next redraw. */
   private reopenAdd: number | null = null;
+  /** A Plainsight board, whose lists can have colours. */
+  private coloured = false;
   /** A list was just added: open its name for typing after the next redraw. */
   private nameNewList = false;
 
@@ -166,6 +168,9 @@ export class BoardView extends MarkdownRenderChild {
   }
 
   private render(board: Board, props: Record<string, unknown>): void {
+    // List colours belong to Plainsight's own boards. A Kanban plugin board
+    // has none in that plugin, so none are shown or offered here either.
+    this.coloured = props["plainsight-plugin"] !== undefined;
     const scroll = this.containerEl.querySelector(".psb-lanes")?.scrollLeft ?? 0;
     this.cards.unload();
     this.cards = new Component();
@@ -292,7 +297,7 @@ export class BoardView extends MarkdownRenderChild {
     const ref: LaneRef = { lane: i, raw: this.lines[lane.line] };
     const el = parent.createDiv({ cls: "psb-lane" });
     el.toggleClass("is-collapsed", lane.collapsed);
-    if (lane.colour) el.dataset.colour = lane.colour;
+    if (lane.colour && this.coloured) el.dataset.colour = lane.colour;
 
     const head = el.createDiv({ cls: "psb-lane-head", attr: { draggable: "true" } });
     head.addEventListener("dragstart", (evt) => this.startDrag(evt, el, { kind: "lane", ref }));
@@ -565,12 +570,14 @@ export class BoardView extends MarkdownRenderChild {
       }
     };
     let listed = false;
-    menu.addItem((i) => {
-      i.setTitle("Colour").setIcon("palette");
-      const sub = (i as unknown as { setSubmenu?(): Menu }).setSubmenu?.();
-      if (sub) colours(sub);
-      else listed = true;
-    });
+    if (this.coloured) {
+      menu.addItem((i) => {
+        i.setTitle("Colour").setIcon("palette");
+        const sub = (i as unknown as { setSubmenu?(): Menu }).setSubmenu?.();
+        if (sub) colours(sub);
+        else listed = true;
+      });
+    }
     if (listed) colours(menu);
     // The status cards take when they land here; Kanban knows only "done".
     menu.addSeparator();

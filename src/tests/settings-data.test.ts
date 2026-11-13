@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { DEFAULT_SETTINGS, parseSettings, serializeSettings } from "../settings-data";
+import { DEFAULT_SETTINGS, listMinWidth, parseSettings, serializeSettings } from "../settings-data";
 
 describe("parseSettings", () => {
   test("nothing stored gives the defaults", () => {
@@ -16,6 +16,7 @@ describe("parseSettings", () => {
       boards: false,
       kanbanBoards: false,
       taskListBoards: false,
+      boardListMinWidth: 260,
       showBoardsRow: false,
       boardCardsInTasks: true,
       hoverPreviews: false,
@@ -59,5 +60,15 @@ describe("parseSettings", () => {
       noteGroupBy: "date",
     });
     expect(extra).toEqual({});
+  });
+});
+
+describe("listMinWidth", () => {
+  test("the default, a chosen width, and values outside the range", () => {
+    expect(listMinWidth(DEFAULT_SETTINGS)).toBe(190);
+    expect(listMinWidth({ ...DEFAULT_SETTINGS, boardListMinWidth: 264.6 })).toBe(265);
+    expect(listMinWidth({ ...DEFAULT_SETTINGS, boardListMinWidth: 20 })).toBe(150);
+    expect(listMinWidth({ ...DEFAULT_SETTINGS, boardListMinWidth: 9000 })).toBe(400);
+    expect(listMinWidth({ ...DEFAULT_SETTINGS, boardListMinWidth: NaN })).toBe(190);
   });
 });
