@@ -1,6 +1,6 @@
 import { App, moment, Notice, normalizePath, PaneType, TFile, WorkspaceLeaf } from "obsidian";
 import { applyTemplate } from "./core/format";
-import { addTag, appendLine } from "./core/edits";
+import { addTag, appendLine, markAsBoard } from "./core/edits";
 import { setPinned } from "./core/pin";
 import { matchTaskLine, toggleTaskLine } from "./core/tasks";
 import { TaskItem } from "./core/types";
@@ -105,11 +105,27 @@ export async function createCanvas(app: App, folder: string | null): Promise<voi
 /**
  * Create a Plainsight board in `folder` (null = Obsidian's default
  * location): lists and cards as the Kanban plugin writes them, under
- * Plainsight's own mark.
+ * Plainsight's own mark. It starts as a copy of the note at `template`
+ * (a path; "" = the default lists).
  */
-export async function createBoard(app: App, folder: string | null, name = "Untitled board"): Promise<TFile> {
+export async function createBoard(app: App, folder: string | null, template: string, name = "Untitled board"): Promise<TFile> {
   const parent = folder ?? app.fileManager.getNewFileParent("").path;
-  return app.vault.create(availablePath(app, parent === "/" ? "" : parent, name), NEW_BOARD);
+  const path = availablePath(app, parent === "/" ? "" : parent, name);
+  let text = NEW_BOARD;
+  if (template) {
+    const file = app.vault.getAbstractFileByPath(template);
+    if (file instanceof TFile) text = markAsBoard(await fromTemplate(app, file, titleOf(path)));
+    else new Notice(`The board template “${template}” isn't there any more, so the new board has the default lists.`, 8000);
+  }
+  return app.vault.create(path, text);
+}
+
+const titleOf = (path: string) => path.split("/").pop()!.replace(/\.md$/, "");
+
+/** A template's text for a note called `title`, with {{title}}, {{date}} and {{time}} filled in as the Templates plugin does. */
+async function fromTemplate(app: App, template: TFile, title: string): Promise<string> {
+  const opts = templateOptions(app);
+  return applyTemplate(await app.vault.cachedRead(template), title, (pattern) => now().format(pattern), opts.dateFormat, opts.timeFormat);
 }
 
 /**
@@ -142,19 +158,7 @@ export async function createTaskListBoard(app: App, folder: string | null): Prom
 export async function createNote(app: App, folder: string | null, template?: TFile): Promise<void> {
   const parent = folder ?? app.fileManager.getNewFileParent("").path;
   const path = availablePath(app, parent === "/" ? "" : parent, "Untitled");
-  const title = path.split("/").pop()!.replace(/\.md$/, "");
-  let text = "";
-  if (template) {
-    const opts = templateOptions(app);
-    text = applyTemplate(
-      await app.vault.cachedRead(template),
-      title,
-      (pattern) => now().format(pattern),
-      opts.dateFormat,
-      opts.timeFormat
-    );
-  }
-  const file = await app.vault.create(path, text);
+  const file = await app.vault.create(path, template ? await fromTemplate(app, template, titleOf(path)) : "");
   await openFile(app, file, false);
 }
 

@@ -173,7 +173,7 @@ export default class WysiwygPlugin extends Plugin {
     });
 
     this.applyBoardPages();
-    registerBoards(this, () => this.settings.boards, this.index);
+    registerBoards(this, () => this.settings.boards, () => this.settings.boardTemplate, this.index);
     this.indexer = new Indexer(this.app, this.index, () => {
       const s = this.settings;
       return s.boards ? { kanban: s.kanbanBoards, taskList: s.taskListBoards } : null;

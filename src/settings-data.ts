@@ -98,6 +98,8 @@ export interface WysiwygSettings {
   kanbanBoards: boolean;
   /** Read the Task List Kanban plugin's boards as boards. */
   taskListBoards: boolean;
+  /** The note a new Plainsight board starts as a copy of; "" = the default lists. */
+  boardTemplate: string;
   /** The narrowest a list on a board gets before the board scrolls sideways, in px. */
   boardListMinWidth: number;
   /** A Boards row in the places column, below Tasks. */
@@ -138,6 +140,7 @@ export const DEFAULT_SETTINGS: WysiwygSettings = {
   boards: true,
   kanbanBoards: true,
   taskListBoards: true,
+  boardTemplate: "",
   boardListMinWidth: 190,
   showBoardsRow: true,
   boardCardsInTasks: false,

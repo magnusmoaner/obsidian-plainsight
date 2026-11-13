@@ -42,7 +42,7 @@ Evernote-style browsing for your vault. The sidebar is its own tab in Obsidian's
 | **Tasks** | Tasks from all your notes. See below. |
 | **Boards** | Every board in the vault: Plainsight's own, and those of the [Kanban](https://github.com/mgmeyers/obsidian-kanban) and [Task List Kanban](https://github.com/erikars/task-list-kanban) plugins. Chips filter by type of board; group by type, or by the note a board is embedded in. See [Boards](#boards). |
 | **Attachments** | PDFs, images and other files, with thumbnails, searchable by the text inside them. Group by month, folder or file type, or not at all. See below. |
-| **Templates** | The core Templates folder. The `+` makes a new template. Click a template to open it; its **New note from template** button (also on right-click) makes a note from it in the folder you last viewed. Right-click the **Note** button to pick a template from anywhere. |
+| **Templates** | The core Templates folder. The `+` makes a new template, or a board template. Click a template to open it; its **New note from template** button (also on right-click) makes a note from it in the folder you last viewed. A board template's button is **New board** instead: a new board with that template's lists. Right-click the **Note** button to pick a template from anywhere. |
 | **Folders** and **Tags** | Collapsible trees with counts. Folders Obsidian uses for attachments are left out, and so are the daily notes and templates folders while they have a place of their own. |
 
 Daily notes and Templates show while their core plugin is on. They, Tasks and Boards can each be turned off in settings. Until its folder is set, the place offers **Choose folder**, which opens that core plugin's settings.
@@ -86,8 +86,8 @@ Rest the mouse on a card to preview the note or file beside the list; rest it on
 ### Creating things
 
 - **The button row** at the top of the left column: the **Note** pill, then round buttons for **Search**, **Daily note** (today's note, while the Daily notes core plugin is on), **New folder**, **New task** and **⋯**. Settings can hide the whole row, or any of the round buttons; a hidden Search, Daily note, New folder or New task button (and, one at a time as the column narrows, New folder, New task and Daily note) moves into the **⋯** menu. Right-click the **Note** pill for **New note from template…**.
-- **A `+`** appears when you hover Notes, Daily notes (today's note), Tasks, Boards (a new board), Templates (a new template), Folders or Tags (not on touch screens).
-- **The list header** has a button for a new note (a new task on Tasks, today's note on Daily notes, a new template on Templates). Outside Daily notes and Templates, a second one makes a new board in the folder you're viewing: Plainsight's own, or, with the [Kanban](https://github.com/mgmeyers/obsidian-kanban) or [Task List Kanban](https://github.com/erikars/task-list-kanban) plugin enabled, a choice of kinds. On Boards, the first button makes a Plainsight board and the second the plugins' kinds.
+- **A `+`** appears when you hover Notes, Daily notes (today's note), Tasks, Boards (a new board), Templates (a new template, or a choice of **New template** and **New board template** while boards are on), Folders or Tags (not on touch screens).
+- **The list header** has a button for a new note (a new task on Tasks, today's note on Daily notes, a new template on Templates). Outside Daily notes and Templates, a second one makes a new board in the folder you're viewing: Plainsight's own, or, with the [Kanban](https://github.com/mgmeyers/obsidian-kanban) or [Task List Kanban](https://github.com/erikars/task-list-kanban) plugin enabled, a choice of kinds. On Boards, the first button makes a Plainsight board and the second the plugins' kinds. On Templates, the second makes a board template: a Plainsight board with the default lists, in the templates folder, ready to be named under **Template for new boards** in the settings.
 - **The ⋯ menu** creates tags, canvases and boards, inserts a template into the open note, opens Obsidian's search, quick switcher, graph view and the Importer, and has expand/collapse all, bookmark cleanup and settings.
 
 Buttons and menu items for plugins that aren't enabled are hidden.
@@ -130,7 +130,7 @@ In a list of notes, a task query keeps the notes that have a matching task.
 
 A board is a set of lists holding cards, for a project, a trip or a week. Plainsight has its own, and they live where your notes do.
 
-- **A new board** starts with three lists: Inbox, Doing (blue) and Done (green), with Done marking its cards done.
+- **A new board** starts with three lists: Inbox, Doing (blue) and Done (green), with Done marking its cards done. To start from your own lists instead, set up a board the way you like it and name it under **Template for new boards** in the settings: every new board is then a copy of it, lists, colours, cards and all. `{{title}}`, `{{date}}` and `{{time}}` in it are filled in as in any template.
 - **On a page of its own, or inside a note.** A board opens as a board from the sidebar, the file explorer or a link. To put one inside a note, run **Insert new board** (it makes `<note name> board` next to the note and embeds it) or **Embed existing board**. An embedded board is worked on in place, without leaving the note.
 - **Cards.** Add, edit, tick, drag and delete them. A dragged card hangs from the pointer, with a line beside it naming the list a drop would put it in, and leaves an empty slot where it would land. A card is edited in Obsidian's own editor, so links and tags complete as you type, and with the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) plugin its suggestions for dates, priority and recurrence come up too. Those details, and tags at the start or end of the card, show as badges along the bottom of the card.
 - **Statuses.** A card is open `[ ]`, in progress `[/]`, done `[x]` or cancelled `[-]`, set from its menu. Ticking a card goes through the Tasks plugin when it's installed, so the card gets its done date and a repeating card leaves its next round behind.
@@ -230,6 +230,7 @@ The settings are in five groups. A setting that depends on another shows only wh
 | Boards | On | Plainsight's boards, and the look of boards in the sidebar. Off: a board is listed like any other note, its cards are ordinary tasks, and an embedded board shows as its code block |
 | Kanban plugin boards | On | Boards made with the Kanban plugin count as boards. Off: they're listed like any other note |
 | Task List Kanban boards | On | The same, for the Task List Kanban plugin |
+| Template for new boards | (none) | A board or note that every new Plainsight board starts as a copy of, in place of the default lists. Chosen from your templates folder, if the Templates core plugin has one set; otherwise any note |
 | Narrowest list | 190 | How narrow a list on a board may get, in pixels (150 to 400), before the board scrolls sideways |
 | ***Editor (beta)*** | | |
 | WYSIWYG editing | On | Hides syntax and enables the editor shortcuts |

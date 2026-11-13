@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting, SettingGroup } from "obsidian";
+import { App, PluginSettingTab, Setting, SettingGroup, TFile } from "obsidian";
 import { corePluginEnabled, dailyNotesFolder, openHotkeys, openSettingsTab, templateOptions } from "./sidebar/internals";
 import { NoteSuggest } from "./sidebar/modals";
 import type WysiwygPlugin from "./main";
@@ -147,6 +147,34 @@ export class WysiwygSettingTab extends PluginSettingTab {
         "Task List Kanban boards",
         "Shown as boards. They gather tasks from other notes, so they have no lists or cards to show or embed. " +
           "Off: listed like any other note."
+      );
+      // From the templates folder, when the Templates core plugin has one; else any note.
+      const folder = templateOptions(this.app).folder;
+      const isTemplate = (file: unknown): file is TFile =>
+        file instanceof TFile && file.extension === "md" && (!folder || file.path.startsWith(`${folder}/`));
+      boards((setting) =>
+        setting
+          .setName("Template for new boards")
+          .setDesc(
+            `A board or note${folder ? ` in your templates folder (“${folder}”)` : ""} that every new Plainsight board starts as a copy of: ` +
+              "its lists, their colours and any cards. Leave empty for the default lists: Inbox, Doing and Done."
+          )
+          .addText((text) => {
+            text.setPlaceholder(`e.g. ${folder ?? "Templates"}/Board.md`).setValue(settings.boardTemplate);
+            // What's typed counts once it names a template, or is cleared.
+            text.onChange(async (value) => {
+              const path = value.trim();
+              if (!path || isTemplate(this.app.vault.getAbstractFileByPath(path))) await this.plugin.updateSettings({ boardTemplate: path });
+            });
+            new NoteSuggest(
+              this.app,
+              text.inputEl,
+              async (file) => {
+                await this.plugin.updateSettings({ boardTemplate: file.path });
+              },
+              isTemplate
+            );
+          })
       );
       boards((setting) =>
         setting

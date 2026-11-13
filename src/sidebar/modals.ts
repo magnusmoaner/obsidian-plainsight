@@ -63,9 +63,14 @@ export function canHoldTasks(app: App, file: TFile): boolean {
   return !isBoardFrontmatter(app.metadataCache.getFileCache(file)?.frontmatter);
 }
 
-/** Type-ahead over the vault's notes, for the default-task-note setting. */
+/** Type-ahead over the vault's notes, for settings that name one. `accept`: which notes are offered. */
 export class NoteSuggest extends AbstractInputSuggest<TFile> {
-  constructor(app: App, private input: HTMLInputElement, private onPick: (file: TFile) => void) {
+  constructor(
+    app: App,
+    private input: HTMLInputElement,
+    private onPick: (file: TFile) => void,
+    private accept: (file: TFile) => boolean = (file) => canHoldTasks(app, file)
+  ) {
     super(app, input);
   }
 
@@ -73,7 +78,7 @@ export class NoteSuggest extends AbstractInputSuggest<TFile> {
     const q = query.toLowerCase();
     return this.app.vault
       .getMarkdownFiles()
-      .filter((f) => canHoldTasks(this.app, f) && f.path.toLowerCase().includes(q))
+      .filter((f) => this.accept(f) && f.path.toLowerCase().includes(q))
       .slice(0, 50);
   }
 

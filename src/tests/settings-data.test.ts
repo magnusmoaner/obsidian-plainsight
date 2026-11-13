@@ -16,6 +16,7 @@ describe("parseSettings", () => {
       boards: false,
       kanbanBoards: false,
       taskListBoards: false,
+      boardTemplate: "Templates/Board.md",
       boardListMinWidth: 260,
       showBoardsRow: false,
       boardCardsInTasks: true,

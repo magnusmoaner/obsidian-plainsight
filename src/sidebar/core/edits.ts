@@ -148,6 +148,16 @@ export function setTextProperty(text: string, key: string, value: string): strin
   return writeFrontmatter(fm);
 }
 
+/** A template's text as a new Plainsight board: the board mark is added to its properties, unless it's there. */
+export function markAsBoard(text: string): string {
+  const line = "plainsight-plugin: board";
+  const fm = readFrontmatter(text);
+  if (!fm) return prependFrontmatter(text, [line]);
+  if (fm.lines.some((l) => l.startsWith("plainsight-plugin:"))) return text;
+  fm.lines.push(line);
+  return writeFrontmatter(fm);
+}
+
 /** Append `line` as the file's last line, keeping its line-ending style. */
 export function appendLine(text: string, line: string): string {
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
