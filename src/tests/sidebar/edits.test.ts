@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { addListItem, addTag, appendLine, folderNameError, normalizeTag, setTextProperty } from "../../sidebar/core/edits";
+import { addListItem, addTag, appendLine, folderNameError, movedPath, normalizeTag, setTextProperty } from "../../sidebar/core/edits";
 
 describe("normalizeTag", () => {
   test("strips #, spaces at the ends and stray slashes", () => {
@@ -196,5 +196,25 @@ describe("setTextProperty", () => {
   test("a property whose name only starts the same is not touched", () => {
     const text = "---\ndescription-long: keep\n---\nB";
     expect(setTextProperty(text, "description", "x")).toBe('---\ndescription-long: keep\ndescription: "x"\n---\nB');
+  });
+});
+
+describe("movedPath", () => {
+  test("a file or folder lands in the folder under its own name", () => {
+    expect(movedPath("Inbox/Plan.md", "Work/Clients")).toBe("Work/Clients/Plan.md");
+    expect(movedPath("Plan.md", "Work")).toBe("Work/Plan.md");
+    expect(movedPath("Work/Clients", "Archive")).toBe("Archive/Clients");
+    expect(movedPath("Work/Clients/Plan.md", "")).toBe("Plan.md");
+  });
+
+  test("something already there stays put", () => {
+    expect(movedPath("Work/Plan.md", "Work")).toBeNull();
+    expect(movedPath("Plan.md", "")).toBeNull();
+  });
+
+  test("a folder can't go into itself or anything inside it", () => {
+    expect(movedPath("Work", "Work")).toBeNull();
+    expect(movedPath("Work", "Work/Clients")).toBeNull();
+    expect(movedPath("Work", "Workshop")).toBe("Workshop/Work");
   });
 });

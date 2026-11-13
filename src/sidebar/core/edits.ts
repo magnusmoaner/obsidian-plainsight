@@ -164,3 +164,17 @@ export function folderNameError(name: string): string | null {
   if (trimmed.startsWith(".")) return "Names can't start with a dot.";
   return null;
 }
+
+/**
+ * Where `path` (a file or folder) ends up when it's moved into `folder`
+ * ("" is the vault root). Null when there's nothing to do or it can't be
+ * done: it's there already, or it's a folder being moved into itself.
+ */
+export function movedPath(path: string, folder: string): string | null {
+  const cut = path.lastIndexOf("/");
+  const parent = cut === -1 ? "" : path.slice(0, cut);
+  if (parent === folder) return null;
+  if (folder === path || folder.startsWith(`${path}/`)) return null;
+  const name = path.slice(cut + 1);
+  return folder ? `${folder}/${name}` : name;
+}

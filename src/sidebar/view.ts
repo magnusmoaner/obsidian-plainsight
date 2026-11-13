@@ -7,6 +7,7 @@ import {
   Keymap,
   MarkdownView,
   Menu,
+  normalizePath,
   Notice,
   PaneType,
   Platform,
@@ -56,6 +57,7 @@ import {
 import type { OcrBox } from "./core/ocr-boxes";
 import { openBoardPage } from "../boards/page";
 import { extractSnippet } from "./core/snippet";
+import { movedPath } from "./core/edits";
 import { cardTitle, taskDetails } from "./core/task-details";
 import { listChips, listGrouping, listSorts } from "../settings-data";
 import type { KindFilter } from "./core/view-state";
@@ -100,6 +102,8 @@ import {
   placePopover,
   hasTasksPlugin,
   KANBAN_NEW_BOARD,
+  onFilesDropped,
+  startFileDrag,
   newKanbanBoard,
   readBookmarks,
   removeBookmark,
@@ -836,6 +840,8 @@ export class SidebarView extends ItemView implements HoverParent {
     el.createSpan({ cls: "ps-nav-label", text: label });
     if (onAdd) this.addButton(el, `New ${label.toLowerCase().replace(/s$/, "")}`, onAdd);
     el.addEventListener("click", () => this.toggleCollapsed(key));
+    // Dropping on "Folders" moves to the top level.
+    if (key === "section:notebooks") this.dropInto(el, "", "the top level", null);
     return !collapsed;
   }
 
@@ -1088,6 +1094,146 @@ export class SidebarView extends ItemView implements HoverParent {
     const row = this.navRow(parent, label, icon, depth, count, this.isActive(place));
     if (onAdd) this.addButton(row, addLabel, onAdd);
     row.addEventListener("click", () => this.setPlace(place));
+    // A note dropped on Templates becomes a template: it moves into that folder.
+    const templates = place.kind === "templates" ? templateOptions(this.app).folder : null;
+    if (templates) this.dropInto(row, templates, "Templates", null, true);
+  }
+
+  // ---------- drag and drop ----------
+
+  /**
+   * Make a card or a folder row draggable. What follows the pointer is a
+   * copy of it, turned a little, as on the boards.
+   */
+  private draggable(el: HTMLElement, path: string): void {
+    el.draggable = true;
+    el.addEventListener("dragstart", (evt) => {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (!file) return;
+      const box = el.getBoundingClientRect();
+      const ghost = createDiv("ps-drag-ghost");
+      const copy = ghost.appendChild(el.cloneNode(true) as HTMLElement);
+      copy.addClass("ps-drag-copy");
+      copy.removeClasses(["is-active", "is-drop-target"]);
+      copy.style.width = `${box.width}px`;
+      // The copy hangs from the pointer by its top left corner, so what's
+      // under the pointer stays in view. It starts where the card is and
+      // slides there (the styles do the sliding once it's marked settled).
+      const hang = { x: 12, y: 18 };
+      copy.style.setProperty("--ps-from-x", `${box.left - evt.clientX - hang.x}px`);
+      copy.style.setProperty("--ps-from-y", `${box.top - evt.clientY - hang.y}px`);
+      // What a drop would do, in words: beside the pointer, above the copy, and always inside the window.
+      const { doc, win } = el;
+      const action = doc.body.createDiv("ps-drag-action");
+      const started = startFileDrag(this.app, evt, file, { el: ghost, anchor: { x: -hang.x, y: -hang.y }, action });
+      if (!started) {
+        action.remove();
+        return void evt.preventDefault();
+      }
+      let settled = false;
+      const follow = (move: DragEvent) => {
+        if (move.clientX === 0 && move.clientY === 0) return;
+        if (!settled) {
+          settled = true;
+          // Two frames on: Obsidian has put the copy on the page, drawn where the card is.
+          win.requestAnimationFrame(() => win.requestAnimationFrame(() => copy.addClass("is-settled")));
+        }
+        // To the right of the pointer, level with it and so just above the copy; held inside the window.
+        const x = Math.min(Math.max(move.clientX + 18, 8), win.innerWidth - action.offsetWidth - 8);
+        const y = Math.min(Math.max(move.clientY - action.offsetHeight / 2, 8), win.innerHeight - action.offsetHeight - 8);
+        action.style.translate = `${x}px ${y}px`;
+      };
+      const done = () => {
+        doc.removeEventListener("dragover", follow, true);
+        doc.removeEventListener("dragend", done, true);
+        doc.removeEventListener("drop", later, true);
+        action.remove();
+        el.removeClass("is-dragging");
+      };
+      // After the drop itself has been handled.
+      const later = () => win.setTimeout(done);
+      doc.addEventListener("dragover", follow, true);
+      doc.addEventListener("dragend", done, true);
+      doc.addEventListener("drop", later, true);
+      // A source that a redraw has taken off the page still gets its own dragend.
+      el.addEventListener("dragend", done, { once: true });
+      el.addClass("is-dragging");
+    });
+  }
+
+  /** A folded folder a drag has rested on, and since when: it opens after a moment. */
+  private dropRest: { key: string; since: number } | null = null;
+
+  /**
+   * Let a row take files and folders dropped on it: they move into `folder`
+   * ("" is the top level). `foldKey`: the row is a folded folder, which opens
+   * when a drag rests on it. `notesOnly`: folders aren't taken.
+   */
+  private dropInto(el: HTMLElement, folder: string, name: string, foldKey: string | null, notesOnly = false): void {
+    const movable = (files: TAbstractFile[]) =>
+      files.filter((f) => !(notesOnly && !(f instanceof TFile && f.extension === "md")) && movedPath(f.path, folder) !== null);
+    onFilesDropped(
+      this.app,
+      el,
+      (files) => {
+        if (!movable(files).length) return null;
+        if (foldKey) {
+          const now = Date.now();
+          if (this.dropRest?.key !== foldKey) this.dropRest = { key: foldKey, since: now };
+          else if (now - this.dropRest.since > 800) {
+            this.dropRest = null;
+            this.setCollapsed(foldKey, false);
+            this.renderNav();
+          }
+        }
+        return folder ? `Move into “${name}”` : "Move to the top level";
+      },
+      (files) => void this.moveInto(movable(files), folder, name)
+    );
+  }
+
+  /** Move files and folders into `folder`, links to them following; one that would overwrite something stays. */
+  private async moveInto(files: TAbstractFile[], folder: string, name: string): Promise<void> {
+    const moved: string[] = [];
+    for (const file of files) {
+      const to = movedPath(file.path, folder);
+      if (!to) continue;
+      if (this.app.vault.getAbstractFileByPath(normalizePath(to))) {
+        new Notice(`“${file.name}” wasn't moved: ${folder ? `“${name}”` : "the top level"} already has something with that name.`);
+        continue;
+      }
+      try {
+        await this.app.fileManager.renameFile(file, normalizePath(to));
+        moved.push(file instanceof TFile ? file.basename : file.name);
+      } catch (err) {
+        new Notice(`Couldn't move “${file.name}”: ${(err as Error).message}`);
+      }
+    }
+    if (moved.length) new Notice(`Moved ${moved.length === 1 ? `“${moved[0]}”` : `${moved.length} items`} to ${folder ? `“${name}”` : "the top level"}.`);
+  }
+
+  /** Let a tag row take notes dropped on it: they get the tag. */
+  private dropOnTag(el: HTMLElement, tag: string): void {
+    const notes = (files: TAbstractFile[]) => files.filter((f): f is TFile => f instanceof TFile && f.extension === "md");
+    // The tag as it's written in the vault; rows are keyed by its lower-cased form.
+    const written = () => this.plugin.index.all().flatMap((n) => n.tags).find((t) => t.toLowerCase() === tag) ?? tag;
+    onFilesDropped(
+      this.app,
+      el,
+      (files) => (notes(files).length ? `Add #${written()}` : null),
+      (files) => {
+        const name = written();
+        for (const note of notes(files)) {
+          void addTagToNote(this.app, note, name).then((added) => {
+            new Notice(
+              added
+                ? `Added #${name} to “${note.basename}”.`
+                : `“${note.basename}” has a tags property Plainsight won't edit automatically. Add the tag in the note's Properties instead.`
+            );
+          });
+        }
+      }
+    );
   }
 
   /** Indented rows; parents get a chevron that folds their children. */
@@ -1128,6 +1274,13 @@ export class SidebarView extends ItemView implements HoverParent {
     const place = toPlace(row);
     const el = this.navRow(parent, row.name, icon, row.depth + 1, row.count, this.isActive(place));
     const key = `${keyPrefix}:${row.path}`;
+    if (place.kind === "notebook") {
+      const folder = place.folder;
+      this.draggable(el, folder);
+      this.dropInto(el, folder, row.name, row.collapsed ? key : null);
+    } else if (place.kind === "tag") {
+      this.dropOnTag(el, place.tag);
+    }
     if (place.kind === "notebook") {
       el.addEventListener("contextmenu", (evt) => {
         const folder = this.app.vault.getAbstractFileByPath(place.folder);
@@ -2055,6 +2208,7 @@ export class SidebarView extends ItemView implements HoverParent {
   private renderCard(note: NoteSummary): HTMLElement {
     const card = this.bodyEl.createDiv({ cls: "ps-card", attr: { "data-path": note.path } });
     card.toggleClass("is-active", this.activeFile()?.path === note.path);
+    this.draggable(card, note.path);
     const text = card.createDiv("ps-card-text");
 
     const title = text.createDiv("ps-card-title");
@@ -2331,6 +2485,7 @@ export class SidebarView extends ItemView implements HoverParent {
     }
 
     card.addEventListener("click", (evt) => void openFile(this.app, tfile, Keymap.isModEvent(evt)));
+    this.draggable(card, tfile.path);
     this.previewOnHover(card, tfile.path);
     card.addEventListener("contextmenu", (evt) =>
       this.fileMenu(evt, tfile, (menu) => {

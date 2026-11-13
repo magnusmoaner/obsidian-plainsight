@@ -59,6 +59,20 @@ Each card shows the title, the first useful line of text, task progress (`3/6`),
 
 Right-click a card to open it in a new tab or to the right, pin or unpin it, rename or delete it, plus whatever other plugins add (such as *Move file to…*). Right-click a folder for New note, New folder, Rename and Delete.
 
+### Drag and drop
+
+Cards and folders can be dragged. A copy of what you're dragging follows the pointer, with a line under it saying what a drop would do.
+
+| Drag | Onto | What happens |
+| --- | --- | --- |
+| A card: a note, board, daily note, template or attachment | A folder in the left column | It moves there. Links to it are updated |
+| A note's card | A tag in the left column | The note gets that tag |
+| A note's card | **Templates** | It moves into the templates folder |
+| A folder | Another folder, or the **Folders** heading | It moves inside that folder, or to the top level |
+| A card or a folder | An open note, a tab or File explorer | What Obsidian does with a file dragged from File explorer: a link in the note, the file opened in the tab, a move in File explorer |
+
+A folded folder opens when a drag rests on it. Nothing is overwritten: a move that would land on something with the same name is refused, with a message. Files dragged out of File explorer can be dropped on Plainsight's folders and tags too. Dragging uses Obsidian's own drag handling, on desktop.
+
 ### Previews
 
 Rest the mouse on a card to preview the note or file beside the list; rest it on a task to preview its note, scrolled to the task. This is Obsidian's core Page preview:
