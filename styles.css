@@ -1888,10 +1888,19 @@
   min-height: 0;
 }
 
-/* Under a dialog's input: what the name is for. */
+/* Under a dialog's input: what the name is for, as a short list of labels and values. */
 .ps-dialog-about {
-  margin-top: 8px;
-  color: var(--text-muted);
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 14px;
+  margin: 12px 2px 0;
   font-size: var(--font-ui-small);
+}
+.ps-dialog-about dt {
+  color: var(--text-faint);
+}
+.ps-dialog-about dd {
+  margin: 0;
+  color: var(--text-muted);
   overflow-wrap: anywhere;
 }

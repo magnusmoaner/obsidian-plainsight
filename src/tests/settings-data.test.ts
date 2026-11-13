@@ -113,3 +113,56 @@ describe("parseSavedSearches", () => {
     expect(parseSettings({ savedSearches: { a: 1 } }).settings.savedSearches).toEqual([]);
   });
 });
+
+describe("a filter's grouping", () => {
+  test("is kept when it's one of its list's groupings", () => {
+    const stored = [
+      { name: "By priority", place: { kind: "tasks" }, query: "is:open", groupBy: "priority" },
+      { name: "By folder", place: { kind: "notes" }, query: "plan", groupBy: "folder" },
+      { name: "Files by type", place: { kind: "attachments" }, query: "pdf", groupBy: "type" },
+      { name: "Boards by note", place: { kind: "boards" }, query: "plan", groupBy: "embed" },
+    ];
+    expect(parseSavedSearches(stored)).toEqual(stored);
+  });
+
+  test("is dropped when it isn't: another list's grouping, a made-up one, or a list that has none", () => {
+    expect(
+      parseSavedSearches([
+        { name: "a", place: { kind: "notes" }, query: "x", groupBy: "priority" },
+        { name: "b", place: { kind: "tasks" }, query: "x", groupBy: "sideways" },
+        { name: "c", place: { kind: "daily" }, query: "x", groupBy: "date" },
+        { name: "d", place: { kind: "tasks" }, query: "x", groupBy: 3 },
+      ])
+    ).toEqual([
+      { name: "a", place: { kind: "notes" }, query: "x" },
+      { name: "b", place: { kind: "tasks" }, query: "x" },
+      { name: "c", place: { kind: "daily" }, query: "x" },
+      { name: "d", place: { kind: "tasks" }, query: "x" },
+    ]);
+  });
+});
+
+describe("a filter's chip and sort order", () => {
+  test("are kept when its list has them", () => {
+    const stored = [
+      { name: "Boards in Work", place: { kind: "notebook", folder: "Work" }, query: "plan", chip: "board", sort: "title" },
+      { name: "My boards", place: { kind: "boards" }, query: "plan", chip: "plainsight", sort: "created" },
+      { name: "Files", place: { kind: "attachments" }, query: "pdf", sort: "modified" },
+    ];
+    expect(parseSavedSearches(stored)).toEqual(stored);
+  });
+
+  test("are dropped when it hasn't: Tasks have no sort or kind chip, a chip must be one of the list's", () => {
+    expect(
+      parseSavedSearches([
+        { name: "a", place: { kind: "tasks" }, query: "x", chip: "board", sort: "title" },
+        { name: "b", place: { kind: "notes" }, query: "x", chip: "plainsight", sort: "sideways" },
+        { name: "c", place: { kind: "attachments" }, query: "x", chip: "note" },
+      ])
+    ).toEqual([
+      { name: "a", place: { kind: "tasks" }, query: "x" },
+      { name: "b", place: { kind: "notes" }, query: "x" },
+      { name: "c", place: { kind: "attachments" }, query: "x" },
+    ]);
+  });
+});
