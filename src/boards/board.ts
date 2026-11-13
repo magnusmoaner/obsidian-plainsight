@@ -28,6 +28,8 @@ export interface Lane {
   status: string | null;
   /** Minimized: only its name and count show. */
   collapsed: boolean;
+  /** One of LIST_COLOURS, or null for none. */
+  colour: string | null;
   cards: Card[];
 }
 
@@ -79,14 +81,25 @@ function readSettings(lines: string[]): { line: number; data: Record<string, unk
   }
 }
 
-function readStatuses(lines: string[]): Record<string, string> {
-  const stored = readSettings(lines)?.data[STATUS_KEY];
+/** The colours a list can have: Obsidian's own named colours, which follow the theme. */
+export const LIST_COLOURS = ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink"] as const;
+/** A list's colour, kept by list name like its status. */
+const COLOUR_KEY = "plainsight-list-colour";
+
+/** What the settings block holds under `key` for each list, by name; only values `valid` accepts. */
+function readNamed(lines: string[], key: string, valid: (value: string) => boolean): Record<string, string> {
+  const stored = readSettings(lines)?.data[key];
   const out: Record<string, string> = {};
   if (stored && typeof stored === "object") {
-    for (const [title, status] of Object.entries(stored)) if (status === "/" || status === "-") out[title] = status;
+    for (const [title, value] of Object.entries(stored)) if (typeof value === "string" && valid(value)) out[title] = value;
   }
   return out;
 }
+
+const readStatuses = (lines: string[]) => readNamed(lines, STATUS_KEY, (v) => v === "/" || v === "-");
+/** Each coloured list's colour, by list name, for a board's text. */
+export const listColours = (text: string) => readColours(text.split(/\r?\n/));
+const readColours = (lines: string[]) => readNamed(lines, COLOUR_KEY, (v) => (LIST_COLOURS as readonly string[]).includes(v));
 
 /**
  * Change what the settings block holds. A board without one gets it, if the
@@ -108,15 +121,17 @@ function writeSettings(lines: string[], change: (data: Record<string, unknown>) 
   lines.push("", "", "%% kanban:settings", "```", JSON.stringify(data), "```", "%%");
 }
 
-/** Store `statuses`, dropping lists that no longer exist. */
-function writeStatuses(lines: string[], statuses: Record<string, string>): void {
+/** Store `values` under `key`, dropping lists that no longer exist. */
+function writeNamed(lines: string[], key: string, values: Record<string, string>): void {
   const titles = new Set(parseBoard(lines.join("\n")).lanes.map((l) => l.title));
-  const kept = Object.fromEntries(Object.entries(statuses).filter(([title]) => titles.has(title)));
+  const kept = Object.fromEntries(Object.entries(values).filter(([title]) => titles.has(title)));
   writeSettings(lines, (data) => {
-    if (Object.keys(kept).length) data[STATUS_KEY] = kept;
-    else delete data[STATUS_KEY];
+    if (Object.keys(kept).length) data[key] = kept;
+    else delete data[key];
   });
 }
+
+const writeStatuses = (lines: string[], statuses: Record<string, string>) => writeNamed(lines, STATUS_KEY, statuses);
 
 /** Which lists are minimized, by position: the Kanban plugin's own setting, so both agree. */
 const COLLAPSE_KEY = "list-collapse";
@@ -164,6 +179,7 @@ export function parseBoard(text: string): Board {
         marker: null,
         status: null,
         collapsed: false,
+        colour: null,
         cards: [],
       });
       continue;
@@ -180,9 +196,11 @@ export function parseBoard(text: string): Board {
   const last = lanes[lanes.length - 1];
   if (last) last.end = end;
   const statuses = readStatuses(lines);
+  const colours = readColours(lines);
   const collapsed = readSettings(lines)?.data[COLLAPSE_KEY];
   lanes.forEach((lane, i) => {
     lane.status = lane.marker !== null ? "x" : statuses[lane.title] ?? null;
+    lane.colour = colours[lane.title] ?? null;
     lane.collapsed = Array.isArray(collapsed) && collapsed[i] === true;
   });
   return { lanes, end };
@@ -302,10 +320,14 @@ export function addLane(text: string, title: string): string {
 export function renameLane(text: string, ref: LaneRef, title: string): string {
   return edit(text, (lines, board) => {
     const lane = findLane(lines, board, ref);
+    // What's kept by the list's name goes with it to the new one.
     const statuses = readStatuses(lines);
+    const colours = readColours(lines);
     if (statuses[lane.title]) statuses[title] = statuses[lane.title];
+    if (colours[lane.title]) colours[title] = colours[lane.title];
     lines[lane.line] = `## ${title}${lane.limit ? ` (${lane.limit})` : ""}`;
     writeStatuses(lines, statuses);
+    writeNamed(lines, COLOUR_KEY, colours);
   });
 }
 
@@ -313,8 +335,10 @@ export function deleteLane(text: string, ref: LaneRef): string {
   return edit(text, (lines, board) => {
     const lane = findLane(lines, board, ref);
     const statuses = readStatuses(lines);
+    const colours = readColours(lines);
     lines.splice(lane.line, lane.end - lane.line);
     writeStatuses(lines, statuses);
+    writeNamed(lines, COLOUR_KEY, colours);
     writeCollapsed(lines, board.lanes.filter((l) => l !== lane).map((l) => l.collapsed));
   });
 }
@@ -324,6 +348,17 @@ export function setLaneCollapsed(text: string, ref: LaneRef, collapsed: boolean)
   return edit(text, (lines, board) => {
     const lane = findLane(lines, board, ref);
     writeCollapsed(lines, board.lanes.map((l) => (l === lane ? collapsed : l.collapsed)));
+  });
+}
+
+/** Give a list one of LIST_COLOURS, or null to take its colour away. */
+export function setLaneColour(text: string, ref: LaneRef, colour: string | null): string {
+  return edit(text, (lines, board) => {
+    const lane = findLane(lines, board, ref);
+    const colours = readColours(lines);
+    if (colour && (LIST_COLOURS as readonly string[]).includes(colour)) colours[lane.title] = colour;
+    else delete colours[lane.title];
+    writeNamed(lines, COLOUR_KEY, colours);
   });
 }
 

@@ -8,6 +8,7 @@ export function note(path: string, over: Partial<NoteSummary> = {}): NoteSummary
     kind: "note",
     columns: [],
     laneCards: [],
+    laneColours: [],
     items: 0,
     title: path.split("/").pop()!.replace(/\.md$/, ""),
     folder,

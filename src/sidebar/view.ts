@@ -1840,6 +1840,8 @@ export class SidebarView extends ItemView implements HoverParent {
       // min(): two lists with the same name share their checked cards.
       const done = Math.min(total, note.tasks.filter((t) => t.section === name && isClosed(t)).length);
       const lane = board.createDiv({ cls: "ps-card-lane", attr: { title: done ? `${name}: ${done} of ${total} done` : name } });
+      const colour = note.laneColours[i];
+      if (colour) lane.dataset.colour = colour;
       lane.createDiv({ cls: "ps-card-lane-name", text: name });
       lane.createDiv({ cls: "ps-card-lane-count", text: String(total) });
       if (done) lane.createDiv("ps-card-lane-done").style.width = `${(done / total) * 100}%`;

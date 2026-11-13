@@ -34,6 +34,8 @@ export interface NoteSummary {
   columns: string[];
   /** Kanban plugin boards: cards in each column, in `columns` order. */
   laneCards: number[];
+  /** Boards: each column's colour (one of the boards' LIST_COLOURS) or null, in `columns` order. */
+  laneColours: (string | null)[];
   /** Kanban plugin boards: number of cards; canvases: number of nodes. 0 otherwise. */
   items: number;
   title: string;

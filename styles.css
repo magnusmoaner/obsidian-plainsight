@@ -1439,6 +1439,32 @@
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
 }
+/* A list's colour: a soft tint of one of Obsidian's named colours, so it
+   follows the theme. Cards keep their own background. */
+.psb-lane[data-colour="red"],
+.ps-card-lane[data-colour="red"] { --psb-lane-rgb: var(--color-red-rgb); }
+.psb-lane[data-colour="orange"],
+.ps-card-lane[data-colour="orange"] { --psb-lane-rgb: var(--color-orange-rgb); }
+.psb-lane[data-colour="yellow"],
+.ps-card-lane[data-colour="yellow"] { --psb-lane-rgb: var(--color-yellow-rgb); }
+.psb-lane[data-colour="green"],
+.ps-card-lane[data-colour="green"] { --psb-lane-rgb: var(--color-green-rgb); }
+.psb-lane[data-colour="cyan"],
+.ps-card-lane[data-colour="cyan"] { --psb-lane-rgb: var(--color-cyan-rgb); }
+.psb-lane[data-colour="blue"],
+.ps-card-lane[data-colour="blue"] { --psb-lane-rgb: var(--color-blue-rgb); }
+.psb-lane[data-colour="purple"],
+.ps-card-lane[data-colour="purple"] { --psb-lane-rgb: var(--color-purple-rgb); }
+.psb-lane[data-colour="pink"],
+.ps-card-lane[data-colour="pink"] { --psb-lane-rgb: var(--color-pink-rgb); }
+.psb-lane[data-colour] {
+  background: rgba(var(--psb-lane-rgb), 0.12);
+  border-color: rgba(var(--psb-lane-rgb), 0.35);
+}
+/* The same tint on the list's tile in the note list. */
+.ps-card-lane[data-colour] {
+  background: rgba(var(--psb-lane-rgb), 0.16);
+}
 /* Minimized: a narrow strip with the name running down it; cards can still be dropped on it. */
 .psb-lane.is-collapsed {
   flex: 0 0 auto;
