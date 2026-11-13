@@ -620,8 +620,24 @@ export class BoardView extends MarkdownRenderChild {
     this.drag = drag;
     evt.dataTransfer?.setData("text/plain", "");
     if (evt.dataTransfer) evt.dataTransfer.effectAllowed = "move";
+    const { left, top, width, height } = el.getBoundingClientRect();
+    // What follows the pointer: a copy of the card or list, turned a little,
+    // on a see-through backing so its rounded corners stay round. (The
+    // browser's own picture of the element is a square-cornered cut-out.)
+    if (evt.dataTransfer) {
+      // Room around the copy for its turned corners and its shadow: the
+      // browser's picture is cut at the backing's edge.
+      const pad = 32;
+      const ghost = el.ownerDocument.body.createDiv("psb-board psb-ghost");
+      ghost.style.padding = `${pad}px`;
+      const copy = ghost.appendChild(el.cloneNode(true) as HTMLElement);
+      copy.style.width = `${width}px`;
+      copy.style.height = `${height}px`;
+      evt.dataTransfer.setDragImage(ghost, evt.clientX - left + pad, evt.clientY - top + pad);
+      // The browser takes its picture at once; the copy has done its job.
+      window.setTimeout(() => ghost.remove());
+    }
     // The slot: an empty space the size of what's dragged, shown where it would land.
-    const { width, height } = el.getBoundingClientRect();
     this.slot = createDiv("psb-drop");
     this.slot.style.width = `${width}px`;
     this.slot.style.height = `${height}px`;
