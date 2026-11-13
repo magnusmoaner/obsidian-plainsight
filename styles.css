@@ -1464,9 +1464,28 @@
 .psb-lane.is-collapsed [aria-label="List actions"] {
   display: none;
 }
-.psb-lane-new {
+/* Add a list, after the last list: a small outlined +. */
+.psb-board button.psb-lane-new {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: auto;
+  padding: 8px;
+  border-radius: 10px;
   background: none;
-  border-style: dashed;
+  box-shadow: none;
+  border: 1px dashed var(--background-modifier-border-hover);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.psb-board button.psb-lane-new:hover {
+  border-style: solid;
+  color: var(--text-normal);
+}
+.psb-lane-new svg {
+  width: 14px;
+  height: 14px;
 }
 .psb-lane-head {
   display: flex;
@@ -1596,7 +1615,8 @@
   gap: 4px;
   font-size: var(--font-ui-smaller);
 }
-.psb-card-foot .ps-badge-tag {
+.psb-card-foot .ps-badge-tag,
+.psb-tags .ps-badge-tag {
   background: var(--tag-background);
   color: var(--tag-color);
 }
@@ -1619,9 +1639,6 @@
   box-shadow: none;
   color: var(--text-muted);
   cursor: pointer;
-}
-.psb-lane-new button.psb-add {
-  background: none;
 }
 .psb-board .psb-input {
   width: 100%;
@@ -1679,8 +1696,111 @@
   display: flex;
   flex-direction: column;
 }
-.psb-page .psb-title {
-  visibility: hidden;
+/* The board's own page starts with what the board is about: a description
+   to click and write, then a quiet row of tags, where it's embedded and its size. */
+.psb-about {
+  margin: 0 4px 14px;
+}
+/* The name as a note shows its title; the description as a line under it.
+   Each is a block of its own, only as wide as its text, so the highlight fits it. */
+.psb-name,
+.psb-desc {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 -8px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  cursor: text;
+}
+.psb-name {
+  font-size: var(--inline-title-size, 1.6em);
+  font-weight: var(--inline-title-weight, 700);
+  line-height: 1.25;
+  color: var(--text-normal);
+}
+.psb-desc {
+  margin-bottom: 8px;
+  font-size: var(--font-ui-medium);
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+.psb-name:hover,
+.psb-name:focus-visible,
+.psb-desc:hover,
+.psb-desc:focus-visible {
+  background: var(--background-modifier-hover);
+}
+.psb-desc.is-empty {
+  color: var(--text-faint);
+}
+/* The fields they turn into while being typed in. */
+.psb-about .psb-input {
+  display: block;
+  margin-bottom: 8px;
+  font-size: var(--font-ui-medium);
+}
+.psb-about .psb-name + .psb-input {
+  margin-bottom: 2px;
+  font-size: var(--inline-title-size, 1.6em);
+  font-weight: var(--inline-title-weight, 700);
+  height: auto;
+}
+.psb-about-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  color: var(--text-muted);
+}
+.psb-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+/* "Tag" is shaped like the tag badges beside it. */
+.psb-board button.psb-tag-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: auto;
+  padding: 0 6px 0 4px;
+  border-radius: 4px;
+  line-height: 1.5;
+  background: none;
+  box-shadow: none;
+  border: 1px dashed var(--background-modifier-border-hover);
+  color: var(--text-muted);
+  font-size: inherit;
+  cursor: pointer;
+}
+.psb-board button.psb-tag-add:hover {
+  border-style: solid;
+  color: var(--text-normal);
+}
+.psb-tag-add span:first-child,
+.psb-embedded-icon {
+  display: inline-flex;
+}
+.psb-tag-add svg {
+  width: 12px;
+  height: 12px;
+}
+.psb-embedded {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.psb-embedded-icon svg {
+  width: 14px;
+  height: 14px;
+}
+.psb-embedded a {
+  text-decoration: none;
+}
+.psb-embedded a:hover {
+  text-decoration: underline;
 }
 .psb-page .psb-lanes {
   flex: 1 1 auto;

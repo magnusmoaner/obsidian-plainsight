@@ -93,6 +93,61 @@ export function addTag(text: string, tag: string): string | null {
   return null;
 }
 
+/**
+ * Add `item` to the list property `key`, editing only its lines: a new
+ * property if the note has none, a new last item if it's a plain block list.
+ * Returns the text unchanged if the item is there already, and null if the
+ * property is in any other shape (a flow list, a single value, comments).
+ */
+export function addListItem(text: string, key: string, item: string): string | null {
+  const fm = readFrontmatter(text);
+  if (!fm) return prependFrontmatter(text, [`${key}:`, `  - ${item}`]);
+  const { lines } = fm;
+  const at = lines.findIndex((l) => l.startsWith(`${key}:`));
+  if (at === -1) {
+    lines.push(`${key}:`, `  - ${item}`);
+    return writeFrontmatter(fm);
+  }
+  if (lines[at].slice(key.length + 1).trim() !== "") return null;
+  let end = at + 1;
+  let indent: string | null = null;
+  for (; end < lines.length; end++) {
+    const m = ITEM.exec(lines[end]);
+    if (!m) break;
+    if ((indent !== null && m[1] !== indent) || !SAFE_ITEM.test(m[2])) return null;
+    if (unquote(m[2]) === unquote(item)) return text;
+    indent = m[1];
+  }
+  // Anything indented after the items (or instead of them) isn't a plain list.
+  if (end < lines.length && /^\s+\S/.test(lines[end])) return null;
+  lines.splice(end, 0, `${indent ?? "  "}- ${item}`);
+  return writeFrontmatter(fm);
+}
+
+/**
+ * Set the one-line text property `key` to `value` ("" removes it), editing
+ * only that line. Null if the property is there in a shape that isn't one
+ * line (a block of text, a list), which is left for the user.
+ */
+export function setTextProperty(text: string, key: string, value: string): string | null {
+  const line = `${key}: ${JSON.stringify(value.replace(/\s+/g, " ").trim())}`;
+  const fm = readFrontmatter(text);
+  if (!fm) return value ? prependFrontmatter(text, [line]) : text;
+  const { lines } = fm;
+  const at = lines.findIndex((l) => l.startsWith(`${key}:`));
+  if (at === -1) {
+    if (!value) return text;
+    lines.push(line);
+    return writeFrontmatter(fm);
+  }
+  const current = lines[at].slice(key.length + 1).trim();
+  const continues = /^\s+\S/.test(lines[at + 1] ?? "");
+  if (current === "" ? continues : /^[|>]/.test(current) || continues) return null;
+  if (value) lines[at] = line;
+  else lines.splice(at, 1);
+  return writeFrontmatter(fm);
+}
+
 /** Append `line` as the file's last line, keeping its line-ending style. */
 export function appendLine(text: string, line: string): string {
   const eol = text.includes("\r\n") ? "\r\n" : "\n";

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { addTag, appendLine, folderNameError, normalizeTag } from "../../sidebar/core/edits";
+import { addListItem, addTag, appendLine, folderNameError, normalizeTag, setTextProperty } from "../../sidebar/core/edits";
 
 describe("normalizeTag", () => {
   test("strips #, spaces at the ends and stray slashes", () => {
@@ -139,4 +139,62 @@ describe("addTag: shapes it refuses (null) rather than risk breaking YAML", () =
       expect(addTag(text, "new")).toBeNull();
     });
   }
+});
+
+describe("addListItem", () => {
+  const item = '"[[Garden plan]]"';
+
+  test("a note without the property gets it, with or without frontmatter", () => {
+    expect(addListItem("Body", "embedded-in", item)).toBe('---\nembedded-in:\n  - "[[Garden plan]]"\n---\nBody');
+    expect(addListItem("---\nplainsight-plugin: board\n---\n\n## To do\n", "embedded-in", item)).toBe(
+      '---\nplainsight-plugin: board\nembedded-in:\n  - "[[Garden plan]]"\n---\n\n## To do\n'
+    );
+  });
+
+  test("a second note is added after the first, in the list's own indent; nothing else moves", () => {
+    const text = '---\n# keep me\nembedded-in:\n    - "[[Trip]]"\ntitle: \'Q\'\n---\nB';
+    expect(addListItem(text, "embedded-in", item)).toBe('---\n# keep me\nembedded-in:\n    - "[[Trip]]"\n    - "[[Garden plan]]"\ntitle: \'Q\'\n---\nB');
+  });
+
+  test("an item that is there already changes nothing", () => {
+    const text = '---\nembedded-in:\n  - "[[Garden plan]]"\n---\nB';
+    expect(addListItem(text, "embedded-in", item)).toBe(text);
+  });
+
+  test("a property in another shape is refused", () => {
+    expect(addListItem('---\nembedded-in: "[[Trip]]"\n---\nB', "embedded-in", item)).toBeNull();
+    expect(addListItem('---\nembedded-in: ["[[Trip]]"]\n---\nB', "embedded-in", item)).toBeNull();
+    expect(addListItem("---\nembedded-in:\n  - a # note\n---\nB", "embedded-in", item)).toBeNull();
+    expect(addListItem("---\nembedded-in:\n  nested: 1\n---\nB", "embedded-in", item)).toBeNull();
+  });
+});
+
+describe("setTextProperty", () => {
+  test("sets, replaces and removes one line, leaving the rest as it was", () => {
+    const text = "---\n# keep me\ntags: [home]\n---\nBody";
+    const set = setTextProperty(text, "description", "New kitchen by Christmas");
+    expect(set).toBe('---\n# keep me\ntags: [home]\ndescription: "New kitchen by Christmas"\n---\nBody');
+    expect(setTextProperty(set!, "description", 'Say "hi": now')).toBe('---\n# keep me\ntags: [home]\ndescription: "Say \\"hi\\": now"\n---\nBody');
+    expect(setTextProperty(set!, "description", "")).toBe(text);
+  });
+
+  test("a note without frontmatter gets one; clearing nothing changes nothing", () => {
+    expect(setTextProperty("Body", "description", "Hello")).toBe('---\ndescription: "Hello"\n---\nBody');
+    expect(setTextProperty("Body", "description", "")).toBe("Body");
+  });
+
+  test("line breaks become spaces: the property is one line", () => {
+    expect(setTextProperty("Body", "description", "one\ntwo")).toBe('---\ndescription: "one two"\n---\nBody');
+  });
+
+  test("a description written over several lines is refused", () => {
+    expect(setTextProperty("---\ndescription: |\n  long\n  text\n---\nB", "description", "x")).toBeNull();
+    expect(setTextProperty("---\ndescription:\n  - a\n---\nB", "description", "x")).toBeNull();
+    expect(setTextProperty("---\ndescription: first\n  and more\n---\nB", "description", "x")).toBeNull();
+  });
+
+  test("a property whose name only starts the same is not touched", () => {
+    const text = "---\ndescription-long: keep\n---\nB";
+    expect(setTextProperty(text, "description", "x")).toBe('---\ndescription-long: keep\ndescription: "x"\n---\nB');
+  });
 });

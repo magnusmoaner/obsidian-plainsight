@@ -1,6 +1,6 @@
 import { App, FileView, PaneType, TFile, WorkspaceLeaf } from "obsidian";
 import { hasCommand, KANBAN_NEW_BOARD } from "../sidebar/internals";
-import { BoardView } from "./view";
+import { BoardHost, BoardView } from "./view";
 
 export const BOARD_VIEW = "plainsight-board";
 
@@ -33,8 +33,14 @@ export class BoardPage extends FileView {
   private board: BoardView | null = null;
 
   // Not "open": that is View's own method, which Obsidian calls with the pane.
-  constructor(leaf: WorkspaceLeaf, private openBoard: (file: TFile, newLeaf: PaneType | boolean) => void) {
+  constructor(
+    leaf: WorkspaceLeaf,
+    private openBoard: (file: TFile, newLeaf: PaneType | boolean) => void,
+    private host: BoardHost
+  ) {
     super(leaf);
+    // Actions are added right to left: this one sits next to the ⋯ menu.
+    this.addAction("plus", "Add a list", () => this.board?.addList());
     this.addAction("file-text", "Open as Markdown", () => {
       if (this.file) this.asMarkdown(this.file, true);
     });
@@ -69,7 +75,7 @@ export class BoardPage extends FileView {
       return;
     }
     this.contentEl.addClass("psb-page");
-    this.board = this.addChild(new BoardView(this.app, this.contentEl.createDiv(), file, file.path, this.openBoard));
+    this.board = this.addChild(new BoardView(this.app, this.contentEl.createDiv(), file, file.path, this.openBoard, this.host));
   }
 
   async onUnloadFile(): Promise<void> {

@@ -1,9 +1,11 @@
 import { App, Editor, MarkdownPostProcessorContext, Notice, Plugin, TFile } from "obsidian";
-import { createBoard, openFile } from "../sidebar/actions";
-import { NotePickerModal } from "../sidebar/modals";
+import { addTagToNote, createBoard, openFile } from "../sidebar/actions";
+import { addListItem } from "../sidebar/core/edits";
+import { NoteIndex } from "../sidebar/core/note-index";
+import { NotePickerModal, TagModal } from "../sidebar/modals";
 import { embedBlock, embedTarget, isBoardFrontmatter, retargetEmbeds } from "./board";
 import { BOARD_VIEW, BoardPage, keptAsMarkdown, openBoardPage, ownsBoard } from "./page";
-import { BoardView } from "./view";
+import { BoardHost, BoardView } from "./view";
 
 /** The board property that names the notes embedding it; the embed block names the board. */
 const EMBEDDED_IN = "embedded-in";
@@ -11,11 +13,35 @@ const EMBEDDED_IN = "embedded-in";
 const isBoard = (app: App, file: TFile) => isBoardFrontmatter(app.metadataCache.getFileCache(file)?.frontmatter);
 
 /** Boards in notes and on their own page: the views, the commands, and keeping the two-way link. */
-export function registerBoards(plugin: Plugin, boardsOn: () => boolean): void {
+export function registerBoards(plugin: Plugin, boardsOn: () => boolean, index: NoteIndex): void {
   const { app } = plugin;
   const open = (file: TFile, newLeaf: Parameters<typeof openFile>[2]) => void openFile(app, file, newLeaf);
 
-  plugin.registerView(BOARD_VIEW, (leaf) => new BoardPage(leaf, open));
+  const host: BoardHost = {
+    // From the notes themselves, so it's true whoever wrote the embed block.
+    // shortcut: the index knows a note's first embed block only, widen it if notes with several boards matter.
+    embeddedIn: (board) =>
+      index
+        .all()
+        .filter((n) => n.embeddedBoard && app.metadataCache.getFirstLinkpathDest(n.embeddedBoard, n.path)?.path === board.path)
+        .map((n) => app.vault.getAbstractFileByPath(n.path))
+        .filter((f): f is TFile => f instanceof TFile),
+    addTag: (board) => {
+      const existing = [...new Set(index.all().flatMap((n) => n.tags))];
+      new TagModal(app, board.basename, existing, (tag) => {
+        void addTagToNote(app, board, tag).then((added) => {
+          if (added) return;
+          new Notice(
+            `"${board.basename}" has a tags property Plainsight won't edit automatically ` +
+              "(comments or a multi-line list). Add the tag with Open as Markdown instead.",
+            8000
+          );
+        });
+      }).open();
+    },
+  };
+
+  plugin.registerView(BOARD_VIEW, (leaf) => new BoardPage(leaf, open, host));
 
   const draw = (source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => {
     const target = embedTarget(source);
@@ -34,12 +60,10 @@ export function registerBoards(plugin: Plugin, boardsOn: () => boolean): void {
     const cursor = editor.getCursor();
     const prefix = editor.getLine(cursor.line).trim() ? "\n" : "";
     editor.replaceSelection(prefix + embedBlock(app.metadataCache.fileToLinktext(board, note.path)));
-    // The other half of the link: the board names the note.
-    const back = `[[${app.metadataCache.fileToLinktext(note, board.path)}]]`;
-    await app.fileManager.processFrontMatter(board, (fm: Record<string, unknown>) => {
-      const list = [fm[EMBEDDED_IN]].flat().filter((v): v is string => typeof v === "string");
-      if (!list.includes(back)) fm[EMBEDDED_IN] = [...list, back];
-    });
+    // The other half of the link: the board names the note. Written as one
+    // new line; a property in a shape that can't take one is left alone.
+    const back = `"[[${app.metadataCache.fileToLinktext(note, board.path)}]]"`;
+    await app.vault.process(board, (text) => addListItem(text, EMBEDDED_IN, back) ?? text);
   };
   const failed = (err: Error) => new Notice(`Couldn't insert the board: ${err.message}`);
 
