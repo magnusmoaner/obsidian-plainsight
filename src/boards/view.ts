@@ -1,9 +1,27 @@
+import { folderNameError, setTextProperty } from "../sidebar/core/edits";
 import { localISODate } from "../sidebar/core/format";
 import { tasksToggle } from "../sidebar/internals";
 import { taskDetails } from "../sidebar/core/task-details";
 import { badge, taskBadges } from "../sidebar/task-badges";
 import { CardEditor, openCardEditor } from "./card-editor";
-import { App, Component, Keymap, MarkdownRenderChild, MarkdownRenderer, Menu, Modal, Notice, PaneType, setIcon, Setting, TFile } from "obsidian";
+import {
+  App,
+  Component,
+  getFrontMatterInfo,
+  Keymap,
+  MarkdownRenderChild,
+  MarkdownRenderer,
+  Menu,
+  Modal,
+  normalizePath,
+  Notice,
+  PaneType,
+  parseFrontMatterTags,
+  parseYaml,
+  setIcon,
+  Setting,
+  TFile,
+} from "obsidian";
 import {
   addCard,
   addLane,
@@ -27,6 +45,14 @@ import {
 } from "./board";
 
 type Drag = { kind: "card"; ref: CardRef } | { kind: "lane"; ref: LaneRef };
+
+/** What a board on its own page asks of the plugin around it. */
+export interface BoardHost {
+  /** The notes that embed the board. */
+  embeddedIn(board: TFile): TFile[];
+  /** Ask for a tag and add it to the board's properties. */
+  addTag(board: TFile): void;
+}
 
 /** Card statuses, as the Tasks plugin names them: character, label, icon. */
 const STATUSES = [
@@ -53,6 +79,8 @@ export class BoardView extends MarkdownRenderChild {
   private pending = false;
   /** The list whose "Add a card" box reopens after the next redraw. */
   private reopenAdd: number | null = null;
+  /** A list was just added: open its name for typing after the next redraw. */
+  private nameNewList = false;
 
   constructor(
     private app: App,
@@ -60,8 +88,10 @@ export class BoardView extends MarkdownRenderChild {
     /** The board: a link as written in an embed block, or the file itself. */
     private target: string | TFile,
     private sourcePath: string,
-    /** Open the board on its own page. */
-    private open: (file: TFile, newLeaf: PaneType | boolean) => void
+    /** Open a board on its own page, or a note. */
+    private open: (file: TFile, newLeaf: PaneType | boolean) => void,
+    /** Given on the board's own page: it shows the board's description, tags and where it's embedded. */
+    private host?: BoardHost
   ) {
     super(containerEl);
   }
@@ -71,6 +101,12 @@ export class BoardView extends MarkdownRenderChild {
     this.registerEvent(
       this.app.vault.on("modify", (f) => {
         if (f.path === this.file?.path) void this.refresh();
+      })
+    );
+    // A renamed board keeps its file, so nothing above fires: redraw its name.
+    this.registerEvent(
+      this.app.vault.on("rename", (f) => {
+        if (f === this.file) void this.refresh();
       })
     );
     // Covers a board created, renamed or deleted after the note was opened.
@@ -96,7 +132,7 @@ export class BoardView extends MarkdownRenderChild {
     if (!this.file || !this.app.vault.getAbstractFileByPath(this.file.path)) return this.renderMissing();
     const text = await this.app.vault.cachedRead(this.file);
     this.lines = text.split(/\r?\n/);
-    this.render(parseBoard(text));
+    this.render(parseBoard(text), properties(text));
   }
 
   private isTyping(): boolean {
@@ -127,7 +163,7 @@ export class BoardView extends MarkdownRenderChild {
     this.containerEl.createDiv({ cls: "psb-missing", text: `Board not found: ${name}` });
   }
 
-  private render(board: Board): void {
+  private render(board: Board, props: Record<string, unknown>): void {
     const scroll = this.containerEl.querySelector(".psb-lanes")?.scrollLeft ?? 0;
     this.cards.unload();
     this.cards = new Component();
@@ -135,28 +171,117 @@ export class BoardView extends MarkdownRenderChild {
     this.containerEl.empty();
 
     const file = this.file!;
-    const head = this.containerEl.createDiv("psb-head");
-    const title = head.createEl("a", { cls: "psb-title internal-link", text: file.basename, href: file.path });
-    title.addEventListener("click", (evt) => {
-      evt.preventDefault();
-      this.open(file, Keymap.isModEvent(evt));
-    });
     const count = board.lanes.reduce((n, l) => n + l.cards.length, 0);
-    head.createSpan({ cls: "psb-count", text: `${count} card${count === 1 ? "" : "s"}` });
+    const cards = `${count} card${count === 1 ? "" : "s"}`;
+    if (this.host) {
+      this.renderAbout(this.host, props, cards);
+    } else {
+      const head = this.containerEl.createDiv("psb-head");
+      const title = head.createEl("a", { cls: "psb-title internal-link", text: file.basename, href: file.path });
+      title.addEventListener("click", (evt) => {
+        evt.preventDefault();
+        this.open(file, Keymap.isModEvent(evt));
+      });
+      head.createSpan({ cls: "psb-count", text: cards });
+    }
 
     const lanesEl = this.containerEl.createDiv("psb-lanes");
     board.lanes.forEach((_, i) => this.renderLane(lanesEl, board, i));
-    // Embedded in a note, a board is for its cards; lists are added on its own page.
-    if (this.target instanceof TFile) this.renderAddLane(lanesEl);
+    // Lists are added on the board's own page: here, or with the button in its header.
+    if (this.host) this.renderAddLane(lanesEl);
     this.dropZone(lanesEl, lanesEl, ".psb-lane", "lane", "x", (index) => {
       // Read now: the drag is over by the time the file is written.
       const drag = this.drag;
       if (drag?.kind === "lane") void this.write((t) => moveLane(t, drag.ref, index));
     });
     lanesEl.scrollLeft = scroll;
+    if (this.nameNewList) {
+      this.nameNewList = false;
+      const titles = lanesEl.querySelectorAll<HTMLElement>(".psb-lane:not(.is-collapsed) > .psb-lane-head > .psb-lane-title");
+      const last = titles[titles.length - 1];
+      last?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      last?.click();
+    }
     if (this.reopenAdd !== null) {
       lanesEl.children[this.reopenAdd]?.querySelector<HTMLElement>(".psb-add")?.click();
       this.reopenAdd = null;
+    }
+  }
+
+  /** On the board's own page: its name and description, then its tags, the notes that embed it and the card count. */
+  private renderAbout(host: BoardHost, props: Record<string, unknown>, cards: string): void {
+    const file = this.file!;
+    const about = this.containerEl.createDiv("psb-about");
+
+    // The board's name is its file's name: typing a new one renames the file.
+    const name = about.createDiv({
+      cls: "psb-name",
+      text: file.basename,
+      attr: { role: "button", tabindex: "0", "aria-label": "Rename the board" },
+    });
+    const rename = () => this.inlineInput(name, file.basename, (v) => this.rename(v));
+    name.addEventListener("click", rename);
+    name.addEventListener("keydown", (evt) => evt.key === "Enter" && rename());
+
+    const description = typeof props.description === "string" ? props.description : "";
+    const desc = about.createDiv({
+      cls: "psb-desc",
+      text: description || "Add a description",
+      attr: { role: "button", tabindex: "0", "aria-label": description ? "Edit the description" : "Add a description" },
+    });
+    desc.toggleClass("is-empty", !description);
+    const edit = () => this.inlineInput(desc, description, (v) => void this.setDescription(v), true);
+    desc.addEventListener("click", edit);
+    desc.addEventListener("keydown", (evt) => evt.key === "Enter" && edit());
+
+    const row = about.createDiv("psb-about-row");
+    // The board's own tags: those in its properties, not the tags on its cards.
+    const tags = row.createDiv("psb-tags");
+    // Drawn as tags are on the cards below, and on note cards in the sidebar.
+    for (const tag of parseFrontMatterTags(props) ?? []) badge(tags, null, tag, null, "ps-badge-tag");
+    const add = tags.createEl("button", { cls: "psb-tag-add", attr: { "aria-label": "Add a tag to the board" } });
+    setIcon(add.createSpan(), "plus");
+    add.createSpan({ text: "Tag" });
+    add.addEventListener("click", () => host.addTag(file));
+
+    const notes = host.embeddedIn(file);
+    if (notes.length) {
+      const where = row.createDiv("psb-embedded");
+      setIcon(where.createSpan("psb-embedded-icon"), "file-symlink");
+      const names = where.createSpan({ text: "Embedded in " });
+      notes.forEach((note, i) => {
+        if (i) names.appendText(", ");
+        const link = names.createEl("a", { cls: "internal-link", text: note.basename, href: note.path });
+        link.addEventListener("click", (evt) => {
+          evt.preventDefault();
+          this.open(note, Keymap.isModEvent(evt));
+        });
+      });
+    }
+    row.createSpan({ cls: "psb-count", text: cards });
+  }
+
+  /** Rename the board's file, as the sidebar's Rename does; links to it follow. */
+  private rename(name: string): void {
+    const file = this.file!;
+    const problem = folderNameError(name);
+    if (problem) return void new Notice(problem);
+    const parent = file.parent && !file.parent.isRoot() ? `${file.parent.path}/` : "";
+    const path = normalizePath(`${parent}${name}.${file.extension}`);
+    if (path === file.path) return;
+    if (this.app.vault.getAbstractFileByPath(path)) return void new Notice("Something with that name already exists here.");
+    this.app.fileManager.renameFile(file, path).catch((err: Error) => new Notice(`Couldn't rename: ${err.message}`));
+  }
+
+  private async setDescription(value: string): Promise<void> {
+    let refused = false;
+    await this.app.vault.process(this.file!, (text) => {
+      const next = setTextProperty(text, "description", value);
+      refused = next === null;
+      return next ?? text;
+    });
+    if (refused) {
+      new Notice("This board's description is written over several lines, so it wasn't changed. Edit it with Open as Markdown.", 8000);
     }
   }
 
@@ -245,37 +370,24 @@ export class BoardView extends MarkdownRenderChild {
     if (!foot.childElementCount) foot.remove();
   }
 
+  /** After the last list, on the board's own page: a narrow strip, like a minimized list. */
   private renderAddLane(parent: HTMLElement): void {
-    const el = parent.createDiv("psb-lane psb-lane-new");
-    const add = el.createEl("button", { cls: "psb-add", text: "Add a list" });
-    add.addEventListener("click", () => {
-      add.hide();
-      const input = el.createEl("input", { cls: "psb-input", attr: { type: "text", placeholder: "List name" } });
-      let closed = false;
-      const close = () => {
-        // Removing a focused input fires its blur, which lands here again.
-        if (closed) return;
-        closed = true;
-        input.remove();
-        add.show();
-        this.doneTyping();
-      };
-      input.addEventListener("keydown", (evt) => {
-        if (evt.key === "Escape") close();
-        if (evt.key !== "Enter" || evt.isComposing) return;
-        const title = input.value.trim();
-        close();
-        if (title) void this.write((t) => addLane(t, title));
-      });
-      input.addEventListener("blur", close);
-      input.focus();
-    });
+    const add = parent.createEl("button", { cls: "psb-lane-new" });
+    setIcon(add.createSpan(), "plus");
+    add.createSpan({ cls: "psb-lane-new-text", text: "Add list" });
+    add.addEventListener("click", () => this.addList());
+  }
+
+  /** Add a list at the end, with its name open for typing over. */
+  addList(): void {
+    this.nameNewList = true;
+    void this.write((t) => addLane(t, "New list"));
   }
 
   // ---- Editing in place -------------------------------------------------
 
   /** Swap `el`'s text for a one-line input; Enter or leaving it saves. */
-  private inlineInput(el: HTMLElement, value: string, save: (v: string) => void): void {
+  private inlineInput(el: HTMLElement, value: string, save: (v: string) => void, allowEmpty = false): void {
     el.hide();
     const input = createEl("input", { cls: "psb-input", attr: { type: "text" } });
     input.value = value;
@@ -287,7 +399,7 @@ export class BoardView extends MarkdownRenderChild {
       const v = input.value.trim();
       input.remove();
       el.show();
-      if (keep && v && v !== value) save(v);
+      if (keep && (v || allowEmpty) && v !== value) save(v);
       this.doneTyping();
     };
     input.addEventListener("keydown", (evt) => {
@@ -531,6 +643,17 @@ export class BoardView extends MarkdownRenderChild {
       drop(place(evt).index);
       this.endDrag();
     });
+  }
+}
+
+/** The properties at the top of a note's text; none if they can't be read. */
+function properties(text: string): Record<string, unknown> {
+  try {
+    const info = getFrontMatterInfo(text);
+    const data = info.exists ? (parseYaml(info.frontmatter) as unknown) : null;
+    return data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : {};
+  } catch {
+    return {};
   }
 }
 
