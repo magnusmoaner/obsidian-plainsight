@@ -57,6 +57,8 @@ import type { OcrBox } from "./core/ocr-boxes";
 import { openBoardPage } from "../boards/page";
 import { extractSnippet } from "./core/snippet";
 import { cardTitle, taskDetails } from "./core/task-details";
+import { listChips, listGrouping, listSorts } from "../settings-data";
+import type { KindFilter } from "./core/view-state";
 import type { SavedSearch } from "../settings-data";
 import { taskBadges } from "./task-badges";
 import { PRIORITIES } from "./core/task-line";
@@ -155,6 +157,52 @@ interface Partitioned {
   boxes: Map<string, Array<{ note: NoteSummary; box: OcrBox }>>;
   isAttachmentFolder: (folder: string) => boolean;
 }
+
+// The lists' groupings, sort orders, tabs and chips by name: for their
+// menus, and for saying what a filter holds.
+const NOTE_GROUPS: Array<[NoteGrouping, string, string]> = [
+  ["date", "Date", "calendar"],
+  ["folder", "Folder", "folder"],
+  ["kind", "Type", "shapes"],
+  ["embed", "Note it's embedded in", "file-text"],
+  ["none", "No grouping", "list"],
+];
+const ATTACHMENT_GROUPS: Array<[AttachmentGrouping, string, string]> = [
+  ["date", "Date", "calendar"],
+  ["folder", "Folder", "folder"],
+  ["type", "Type", "shapes"],
+  ["none", "No grouping", "list"],
+];
+const TASK_GROUPS: Array<[TaskGrouping, string, string]> = [
+  ["due", "Due date", "calendar"],
+  ["scheduled", "Scheduled date", "calendar-clock"],
+  ["priority", "Priority", "flag"],
+  ["recurrence", "Recurrence", "repeat"],
+  ["tag", "Tag", "tag"],
+  ["folder", "Folder", "folder"],
+  ["note", "Note", "file-text"],
+  ["board", "Board", "kanban"],
+  ["none", "No grouping", "list"],
+];
+const SORTS: Array<[SortKey, string]> = [
+  ["modified", "Date updated"],
+  ["created", "Date created"],
+  ["title", "Title"],
+];
+const TASK_TABS: Array<[TaskFilter, string]> = [
+  ["open", "Open"],
+  ["overdue", "Overdue"],
+  ["done", "Done"],
+];
+const CHIPS: Record<string, string> = {
+  all: "All",
+  note: "Notes",
+  board: "Boards",
+  canvas: "Canvases",
+  plainsight: "Plainsight",
+  kanban: "Kanban",
+  taskList: "Task List Kanban",
+};
 
 /** Two columns: places on the left, the selected place's notes or tasks on the right. */
 export class SidebarView extends ItemView implements HoverParent {
@@ -1796,12 +1844,7 @@ export class SidebarView extends ItemView implements HoverParent {
     setIcon(sort, "arrow-up-down");
     sort.addEventListener("click", (evt) => {
       const menu = new Menu();
-      const options: Array<[SortKey, string]> = [
-        ["modified", "Date updated"],
-        ["created", "Date created"],
-        ["title", "Title"],
-      ];
-      for (const [key, label] of options) {
+      for (const [key, label] of SORTS) {
         menu.addItem((item) =>
           item
             .setTitle(label)
@@ -1845,9 +1888,30 @@ export class SidebarView extends ItemView implements HoverParent {
   private currentSearch(): Omit<SavedSearch, "name"> | null {
     const query = this.search.trim();
     if (!query) return null;
-    return this.place.kind === "tasks"
-      ? { place: this.place, query, taskFilter: this.plugin.viewState.state.taskFilter }
-      : { place: this.place, query };
+    const state = this.plugin.viewState.state;
+    const current: Omit<SavedSearch, "name"> =
+      this.place.kind === "tasks" ? { place: this.place, query, taskFilter: state.taskFilter } : { place: this.place, query };
+    // How the list is grouped, which chip is chosen and how it's sorted are part of what's saved.
+    const grouping = listGrouping(this.place);
+    if (grouping) current.groupBy = state[grouping.key];
+    if (listChips(this.place)) current.chip = this.place.kind === "boards" ? this.boardTypeFilter : state.noteKindFilter;
+    if (listSorts(this.place)) current.sort = this.sort;
+    return current;
+  }
+
+  /** What a filter holds, line by line, for the dialogs that save and rename one. */
+  private filterDetails(filter: Omit<SavedSearch, "name">): Array<[string, string]> {
+    const named = (list: Array<[string, string, ...string[]]>, key: string | undefined) => list.find(([k]) => k === key)?.[1];
+    const groups = filter.place.kind === "tasks" ? TASK_GROUPS : filter.place.kind === "attachments" ? ATTACHMENT_GROUPS : NOTE_GROUPS;
+    const lines: Array<[string, string | undefined]> = [
+      ["List", this.placeTitle(filter.place)],
+      ["Search", filter.query],
+      ["Tab", named(TASK_TABS, filter.taskFilter)],
+      ["Showing", filter.chip ? CHIPS[filter.chip] : undefined],
+      ["Grouped by", named(groups, filter.groupBy)],
+      ["Sorted by", named(SORTS, filter.sort)],
+    ];
+    return lines.filter((line): line is [string, string] => !!line[1]);
   }
 
   /** The saved search last opened from the side menu, while its list is still the one shown. */
@@ -1864,14 +1928,20 @@ export class SidebarView extends ItemView implements HoverParent {
     const current = this.currentSearch();
     if (!showSavedSearches || !current) return;
     const here = (s: SavedSearch) => JSON.stringify(s.place) === JSON.stringify(current.place);
-    if (savedSearches.some((s) => here(s) && s.query.trim() === current.query && s.taskFilter === current.taskFilter)) return;
+    const same = (s: SavedSearch) =>
+      s.query.trim() === current.query &&
+      s.taskFilter === current.taskFilter &&
+      s.groupBy === current.groupBy &&
+      s.chip === current.chip &&
+      s.sort === current.sort;
+    if (savedSearches.some((s) => here(s) && same(s))) return;
     const opened = this.openedSearch && savedSearches.includes(this.openedSearch) && here(this.openedSearch) ? this.openedSearch : null;
     const save = actions.createDiv({ cls: "ps-action", attr: { "aria-label": opened ? `Save as a filter (updates “${opened.name}”)` : "Save as a filter" } });
     setIcon(save, "bookmark-plus");
     save.addEventListener("click", () => {
       new NameModal(
         this.app,
-        { title: "Save as a filter", cta: "Save", value: opened?.name ?? current.query, about: `${this.placeTitle(current.place)}: ${current.query}` },
+        { title: "Save as a filter", cta: "Save", value: opened?.name ?? current.query, about: this.filterDetails(current) },
         (name) => {
           const kept: SavedSearch = { name, ...current };
           const list = this.plugin.settings.savedSearches;
@@ -1886,6 +1956,11 @@ export class SidebarView extends ItemView implements HoverParent {
   /** Show the saved search's list with its query in the search field (on Tasks, on its tab). */
   private openSavedSearch(saved: SavedSearch): void {
     if (saved.taskFilter) this.plugin.viewState.update({ taskFilter: saved.taskFilter });
+    const grouping = listGrouping(saved.place);
+    if (grouping && saved.groupBy) this.plugin.viewState.update({ [grouping.key]: saved.groupBy });
+    if (saved.chip && saved.place.kind === "boards") this.boardTypeFilter = saved.chip as BoardType | "all";
+    else if (saved.chip) this.plugin.viewState.update({ noteKindFilter: saved.chip as KindFilter });
+    if (saved.sort) this.sort = saved.sort as SortKey;
     this.showPlace(saved.place);
     this.openedSearch = saved;
     this.filterInput.setValue(saved.query);
@@ -1916,7 +1991,7 @@ export class SidebarView extends ItemView implements HoverParent {
           .onClick(() =>
             new NameModal(
               this.app,
-              { title: "Rename filter", cta: "Rename", value: saved.name, about: `${this.placeTitle(saved.place)}: ${saved.query}` },
+              { title: "Rename filter", cta: "Rename", value: saved.name, about: this.filterDetails(saved) },
               (name) => replace({ ...saved, name })
             ).open()
           )
@@ -2327,14 +2402,7 @@ export class SidebarView extends ItemView implements HoverParent {
 
   private noteGroupMenu(evt: MouseEvent): void {
     const menu = new Menu();
-    const options: Array<[NoteGrouping, string, string]> = [
-      ["date", "Date", "calendar"],
-      ["folder", "Folder", "folder"],
-      ["kind", "Type", "shapes"],
-      ["embed", "Note it's embedded in", "file-text"],
-      ["none", "No grouping", "list"],
-    ];
-    for (const [key, label, icon] of options) {
+    for (const [key, label, icon] of NOTE_GROUPS) {
       if (key === "embed" && this.place.kind !== "boards") continue;
       menu.addItem((item) =>
         item
@@ -2353,13 +2421,7 @@ export class SidebarView extends ItemView implements HoverParent {
 
   private attachmentGroupMenu(evt: MouseEvent): void {
     const menu = new Menu();
-    const options: Array<[AttachmentGrouping, string, string]> = [
-      ["date", "Date", "calendar"],
-      ["folder", "Folder", "folder"],
-      ["type", "Type", "shapes"],
-      ["none", "No grouping", "list"],
-    ];
-    for (const [key, label, icon] of options) {
+    for (const [key, label, icon] of ATTACHMENT_GROUPS) {
       menu.addItem((item) =>
         item
           .setTitle(label)
@@ -2377,18 +2439,7 @@ export class SidebarView extends ItemView implements HoverParent {
 
   private groupMenu(evt: MouseEvent): void {
     const menu = new Menu();
-    const options: Array<[TaskGrouping, string, string]> = [
-      ["due", "Due date", "calendar"],
-      ["scheduled", "Scheduled date", "calendar-clock"],
-      ["priority", "Priority", "flag"],
-      ["recurrence", "Recurrence", "repeat"],
-      ["tag", "Tag", "tag"],
-      ["folder", "Folder", "folder"],
-      ["note", "Note", "file-text"],
-      ["board", "Board", "kanban"],
-      ["none", "No grouping", "list"],
-    ];
-    for (const [key, label, icon] of options) {
+    for (const [key, label, icon] of TASK_GROUPS) {
       if (key === "board" && !this.plugin.settings.boards) continue;
       menu.addItem((item) =>
         item
@@ -2529,11 +2580,7 @@ export class SidebarView extends ItemView implements HoverParent {
     const groups = groupTaskRows(rows, grouping, today);
     this.renderHeader("Tasks", groups.reduce((n, g) => n + g.rows.length, 0));
 
-    const filters: Array<[TaskFilter, string]> = [
-      ["open", "Open"],
-      ["overdue", "Overdue"],
-      ["done", "Done"],
-    ];
+    const filters = TASK_TABS;
     // Each tab counts what it would show under the current search and note
     // filter (the note filter only narrows if that note has tasks there).
     const notes = this.partition().notes;

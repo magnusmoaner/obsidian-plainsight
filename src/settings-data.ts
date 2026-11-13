@@ -1,3 +1,5 @@
+import { ATTACHMENT_GROUPINGS } from "./sidebar/core/attachments";
+import { BOARD_TYPES, NOTE_GROUPINGS, TASK_GROUPINGS } from "./sidebar/core/queries";
 import type { Place, TaskFilter } from "./sidebar/core/queries";
 import { LEGACY_VIEW_KEYS } from "./sidebar/core/view-state";
 
@@ -15,6 +17,36 @@ export interface SavedSearch {
   query: string;
   /** On Tasks: the tab (Open, Overdue or Done) it was saved on. */
   taskFilter?: TaskFilter;
+  /** How its list was grouped when it was saved; one of that list's groupings. */
+  groupBy?: string;
+  /** The chip chosen under the search field: a kind of note, or on Boards a type of board. */
+  chip?: string;
+  /** The list's sort order. Tasks have none. */
+  sort?: string;
+}
+
+/** The chips under a list's search field that a filter remembers; null where there are none to remember. */
+export function listChips(place: Place): readonly string[] | null {
+  if (place.kind === "boards") return ["all", ...BOARD_TYPES];
+  // Tasks keep their tab in taskFilter; attachments have no chips.
+  if (place.kind === "tasks" || place.kind === "attachments") return null;
+  return ["all", "note", "board", "canvas"];
+}
+
+/** The sort orders a list has; null for Tasks, which are ordered by their grouping. */
+export function listSorts(place: Place): readonly string[] | null {
+  return place.kind === "tasks" ? null : ["modified", "created", "title"];
+}
+
+/**
+ * Where a list keeps its grouping in the view state, and the groupings it
+ * has. Null for Daily notes and Templates, which are always grouped by date.
+ */
+export function listGrouping(place: Place): { key: "taskGroupBy" | "noteGroupBy" | "attachmentGroupBy"; values: readonly string[] } | null {
+  if (place.kind === "tasks") return { key: "taskGroupBy", values: TASK_GROUPINGS };
+  if (place.kind === "attachments") return { key: "attachmentGroupBy", values: ATTACHMENT_GROUPINGS };
+  if (place.kind === "daily" || place.kind === "templates") return null;
+  return { key: "noteGroupBy", values: NOTE_GROUPINGS };
 }
 
 const PLACE_KINDS = ["notes", "tasks", "boards", "daily", "templates", "attachments"];
@@ -26,7 +58,15 @@ export function parseSavedSearches(raw: unknown): SavedSearch[] {
   const out: SavedSearch[] = [];
   for (const item of raw as unknown[]) {
     if (!item || typeof item !== "object") continue;
-    const { name, place, query, taskFilter } = item as { name?: unknown; place?: Record<string, unknown>; query?: unknown; taskFilter?: unknown };
+    const { name, place, query, taskFilter, groupBy, chip, sort } = item as {
+      name?: unknown;
+      place?: Record<string, unknown>;
+      query?: unknown;
+      taskFilter?: unknown;
+      groupBy?: unknown;
+      chip?: unknown;
+      sort?: unknown;
+    };
     if (typeof query !== "string" || !query.trim() || !place || typeof place !== "object") continue;
     let where: Place | null = null;
     if (typeof place.kind === "string" && PLACE_KINDS.includes(place.kind)) where = { kind: place.kind } as Place;
@@ -35,7 +75,11 @@ export function parseSavedSearches(raw: unknown): SavedSearch[] {
     if (!where) continue;
     const tab = where.kind === "tasks" && typeof taskFilter === "string" && TASK_FILTERS.includes(taskFilter) ? (taskFilter as TaskFilter) : undefined;
     const called = typeof name === "string" && name.trim() ? name.trim() : query.trim();
-    out.push(tab ? { name: called, place: where, query, taskFilter: tab } : { name: called, place: where, query });
+    const saved: SavedSearch = tab ? { name: called, place: where, query, taskFilter: tab } : { name: called, place: where, query };
+    if (typeof groupBy === "string" && listGrouping(where)?.values.includes(groupBy)) saved.groupBy = groupBy;
+    if (typeof chip === "string" && listChips(where)?.includes(chip)) saved.chip = chip;
+    if (typeof sort === "string" && listSorts(where)?.includes(sort)) saved.sort = sort;
+    out.push(saved);
   }
   return out;
 }

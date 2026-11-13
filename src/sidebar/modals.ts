@@ -185,11 +185,11 @@ function dialogChip(row: HTMLElement, icon: string, onClick: (evt: MouseEvent) =
   };
 }
 
-/** Ask for a name: a title, the name to start from, and a line saying what it's for. */
+/** Ask for a name: a title, the name to start from, and what it's a name for, as labelled lines. */
 export class NameModal extends Modal {
   constructor(
     app: App,
-    private options: { title: string; cta: string; value: string; about: string },
+    private options: { title: string; cta: string; value: string; about: Array<[string, string]> },
     private onSubmit: (name: string) => void
   ) {
     super(app);
@@ -207,7 +207,11 @@ export class NameModal extends Modal {
       name = v;
       d.cta.disabled = !v.trim();
     }, submit);
-    d.body.createDiv({ cls: "ps-dialog-about", text: this.options.about });
+    const about = d.body.createEl("dl", { cls: "ps-dialog-about" });
+    for (const [label, value] of this.options.about) {
+      about.createEl("dt", { text: label });
+      about.createEl("dd", { text: value });
+    }
   }
 
   onClose(): void {
