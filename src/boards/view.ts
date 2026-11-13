@@ -54,6 +54,10 @@ export interface BoardHost {
   embeddedIn(board: TFile): TFile[];
   /** Ask for a tag and add it to the board's properties. */
   addTag(board: TFile): void;
+  /** Ask for a note and embed the board at the end of it. */
+  embedIn(board: TFile): void;
+  /** Call `listener` when what's known about the vault's notes changes; returns how to stop. */
+  onChange(listener: () => void): () => void;
 }
 
 /** Card statuses, as the Tasks plugin names them: character, label, icon. */
@@ -83,6 +87,8 @@ export class BoardView extends MarkdownRenderChild {
   private reopenAdd: number | null = null;
   /** A Plainsight board, whose lists can have colours. */
   private coloured = false;
+  /** The notes the board was embedded in when its header was last drawn; null before that. */
+  private embeddedKey: string | null = null;
   /** A list was just added: open its name for typing after the next redraw. */
   private nameNewList = false;
 
@@ -113,6 +119,15 @@ export class BoardView extends MarkdownRenderChild {
         if (f === this.file) void this.refresh();
       })
     );
+    // Where the board is embedded is read from other notes: redraw when that changes.
+    if (this.host) {
+      const host = this.host;
+      this.register(
+        host.onChange(() => {
+          if (this.file && this.embeddedKey !== null && embedKey(host.embeddedIn(this.file)) !== this.embeddedKey) void this.refresh();
+        })
+      );
+    }
     // Covers a board created, renamed or deleted after the note was opened.
     this.registerEvent(this.app.metadataCache.on("resolved", () => !this.file && void this.refresh()));
     void this.refresh();
@@ -246,13 +261,21 @@ export class BoardView extends MarkdownRenderChild {
     const tags = row.createDiv("psb-tags");
     // Drawn as tags are on the cards below, and on note cards in the sidebar.
     for (const tag of parseFrontMatterTags(props) ?? []) badge(tags, null, tag, null, "ps-badge-tag");
-    const add = tags.createEl("button", { cls: "psb-tag-add", attr: { "aria-label": "Add a tag to the board" } });
+    const add = tags.createEl("button", { cls: "psb-about-add", attr: { "aria-label": "Add a tag to the board" } });
     setIcon(add.createSpan(), "plus");
     add.createSpan({ text: "Tag" });
     add.addEventListener("click", () => host.addTag(file));
 
     const notes = host.embeddedIn(file);
-    if (notes.length) {
+    this.embeddedKey = embedKey(notes);
+    if (!notes.length) {
+      // Not in any note yet: offer to put it at the end of one.
+      // Beside "Tag", in the same group, so the two sit and size alike.
+      const embed = tags.createEl("button", { cls: "psb-about-add", attr: { "aria-label": "Embed the board at the end of a note" } });
+      setIcon(embed.createSpan(), "file-symlink");
+      embed.createSpan({ text: "Embed in note" });
+      embed.addEventListener("click", () => host.embedIn(file));
+    } else {
       const where = row.createDiv("psb-embedded");
       setIcon(where.createSpan("psb-embedded-icon"), "file-symlink");
       const names = where.createSpan({ text: "Embedded in " });
@@ -690,6 +713,9 @@ export class BoardView extends MarkdownRenderChild {
     });
   }
 }
+
+/** Which notes, as one value to compare. */
+const embedKey = (notes: TFile[]) => notes.map((n) => n.path).join("\n");
 
 /** The properties at the top of a note's text; none if they can't be read. */
 function properties(text: string): Record<string, unknown> {

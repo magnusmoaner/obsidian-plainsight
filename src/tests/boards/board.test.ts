@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   addCard,
   addLane,
+  appendEmbed,
   cardDisplay,
   CardRef,
   deleteCard,
@@ -291,6 +292,13 @@ describe("embed blocks", () => {
     expect(embedTarget("board: Garden/Plan board.md")).toBe("Garden/Plan board.md");
     expect(embedTarget("lanes: Todo")).toBeNull();
     expect(embedTarget(embedBlock("Plan board").split("\n")[1])).toBe("Plan board");
+  });
+
+  test("a board is embedded at the end of a note, after a blank line", () => {
+    expect(appendEmbed("Plans for the shed.\n\n\n", "Shed board")).toBe("Plans for the shed.\n\n```plainsight-board\nboard: [[Shed board]]\n```\n");
+    expect(appendEmbed("---\ntags: [home]\n---\nText", "Shed board")).toBe("---\ntags: [home]\n---\nText\n\n```plainsight-board\nboard: [[Shed board]]\n```\n");
+    expect(appendEmbed("", "Shed board")).toBe("```plainsight-board\nboard: [[Shed board]]\n```\n");
+    expect(embedTarget(appendEmbed("Text", "Folder/Shed board"))).toBe("Folder/Shed board");
   });
 
   test("a renamed board is retargeted in the blocks that named it, and nowhere else", () => {

@@ -413,6 +413,12 @@ export function embedBlock(link: string): string {
   return "```plainsight-board\nboard: [[" + link + "]]\n```\n";
 }
 
+/** A note's text with the board's embed block after everything in it. */
+export function appendEmbed(text: string, link: string): string {
+  const body = text.replace(/\s*$/, "");
+  return body ? `${body}\n\n${embedBlock(link)}` : embedBlock(link);
+}
+
 const EMBED = /^```(?:plainsight-board|kanban-embed)[^\n]*\n[\s\S]*?^```/gm;
 
 /**
