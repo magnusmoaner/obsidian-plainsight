@@ -336,6 +336,7 @@ interface DragManager {
   dragFolder(evt: DragEvent, folder: TFolder): object;
   handleDrop(el: HTMLElement, handler: (evt: DragEvent, draggable: Draggable | null, over: boolean) => object | null): void;
   actionEl?: HTMLElement | null;
+  onDragEnd?(): void;
 }
 
 function dragManager(app: App): DragManager | null {
@@ -362,6 +363,50 @@ export function startFileDrag(
   // With a ghost of our own, the manager makes no line for the action: it gets ours.
   manager.actionEl = ghost.action;
   return true;
+}
+
+/** What Obsidian's drag manager is told a dragged task is; nothing of its own takes one. */
+const TASK_DRAG = "plainsight-task";
+
+/** Start dragging something that isn't a file, told to the drag manager as `type`. */
+function startOwnDrag(
+  app: App,
+  evt: DragEvent,
+  type: string,
+  title: string,
+  ghost: { el: HTMLElement; anchor: { x: number; y: number }; action: HTMLElement }
+): boolean {
+  const manager = dragManager(app);
+  if (!manager || !evt.dataTransfer) return false;
+  manager.onDragStart(evt, { type, title, ghostEl: ghost.el, ghostAnchor: ghost.anchor });
+  manager.actionEl = ghost.action;
+  // The manager learns that a drag is over from a dragstart that reaches the
+  // document. A board keeps its dragstart to itself, so it's told here too.
+  evt.target?.addEventListener("dragend", () => manager.onDragEnd?.(), { once: true });
+  return true;
+}
+
+type Ghost = Parameters<typeof startOwnDrag>[4];
+
+/** Start dragging a task: like startFileDrag, for something that isn't a file. */
+export const startTaskDrag = (app: App, evt: DragEvent, title: string, ghost: Ghost): boolean => startOwnDrag(app, evt, TASK_DRAG, title, ghost);
+
+/** Start dragging a board's card or list. Only its own board takes it. */
+export const startBoardDrag = (app: App, evt: DragEvent, ghost: Ghost): boolean => startOwnDrag(app, evt, "plainsight-board-item", "", ghost);
+
+/** Say beside the pointer what a drop here would do. For targets that handle the drop themselves. */
+export function dragAction(app: App, action: string): void {
+  (dragManager(app) as (DragManager & { setAction?(text: string): void }) | null)?.setAction?.(action);
+}
+
+/** Let `el` take a dropped task: `accept` says what dropping it would do, or null to refuse; `drop` does it. */
+export function onTaskDropped(app: App, el: HTMLElement, accept: () => string | null, drop: () => void): void {
+  dragManager(app)?.handleDrop(el, (_evt, draggable, over) => {
+    const action = draggable?.type === TASK_DRAG ? accept() : null;
+    if (!action) return null;
+    if (!over) drop();
+    return { action, dropEffect: "move", hoverEl: el, hoverClass: "is-drop-target" };
+  });
 }
 
 /**

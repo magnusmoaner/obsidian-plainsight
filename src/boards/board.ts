@@ -286,6 +286,23 @@ export function addCard(text: string, ref: LaneRef, body: string): string {
 }
 
 /**
+ * Put a new card at position `index` (0 = top) of a list: one that comes
+ * from elsewhere, with the status it had. A list that gives its cards a
+ * status gives it to this one; a done list completes it through `via`.
+ */
+export function insertCard(text: string, to: LaneRef, index: number, body: string, check: string, via?: TasksToggle): string {
+  return edit(text, (lines, board) => {
+    const lane = findLane(lines, board, to);
+    let card = cardLines(lane.status && lane.status !== "x" ? lane.status : check, body);
+    if (lane.status === "x" && !isDone(check)) {
+      const done = via?.(card[0])?.split("\n");
+      card = done?.some((l) => DONE_LINE.test(l)) ? [...done, ...card.slice(1)] : cardLines("x", body);
+    }
+    lines.splice(cardSlot(lines, lane, index), 0, ...card);
+  });
+}
+
+/**
  * Move a card to position `index` (0 = top) of list `to`, counted before
  * the move. A card that a list completes or reopens goes through `via`.
  */
