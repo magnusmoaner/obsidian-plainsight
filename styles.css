@@ -1887,3 +1887,11 @@
   flex: 1 1 auto;
   min-height: 0;
 }
+
+/* Under a dialog's input: what the name is for. */
+.ps-dialog-about {
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  overflow-wrap: anywhere;
+}

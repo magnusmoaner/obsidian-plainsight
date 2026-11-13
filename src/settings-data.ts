@@ -1,3 +1,4 @@
+import type { Place, TaskFilter } from "./sidebar/core/queries";
 import { LEGACY_VIEW_KEYS } from "./sidebar/core/view-state";
 
 /*
@@ -5,6 +6,39 @@ import { LEGACY_VIEW_KEYS } from "./sidebar/core/view-state";
  * are, their defaults, and how a stored file is read back. Per-device view
  * state lives in sidebar/core/view-state.ts instead.
  */
+
+/** A search kept in the side menu: a list, and what was typed in its search field. */
+export interface SavedSearch {
+  /** What it's called in the side menu; the query itself until it's given a name. */
+  name: string;
+  place: Place;
+  query: string;
+  /** On Tasks: the tab (Open, Overdue or Done) it was saved on. */
+  taskFilter?: TaskFilter;
+}
+
+const PLACE_KINDS = ["notes", "tasks", "boards", "daily", "templates", "attachments"];
+const TASK_FILTERS = ["open", "overdue", "done"];
+
+/** The saved searches in a stored file: those that are whole, in order; the rest are dropped. */
+export function parseSavedSearches(raw: unknown): SavedSearch[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SavedSearch[] = [];
+  for (const item of raw as unknown[]) {
+    if (!item || typeof item !== "object") continue;
+    const { name, place, query, taskFilter } = item as { name?: unknown; place?: Record<string, unknown>; query?: unknown; taskFilter?: unknown };
+    if (typeof query !== "string" || !query.trim() || !place || typeof place !== "object") continue;
+    let where: Place | null = null;
+    if (typeof place.kind === "string" && PLACE_KINDS.includes(place.kind)) where = { kind: place.kind } as Place;
+    else if (place.kind === "notebook" && typeof place.folder === "string") where = { kind: "notebook", folder: place.folder };
+    else if (place.kind === "tag" && typeof place.tag === "string" && place.tag) where = { kind: "tag", tag: place.tag };
+    if (!where) continue;
+    const tab = where.kind === "tasks" && typeof taskFilter === "string" && TASK_FILTERS.includes(taskFilter) ? (taskFilter as TaskFilter) : undefined;
+    const called = typeof name === "string" && name.trim() ? name.trim() : query.trim();
+    out.push(tab ? { name: called, place: where, query, taskFilter: tab } : { name: called, place: where, query });
+  }
+  return out;
+}
 
 export interface WysiwygSettings {
   enabled: boolean;
@@ -46,6 +80,10 @@ export interface WysiwygSettings {
    * while its core plugin is on). */
   showDailyNotes: boolean;
   showTemplates: boolean;
+  /** Searches kept in the side menu, at the end of the Bookmarks section. */
+  savedSearches: SavedSearch[];
+  /** Saved searches in the side menu, and the button that saves one. Off keeps what's saved. */
+  showSavedSearches: boolean;
 }
 
 export const DEFAULT_SETTINGS: WysiwygSettings = {
@@ -72,6 +110,8 @@ export const DEFAULT_SETTINGS: WysiwygSettings = {
   showMoreButton: true,
   showDailyNotes: true,
   showTemplates: true,
+  savedSearches: [],
+  showSavedSearches: true,
 };
 
 /** The range the settings offer for a list's narrowest width. */
@@ -105,7 +145,9 @@ export function parseSettings(raw: unknown): { settings: WysiwygSettings; extra:
   for (const [key, value] of Object.entries(data)) {
     if (KNOWN.has(key)) {
       const name = key as keyof WysiwygSettings;
-      if (typeof value === typeof DEFAULT_SETTINGS[name]) (settings as Record<string, unknown>)[name] = value;
+      // A list is checked item by item; everything else by its type.
+      if (name === "savedSearches") settings.savedSearches = parseSavedSearches(value);
+      else if (typeof value === typeof DEFAULT_SETTINGS[name]) (settings as Record<string, unknown>)[name] = value;
     } else if (!LEGACY_VIEW_KEYS.includes(key) && !RETIRED.includes(key)) {
       extra[key] = value;
     }

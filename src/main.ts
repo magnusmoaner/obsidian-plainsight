@@ -380,6 +380,8 @@ export default class WysiwygPlugin extends Plugin {
       before.tasks !== now.tasks ||
       before.showBoardsRow !== now.showBoardsRow ||
       before.boardCardsInTasks !== now.boardCardsInTasks ||
+      before.savedSearches !== now.savedSearches ||
+      before.showSavedSearches !== now.showSavedSearches ||
       buttons.some((key) => before[key] !== now[key])
     ) {
       this.refreshSidebar();

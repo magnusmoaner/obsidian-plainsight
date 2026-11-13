@@ -467,3 +467,13 @@ export function excerpt(
   highlights.sort((a, b) => a[0] - b[0]);
   return { text: window, highlights };
 }
+
+/**
+ * Whether what's typed finds a saved search by its name: every word typed is
+ * somewhere in the name, whatever the case.
+ */
+export function savedSearchMatches(name: string, input: string): boolean {
+  const words = input.toLowerCase().split(/\s+/).filter(Boolean);
+  const lower = name.toLowerCase();
+  return words.length > 0 && words.every((word) => lower.includes(word));
+}

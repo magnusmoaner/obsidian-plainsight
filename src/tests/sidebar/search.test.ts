@@ -7,6 +7,7 @@ import {
   parseQuery,
   rankNotes,
   rankTasks,
+  savedSearchMatches,
   toObsidianQuery,
   toOmnisearchQuery,
   toTasksQuery,
@@ -217,3 +218,16 @@ describe("toOmnisearchQuery", () => {
   });
 });
 
+
+describe("savedSearchMatches", () => {
+  test("every word typed must be in the name, in any case and order", () => {
+    expect(savedSearchMatches("Late client reports", "late")).toBe(true);
+    expect(savedSearchMatches("Late client reports", "REPORTS late")).toBe(true);
+    expect(savedSearchMatches("Late client reports", "rep cli")).toBe(true);
+    expect(savedSearchMatches("Late client reports", "late invoices")).toBe(false);
+  });
+
+  test("nothing typed finds nothing", () => {
+    expect(savedSearchMatches("Late client reports", "   ")).toBe(false);
+  });
+});

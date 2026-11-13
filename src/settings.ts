@@ -83,6 +83,13 @@ export class WysiwygSettingTab extends PluginSettingTab {
       folder: templateOptions(this.app).folder,
     });
     if (settings.boards) this.toggle(menu, "showBoardsRow", "Boards", "Lists every board in the vault, below Tasks.");
+    this.toggle(
+      menu,
+      "showSavedSearches",
+      "Filters",
+      "A filter is a search you save: one click opens its list with the search filled in. They're listed after your bookmarks, " +
+        "and a button beside a list's other buttons saves what's in its search field as one. Off hides both; your filters are kept."
+    );
 
     const tasks = this.group("Tasks");
     this.toggle(
