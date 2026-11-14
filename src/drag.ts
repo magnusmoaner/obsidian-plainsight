@@ -1,16 +1,23 @@
 import { App, Notice, TFile } from "obsidian";
 import { takeTask } from "./sidebar/core/task-move";
 import type { TaskRef } from "./sidebar/core/task-move";
+import type { CardRef } from "./boards/board";
+import { cardTitle } from "./sidebar/core/task-details";
 
 /*
- * The task being dragged out of the Tasks list, while it is. The sidebar
- * sets it; the places a task can be dropped (a note's editor, a note's card,
- * a board) read it.
+ * The task being dragged, while it is: out of the Tasks list, or a card off
+ * a board (a card is a task line in its board's file). The source sets it;
+ * the places a task can be dropped (a note's editor, a note's card, a board)
+ * read it.
  */
 export interface TaskDrag {
   /** The note the task is in. */
   path: string;
   ref: TaskRef;
+  /** Set when it's a card dragged off a board: the card there. */
+  card?: CardRef;
+  /** Set when it's dragged out of an editor: the note as it's being typed, which may not be saved yet. */
+  buffer?: { read(): string; write(text: string): void };
 }
 
 let dragged: TaskDrag | null = null;
@@ -26,8 +33,10 @@ export const setDraggedTask = (task: TaskDrag | null): void => void (dragged = t
  */
 export async function moveTaskOut(app: App, from: TaskDrag, place: (block: string[]) => void | Promise<void>): Promise<boolean> {
   const file = app.vault.getAbstractFileByPath(from.path);
-  const taken = file instanceof TFile ? takeTask(await app.vault.read(file), from.ref) : null;
-  if (!(file instanceof TFile) || !taken) {
+  const read = async () => from.buffer?.read() ?? (file instanceof TFile ? await app.vault.read(file) : null);
+  const text = await read();
+  const taken = text === null ? null : takeTask(text, from.ref);
+  if (!taken) {
     new Notice("That task moved or changed in its note, so it wasn't moved.");
     return false;
   }
@@ -38,13 +47,38 @@ export async function moveTaskOut(app: App, from: TaskDrag, place: (block: strin
     return false;
   }
   let left = false;
-  await app.vault.process(file, (data) => {
+  const without = (data: string) => {
     const now = takeTask(data, from.ref);
     left = !now;
     return now ? now.text : data;
-  });
-  if (left) new Notice(`The task is in its new place, but “${file.basename}” changed meanwhile, so it's still there too.`, 8000);
+  };
+  if (from.buffer) from.buffer.write(without(from.buffer.read()));
+  else if (file instanceof TFile) await app.vault.process(file, without);
+  if (left) new Notice(`The task is in its new place, but “${file?.name.replace(/\.md$/, "")}” changed meanwhile, so it's still there too.`, 8000);
   return true;
+}
+
+/**
+ * In a dragged task's copy: the task as a board card, which takes the copy's
+ * place over a board (see `overBoard`). `badges` fills the card's footer.
+ */
+export function taskCardCopy(ghost: HTMLElement, status: string, text: string, badges: (foot: HTMLElement) => void): void {
+  const card = ghost.createDiv("psb-board ps-drag-card").createDiv({ cls: "psb-card", attr: { "data-status": status } });
+  card.createEl("button", { cls: "psb-check" });
+  card.createDiv("psb-card-body").createDiv({ cls: "psb-card-text", text: cardTitle(text) });
+  const foot = card.createDiv("psb-card-foot");
+  badges(foot);
+  if (!foot.childElementCount) foot.remove();
+}
+
+/** As a dragged task moves: over a board's list its copy is the card, as wide as that list's cards. */
+export function overBoard(move: DragEvent, ghost: HTMLElement): void {
+  const under = move.target instanceof Element ? move.target : null;
+  const cards = under?.closest(".psb-lane")?.querySelector<HTMLElement>(".psb-cards") ?? null;
+  ghost.toggleClass("is-over-board", !!cards);
+  const card = ghost.querySelector<HTMLElement>(".ps-drag-card");
+  // A copy that's always the card (is-card) goes back to its own width off the board.
+  if (card && (cards || ghost.hasClass("is-card"))) card.style.width = cards ? `${cards.clientWidth}px` : "";
 }
 
 /**

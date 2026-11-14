@@ -789,6 +789,19 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* On a subtask's row: the task or item it's under. */
+.ps-task-under {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.ps-task-under svg {
+  width: 12px;
+  height: 12px;
+}
 .ps-task-note:hover {
   color: var(--text-normal);
   text-decoration: underline;
@@ -1669,6 +1682,78 @@
 .psb-card-text > :last-child {
   margin-bottom: 0;
 }
+/* The lines under a card's first: paragraphs, lists and subtasks sit close
+   under it, the first level under the card's text and each next a small step in. */
+.psb-card-text :is(p, ul, ol) {
+  margin-block: 4px;
+}
+.psb-card-text :is(ul, ol) {
+  padding-inline-start: 20px;
+}
+.psb-card-text li {
+  margin-block: 3px;
+}
+.psb-card-text li > :is(ul, ol) {
+  margin-bottom: 0;
+}
+/* A card's subtasks: small boxes under its text, as cards are in a board's
+   mini preview, each with a small box to tick. One under another steps in. */
+.psb-subtasks {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 6px;
+  cursor: text;
+}
+.psb-subtask {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-inline-start: calc(var(--psb-depth, 0) * 14px);
+  padding: 2px 8px 2px 6px;
+  border-radius: 6px;
+  background: var(--background-secondary);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.psb-subtask:is([data-status="x"], [data-status="X"], [data-status="-"]) .psb-subtask-text {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+.psb-board button.psb-subcheck {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  /* Level with the first line of the subtask's text. */
+  margin-top: calc((1.5em - 13px) / 2);
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-faint);
+  background: none;
+  box-shadow: none;
+  color: var(--text-on-accent);
+  cursor: pointer;
+}
+.psb-subcheck svg {
+  width: 9px;
+  height: 9px;
+  stroke-width: 3px;
+}
+.psb-subtask:is([data-status="x"], [data-status="X"]) .psb-subcheck {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+}
+.psb-subtask[data-status="/"] .psb-subcheck {
+  border-color: var(--interactive-accent);
+  background: linear-gradient(to right, var(--interactive-accent) 50%, transparent 50%);
+}
+.psb-subtask[data-status="-"] .psb-subcheck {
+  background: var(--text-faint);
+}
 .psb-card.is-done .psb-card-text {
   color: var(--text-muted);
   text-decoration: line-through;
@@ -1991,4 +2076,35 @@
 }
 .cm-line.ps-task-drop-below {
   box-shadow: 0 2px 0 var(--interactive-accent);
+}
+
+/* In a note being edited: the grip left of the task line the pointer is level with (placed in code). */
+.ps-task-grip {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  /* Its right edge a little left of what it's placed against. */
+  margin-left: -19px;
+  border-radius: 4px;
+  color: var(--text-faint);
+  cursor: grab;
+}
+.ps-task-grip:hover {
+  color: var(--text-muted);
+  background: var(--background-modifier-hover);
+}
+.ps-task-grip svg {
+  width: 14px;
+  height: 14px;
+}
+/* A task dragged by its grip hangs from the pointer as a card all the way. */
+.ps-drag-ghost.is-card .ps-drag-card {
+  opacity: 1;
+  width: 260px;
+}
+.ps-drag-ghost.is-card .ps-drag-copy {
+  opacity: 0;
 }

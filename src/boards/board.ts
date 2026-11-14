@@ -5,6 +5,8 @@
  * exactly as it was.
  */
 
+import { matchTaskLine, toggleTaskLine } from "../sidebar/core/tasks";
+
 export interface Card {
   /** First line, and one past the last line, of the card. */
   line: number;
@@ -219,6 +221,37 @@ export function cardDisplay(text: string): { body: string; date: string | null; 
   return { body, date, time };
 }
 
+export interface Subtask {
+  /** 0 for a subtask of the card, 1 for one under that, … */
+  depth: number;
+  status: string;
+  text: string;
+}
+
+/**
+ * The lines under a card's first, in two: its subtasks (the task lines, in
+ * order) and the rest, which is the card's text. A line that isn't a task
+ * and sits under a subtask is in neither: it shows when the card is edited.
+ */
+export function cardParts(rest: string[]): { subtasks: Subtask[]; text: string[] } {
+  const subtasks: Subtask[] = [];
+  const text: string[] = [];
+  // The indents of the subtasks the line being read sits under.
+  const open: number[] = [];
+  for (const line of rest) {
+    const indent = /^[ \t]*/.exec(line)![0].length;
+    if (line.trim()) while (open.length && open[open.length - 1] >= indent) open.pop();
+    const task = matchTaskLine(line);
+    if (task) {
+      subtasks.push({ depth: open.length, ...task });
+      open.push(indent);
+    } else if (!open.length) {
+      text.push(line);
+    }
+  }
+  return { subtasks, text };
+}
+
 /** Kanban's done mark; any other character (" ", "/", "-", …) is not done. */
 export function isDone(check: string | null): boolean {
   return check === "x" || check === "X";
@@ -261,6 +294,19 @@ export function setCardStatus(text: string, ref: CardRef, status: string, via?: 
     const toggled = status === "x" && !isDone(c.check) ? toggledLines(lines, c, via, true) : null;
     if (toggled) return void lines.splice(c.line, c.end - c.line, ...toggled);
     lines[c.line] = lines[c.line].replace(/^([-*+]\s+)(\[.\]\s*)?/, `$1[${status}] `);
+  });
+}
+
+/**
+ * Tick or untick a subtask: the `index`-th task line under a card's first
+ * line, counted from 0. Through `via` when given, else just its checkbox.
+ */
+export function toggleSubtask(text: string, ref: CardRef, index: number, via?: TasksToggle): string {
+  return edit(text, (lines, board) => {
+    const c = findCard(lines, board, ref);
+    const at = Array.from({ length: c.end - c.line - 1 }, (_, i) => c.line + 1 + i).filter((i) => matchTaskLine(lines[i]))[index];
+    if (at === undefined) throw new StaleBoardError();
+    lines.splice(at, 1, ...(via?.(lines[at]) ?? toggleTaskLine(lines[at])!).split("\n"));
   });
 }
 

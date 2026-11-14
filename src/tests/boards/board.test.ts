@@ -23,7 +23,9 @@ import {
   setLaneColour,
   setLaneStatus,
   StaleBoardError,
+  cardParts,
   toggleCard,
+  toggleSubtask,
 } from "../../boards/board";
 
 /** A board with three empty lists and no settings block. */
@@ -139,6 +141,26 @@ describe("card edits", () => {
     expect(shape(toggleCard(BOARD, cardRef(BOARD, 0, 0)))[0][1]).toBe("[x] Buy paint @{2026-01-31}");
     expect(shape(toggleCard(BOARD, cardRef(BOARD, 0, 1)))[0][2]).toMatch(/^\[ \] Fix the gate/);
     expect(shape(toggleCard(BOARD, cardRef(BOARD, 1, 0)))[1][1]).toBe("[ ] Pick colours");
+  });
+
+  test("the lines under a card are its subtasks and its text", () => {
+    expect(cardParts(["a note", "- [ ] Buy paint", "    - [x] Pick colours", "    about the paint", "- plain", "    - [/] Deep", "last"])).toEqual({
+      subtasks: [
+        { depth: 0, status: " ", text: "Buy paint" },
+        { depth: 1, status: "x", text: "Pick colours" },
+        { depth: 0, status: "/", text: "Deep" },
+      ],
+      text: ["a note", "- plain", "last"],
+    });
+  });
+
+  test("a subtask is ticked by its place among the task lines under the card", () => {
+    const text = ["## To do", "", "- [ ] Paint the shed", "    a note", "    - [ ] Buy paint", "        - [x] Pick colours", "- [ ] Next", ""].join("\n");
+    const ref = cardRef(text, 0, 0);
+    expect(toggleSubtask(text, ref, 0).split("\n")[4]).toBe("    - [x] Buy paint");
+    expect(toggleSubtask(text, ref, 1).split("\n")[5]).toBe("        - [ ] Pick colours");
+    expect(toggleSubtask(text, ref, 1, (l) => l.replace("[x]", "[ ]") + " via").split("\n")[5]).toBe("        - [ ] Pick colours via");
+    expect(() => toggleSubtask(text, ref, 2)).toThrow();
   });
 
   test("edit replaces all of a multi-line card and keeps its status", () => {

@@ -1,9 +1,10 @@
 import { folderNameError, setTextProperty } from "../sidebar/core/edits";
 import { localISODate } from "../sidebar/core/format";
-import { taskDetails } from "../sidebar/core/task-details";
+import { cardTitle, taskDetails } from "../sidebar/core/task-details";
 import { badge, taskBadges } from "../sidebar/task-badges";
-import { dragCopy, draggedTask, moveTaskOut } from "../drag";
+import { dragCopy, draggedTask, moveTaskOut, setDraggedTask } from "../drag";
 import { taskAsCard } from "../sidebar/core/task-move";
+import { matchTaskLine } from "../sidebar/core/tasks";
 import { dragAction, startBoardDrag, tasksToggle } from "../sidebar/internals";
 import { CardEditor, openCardEditor } from "./card-editor";
 import {
@@ -29,6 +30,7 @@ import {
   addLane,
   Board,
   cardDisplay,
+  cardParts,
   CardRef,
   deleteCard,
   deleteLane,
@@ -47,9 +49,11 @@ import {
   setLaneStatus,
   StaleBoardError,
   toggleCard,
+  toggleSubtask,
 } from "./board";
 
-type Drag = { kind: "card"; ref: CardRef } | { kind: "lane"; ref: LaneRef };
+/** `line`: the card's first line in the board's file. */
+type Drag = { kind: "card"; ref: CardRef; line: number } | { kind: "lane"; ref: LaneRef };
 
 /** What a board on its own page asks of the plugin around it. */
 export interface BoardHost {
@@ -132,11 +136,16 @@ export class BoardView extends MarkdownRenderChild {
       );
     }
     // The slot shown for a task dragged in from outside is taken away when
-    // the pointer leaves the board, and when that drag ends anywhere.
+    // the pointer leaves the board, and when that drag ends anywhere. The
+    // slot of the board's own card or list goes back to where that came from
+    // while the pointer is off the board: dropped nowhere, it stays there.
     const doc = this.containerEl.doc;
     const leave = (evt: Event) => {
-      if (this.drag || !this.slot) return;
-      if (evt.type !== "dragover" || !(evt.target instanceof Node) || !this.containerEl.contains(evt.target)) this.endDrag();
+      if (!this.slot) return;
+      if (evt.type === "dragover" && evt.target instanceof Node && this.containerEl.contains(evt.target)) return;
+      if (!this.drag) return this.endDrag();
+      const from = evt.type === "dragover" ? this.containerEl.querySelector(".is-dragging") : null;
+      if (from && this.slot.nextElementSibling !== from) from.before(this.slot);
     };
     for (const type of ["dragover", "dragend", "drop"] as const) {
       doc.addEventListener(type, leave, true);
@@ -391,7 +400,7 @@ export class BoardView extends MarkdownRenderChild {
     const done = isDone(card.check);
     const el = parent.createDiv({ cls: "psb-card", attr: { draggable: "true", "data-status": card.check ?? " " } });
     el.toggleClass("is-done", done || card.check === "-");
-    el.addEventListener("dragstart", (evt) => this.startDrag(evt, el, { kind: "card", ref }));
+    el.addEventListener("dragstart", (evt) => this.startDrag(evt, el, { kind: "card", ref, line: card.line }));
     el.addEventListener("dragend", () => this.endDrag());
 
     const box = el.createEl("button", {
@@ -407,14 +416,36 @@ export class BoardView extends MarkdownRenderChild {
     const { body, date, time } = cardDisplay(card.text);
     const [first, ...rest] = body.split("\n");
     const details = taskDetails(first);
+    const { subtasks, text } = cardParts(rest);
     const content = el.createDiv("psb-card-body");
     const textEl = content.createDiv("psb-card-text");
-    void MarkdownRenderer.render(this.app, [details.description, ...rest].join("\n"), textEl, this.file!.path, this.cards);
+    void MarkdownRenderer.render(this.app, [details.description, ...text].join("\n"), textEl, this.file!.path, this.cards);
     textEl.addEventListener("click", (evt) => {
       const link = (evt.target as HTMLElement).closest("a");
       if (link) return this.followLink(evt, link);
       this.editCardInput(content, card.text, ref);
     });
+    // The card's subtasks: small boxes under its text, each with a box to tick.
+    if (subtasks.length) {
+      const list = content.createDiv("psb-subtasks");
+      list.addEventListener("click", () => this.editCardInput(content, card.text, ref));
+      subtasks.forEach((sub, n) => {
+        const row = list.createDiv({ cls: "psb-subtask", attr: { "data-status": sub.status } });
+        row.style.setProperty("--psb-depth", String(sub.depth));
+        const ticked = isDone(sub.status);
+        const tick = row.createEl("button", {
+          cls: "psb-subcheck",
+          attr: { "aria-label": ticked ? "Mark as not done" : "Mark as done", role: "checkbox", "aria-checked": String(ticked) },
+        });
+        if (ticked) setIcon(tick, "check");
+        else if (sub.status === "-") setIcon(tick, "minus");
+        tick.addEventListener("click", (evt) => {
+          evt.stopPropagation();
+          void this.write((t) => toggleSubtask(t, ref, n, this.viaTasks));
+        });
+        row.createSpan({ cls: "psb-subtask-text", text: cardTitle(sub.text) });
+      });
+    }
 
     const more = el.createEl("button", { cls: "psb-icon clickable-icon", attr: { "aria-label": "Card actions" } });
     setIcon(more, "more-horizontal");
@@ -673,10 +704,20 @@ export class BoardView extends MarkdownRenderChild {
     const { width, height } = el.getBoundingClientRect();
     // A copy hangs from the pointer, as in the sidebar. Without Obsidian's
     // drag manager the drag still works, with the browser's own picture.
-    dragCopy(evt, el, (ghost) => {
-      ghost.el.addClass("psb-board");
-      return startBoardDrag(this.app, evt, ghost) || true;
-    });
+    dragCopy(
+      evt,
+      el,
+      (ghost) => {
+        ghost.el.addClass("psb-board");
+        return startBoardDrag(this.app, evt, ghost) || true;
+      },
+      undefined,
+      () => setDraggedTask(null)
+    );
+    // A card is a task line in the board's file, so it can be dropped where a
+    // task can: in a note that's open, or on another board.
+    const task = drag.kind === "card" && this.file ? matchTaskLine(drag.ref.raw) : null;
+    if (task && drag.kind === "card") setDraggedTask({ path: this.file!.path, ref: { line: drag.line, ...task }, card: drag.ref });
     if (evt.dataTransfer) evt.dataTransfer.effectAllowed = "move";
     // The slot: an empty space the size of what's dragged, shown where it would land.
     this.slot = createDiv("psb-drop");
@@ -695,7 +736,11 @@ export class BoardView extends MarkdownRenderChild {
   private takeTask(to: LaneRef, index: number): void {
     const task = draggedTask();
     if (!task || !this.file) return;
-    if (task.path === this.file.path) return void new Notice("That card is already on this board. Drag the card itself to move it.");
+    if (task.path === this.file.path) {
+      // The same board, open in two places: the card moves within it.
+      if (task.card) return void this.write((t) => moveCard(t, task.card!, to, index, this.viaTasks));
+      return void new Notice("That card is already on this board. Drag the card itself to move it.");
+    }
     void moveTaskOut(this.app, task, async (block) => {
       const { check, body } = taskAsCard(block);
       if (!(await this.write((t) => insertCard(t, to, index, body, check, this.viaTasks)))) throw new Error("the board changed");

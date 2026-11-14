@@ -8,6 +8,18 @@ import {
 } from "../../sidebar/core/tasks";
 
 describe("parseTasks", () => {
+  test("a subtask knows the item it's under, a task or a plain bullet", () => {
+    const text = ["- [ ] Paint the shed", "    a note", "    - [ ] Buy paint", "        - [x] Pick colours", "- Shopping", "    - [ ] Milk", "", "Some text", "    - [ ] Loose", "- [ ] Top"].join("\n");
+    expect(parseTasks(text).map((t) => [t.text, t.under])).toEqual([
+      ["Paint the shed", undefined],
+      ["Buy paint", "Paint the shed"],
+      ["Pick colours", "Buy paint"],
+      ["Milk", "Shopping"],
+      ["Loose", undefined],
+      ["Top", undefined],
+    ]);
+  });
+
   test("finds tasks with line numbers and statuses", () => {
     const text = "intro\n- [ ] open\n- [x] done\n* [/] doing";
     expect(parseTasks(text)).toEqual([

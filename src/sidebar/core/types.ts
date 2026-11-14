@@ -14,6 +14,8 @@ export interface TaskItem {
   section: string | null;
   /** YYYY-MM-DD from the Tasks plugin's ✅ (completed) field, if present. */
   done: string | null;
+  /** A subtask: the text of the list item (a task or a plain bullet) it's indented under. Absent at the top level. */
+  under?: string;
 }
 
 /**
