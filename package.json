@@ -1,6 +1,6 @@
 {
   "name": "plainsight",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Calm, syntax-free Markdown editing and an Evernote-like sidebar for Obsidian",
   "main": "main.js",
   "license": "MIT",

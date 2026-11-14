@@ -272,9 +272,9 @@ Plainsight doesn't talk to these plugins, but they go well with it:
 
 ## Installation
 
-Plainsight isn't in the Community Plugins directory yet, and there are no releases yet either. To install it by hand:
+Plainsight isn't in the Community Plugins directory yet. Until it is, install it by hand:
 
-1. Build it (see Development below), which produces `main.js`; `manifest.json` and `styles.css` are in the repo.
+1. Download `main.js`, `manifest.json` and `styles.css` from the newest release on the [releases page](https://github.com/magnusmoaner/obsidian-plainsight/releases). The releases so far are pre-releases. Or build `main.js` yourself (see Development below); the other two files are in the repo.
 2. Copy those three files to `<your vault>/.obsidian/plugins/plainsight/`.
 3. In Obsidian, go to Settings → Community plugins, reload, and enable **Plainsight**.
 
