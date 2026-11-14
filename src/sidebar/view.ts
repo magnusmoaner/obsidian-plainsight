@@ -229,6 +229,8 @@ export class SidebarView extends ItemView implements HoverParent {
   private placesEl!: HTMLElement;
   private actionsEl!: HTMLElement;
   private navEl!: HTMLElement;
+  /** Above the list: how it's grouped and sorted. */
+  private howEl!: HTMLElement;
   private filterInput!: SearchComponent;
   private headerEl!: HTMLElement;
   private filtersEl!: HTMLElement;
@@ -327,10 +329,12 @@ export class SidebarView extends ItemView implements HoverParent {
       .setPlaceholder("Filter")
       .onChange((value) => {
         this.search = value;
+        if (!value.trim()) this.endSavedSearch();
         this.resetScroll();
         this.renderList();
       });
     this.filtersEl = list.createDiv("ps-filters");
+    this.howEl = list.createDiv("ps-list-how");
     this.bodyEl = list.createDiv("ps-list-body");
 
     this.makeResizable(divider);
@@ -488,6 +492,7 @@ export class SidebarView extends ItemView implements HoverParent {
       this.filterInput.setValue("");
       this.search = "";
       this.openedSearch = null;
+      this.endSavedSearch();
     }
     this.place = place;
     if (place.kind === "notebook") this.lastNotebook = place.folder;
@@ -759,6 +764,8 @@ export class SidebarView extends ItemView implements HoverParent {
     ]);
     if (key === this.navKey) return;
     this.navKey = key;
+    // The column is rebuilt, not moved: it stays scrolled where it was.
+    const scroll = nav.scrollTop;
     nav.empty();
     this.actionsEl.empty();
 
@@ -843,6 +850,7 @@ export class SidebarView extends ItemView implements HoverParent {
     if (this.navHeading(nav, "Tags", "tag", "section:tags", () => this.newTag(tags.map((t) => t.path)))) {
       this.treeSection(nav, tags, "tag", (row) => ({ kind: "tag", tag: row.path }));
     }
+    nav.scrollTop = scroll;
   }
 
   /**
@@ -2000,39 +2008,48 @@ export class SidebarView extends ItemView implements HoverParent {
       board.addEventListener("click", (evt) => this.newBoard(evt, boards));
     }
 
+    // Above the list, in a few quiet words: how it's grouped and sorted,
+    // each part a menu to change it. Tasks are ordered by their grouping;
+    // Daily notes and Templates are always grouped by date.
+    const how = this.howEl;
+    how.empty();
+    const part = (text: string, label: string, open: (evt: MouseEvent) => void) => {
+      const button = how.createEl("button", { cls: "ps-list-how-choice", attr: { "aria-label": label } });
+      button.createSpan({ text });
+      setIcon(button.createSpan("ps-filter-caret"), "chevron-down");
+      button.addEventListener("click", open);
+    };
+    const named = (list: Array<[string, string, ...string[]]>, key: string) => (list.find(([k]) => k === key)?.[1] ?? key).toLowerCase();
+    const grouped = (key: string, list: Array<[string, string, ...string[]]>, open: (evt: MouseEvent) => void) =>
+      part(key === "none" ? "Not grouped" : `Grouped by ${named(list, key)}`, "Group by", open);
+    const view = this.plugin.viewState.state;
     if (this.place.kind === "tasks") {
-      const group = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "Group by" } });
-      setIcon(group, "group");
-      group.addEventListener("click", (evt) => this.groupMenu(evt));
-      this.saveSearchButton(actions);
-      return;
+      // As the list is drawn: by due date when grouped by board with boards turned off.
+      grouped(view.taskGroupBy === "board" && !this.plugin.settings.boards ? "due" : view.taskGroupBy, TASK_GROUPS, (evt) => this.groupMenu(evt));
+    } else if (this.place.kind === "attachments") {
+      grouped(view.attachmentGroupBy, ATTACHMENT_GROUPS, (evt) => this.attachmentGroupMenu(evt));
+    } else if (!datedOnly) {
+      grouped(view.noteGroupBy, NOTE_GROUPS, (evt) => this.noteGroupMenu(evt));
     }
-    if (!datedOnly) {
-      const group = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "Group by" } });
-      setIcon(group, "group");
-      group.addEventListener("click", (evt) =>
-        this.place.kind === "attachments" ? this.attachmentGroupMenu(evt) : this.noteGroupMenu(evt)
+    if (this.place.kind !== "tasks") part(`Sorted by ${named(SORTS, this.sort)}`, "Sort", (evt) => this.sortMenu(evt));
+    this.saveSearchButton(actions);
+  }
+
+  private sortMenu(evt: MouseEvent): void {
+    const menu = new Menu();
+    for (const [key, label] of SORTS) {
+      menu.addItem((item) =>
+        item
+          .setTitle(label)
+          .setChecked(this.sort === key)
+          .onClick(() => {
+            this.sort = key;
+            this.resetScroll();
+            this.renderList();
+          })
       );
     }
-    const sort = actions.createDiv({ cls: "ps-action", attr: { "aria-label": "Sort" } });
-    setIcon(sort, "arrow-up-down");
-    sort.addEventListener("click", (evt) => {
-      const menu = new Menu();
-      for (const [key, label] of SORTS) {
-        menu.addItem((item) =>
-          item
-            .setTitle(label)
-            .setChecked(this.sort === key)
-            .onClick(() => {
-              this.sort = key;
-              this.resetScroll();
-              this.renderList();
-            })
-        );
-      }
-      menu.showAtMouseEvent(evt);
-    });
-    this.saveSearchButton(actions);
+    menu.showAtMouseEvent(evt);
   }
 
   private placeTitle(place: Place = this.place): string {
@@ -2127,15 +2144,34 @@ export class SidebarView extends ItemView implements HoverParent {
     });
   }
 
+  /** What an opened saved search changed about its list (tab, grouping, chip, sort), as steps that put it back. */
+  private savedSearchUndo: Array<() => void> = [];
+
+  /** The saved search is cleared or its list left: the list is as it was before it was opened. */
+  private endSavedSearch(): void {
+    for (const undo of this.savedSearchUndo.splice(0)) undo();
+  }
+
   /** Show the saved search's list with its query in the search field (on Tasks, on its tab). */
   private openSavedSearch(saved: SavedSearch): void {
-    if (saved.taskFilter) this.plugin.viewState.update({ taskFilter: saved.taskFilter });
-    const grouping = listGrouping(saved.place);
-    if (grouping && saved.groupBy) this.plugin.viewState.update({ [grouping.key]: saved.groupBy });
-    if (saved.chip && saved.place.kind === "boards") this.boardTypeFilter = saved.chip as BoardType | "all";
-    else if (saved.chip) this.plugin.viewState.update({ noteKindFilter: saved.chip as KindFilter });
-    if (saved.sort) this.sort = saved.sort as SortKey;
+    this.endSavedSearch();
     this.showPlace(saved.place);
+    const view = this.plugin.viewState;
+    // Set what the filter holds, and remember how to put it back: only if
+    // it's still as the filter set it, so a change made since is kept.
+    const set = <T>(get: () => T, put: (value: T) => void, value: T) => {
+      const was = get();
+      put(value);
+      this.savedSearchUndo.push(() => {
+        if (get() === value) put(was);
+      });
+    };
+    if (saved.taskFilter) set(() => view.state.taskFilter, (v) => view.update({ taskFilter: v }), saved.taskFilter);
+    const grouping = listGrouping(saved.place);
+    if (grouping && saved.groupBy) set<string>(() => view.state[grouping.key], (v) => view.update({ [grouping.key]: v }), saved.groupBy);
+    if (saved.chip && saved.place.kind === "boards") set(() => this.boardTypeFilter, (v) => (this.boardTypeFilter = v), saved.chip as BoardType | "all");
+    else if (saved.chip) set(() => view.state.noteKindFilter, (v) => view.update({ noteKindFilter: v }), saved.chip as KindFilter);
+    if (saved.sort) set(() => this.sort, (v) => (this.sort = v), saved.sort as SortKey);
     this.openedSearch = saved;
     this.filterInput.setValue(saved.query);
     this.search = saved.query;
