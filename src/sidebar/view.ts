@@ -57,7 +57,7 @@ import {
 import type { OcrBox } from "./core/ocr-boxes";
 import { openBoardPage } from "../boards/page";
 import { extractSnippet } from "./core/snippet";
-import { dragCopy, draggedTask, moveTaskOut, setDraggedTask } from "../drag";
+import { dragCopy, draggedTask, moveTaskOut, overBoard, setDraggedTask, taskCardCopy } from "../drag";
 import { movedPath } from "./core/edits";
 import { appendTask } from "./core/task-move";
 import { cardTitle, taskDetails } from "./core/task-details";
@@ -1143,28 +1143,18 @@ export class SidebarView extends ItemView implements HoverParent {
     el.draggable = true;
     el.addEventListener("dragstart", (evt) => {
       const details = taskDetails(task.text);
-      let card: HTMLElement | null = null;
       dragCopy(
         evt,
         el,
         (ghost) => {
           if (!startTaskDrag(this.app, evt, details.description || task.text, ghost)) return false;
           setDraggedTask({ path: note.path, ref: { line: task.line, status: task.status, text: task.text } });
-          // The same task as a board card, shown in the copy's place over a board.
-          card = ghost.el.createDiv("psb-board ps-drag-card").createDiv({ cls: "psb-card", attr: { "data-status": task.status } });
-          card.createEl("button", { cls: "psb-check" });
-          card.createDiv("psb-card-body").createDiv({ cls: "psb-card-text", text: cardTitle(task.text) });
-          const foot = card.createDiv("psb-card-foot");
-          taskBadges(foot, details, isClosed(task), today, { due: task.due, done: task.done });
-          if (!foot.childElementCount) foot.remove();
+          taskCardCopy(ghost.el, task.status, task.text, (foot) =>
+            taskBadges(foot, details, isClosed(task), today, { due: task.due, done: task.done })
+          );
           return true;
         },
-        (move, ghost) => {
-          const under = move.target instanceof Element ? move.target : null;
-          const cards = under?.closest(".psb-lane")?.querySelector<HTMLElement>(".psb-cards") ?? null;
-          ghost.toggleClass("is-over-board", !!cards);
-          if (cards && card) card.parentElement!.style.width = `${cards.clientWidth}px`;
-        },
+        overBoard,
         () => setDraggedTask(null)
       );
     });
@@ -2206,8 +2196,10 @@ export class SidebarView extends ItemView implements HoverParent {
     const shown = note.columns.length > MAX ? MAX - 1 : MAX;
     note.columns.slice(0, shown).forEach((name, i) => {
       const total = note.laneCards[i] ?? 0;
+      // The list's cards: not the subtasks under them.
+      const cards = note.tasks.filter((t) => t.section === name && t.under === undefined);
       // min(): two lists with the same name share their checked cards.
-      const done = Math.min(total, note.tasks.filter((t) => t.section === name && isClosed(t)).length);
+      const done = Math.min(total, cards.filter(isClosed).length);
       const lane = board.createDiv({ cls: "ps-card-lane", attr: { title: done ? `${name}: ${done} of ${total} done` : name } });
       const colour = note.laneColours[i];
       if (colour) lane.dataset.colour = colour;
@@ -2216,7 +2208,6 @@ export class SidebarView extends ItemView implements HoverParent {
       head.createDiv({ cls: "ps-card-lane-count", text: String(total) });
       if (!compact) {
         // Up to three cards by name; with more, two and how many are left.
-        const cards = note.tasks.filter((t) => t.section === name);
         for (const card of cards.slice(0, cards.length > 3 ? 2 : 3)) {
           lane.createDiv({ cls: "ps-card-lane-card", text: cardTitle(card.text) }).toggleClass("is-done", isClosed(card));
         }
@@ -2859,6 +2850,12 @@ export class SidebarView extends ItemView implements HoverParent {
       evt.stopPropagation();
       this.filterTasksTo(note.path);
     });
+    // A subtask says what it's under.
+    if (task.under) {
+      const under = meta.createSpan({ cls: "ps-task-under", attr: { "aria-label": `Subtask of ${cardTitle(task.under)}` } });
+      setIcon(under.createSpan(), "corner-down-right");
+      under.createSpan({ text: cardTitle(task.under) });
+    }
     taskBadges(meta, details, closed, today, { due: task.due, done: task.done });
 
     row.addEventListener("click", (evt) => void this.openTask(note.path, task.line, evt));

@@ -1,6 +1,7 @@
 import { TaskItem } from "./types";
 
 const TASK_LINE = /^(\s*(?:[-*+]|\d+[.)])\s+\[)(.)(\]\s?)(.*)$/;
+const LIST_ITEM = /^\s*(?:[-*+]|\d+[.)])\s+(.*)$/;
 const DUE = /📅\s*(\d{4}-\d{2}-\d{2})/u;
 const DONE = /✅\s*(\d{4}-\d{2}-\d{2})/u;
 const FENCE = /^\s*(```|~~~)/;
@@ -12,12 +13,16 @@ export function parseTasks(text: string): TaskItem[] {
   const tasks: TaskItem[] = [];
   let inFence = false;
   let section: string | null = null;
+  // The list items the line being read sits under, outermost first.
+  const above: Array<{ indent: number; text: string }> = [];
   text.split(/\r?\n/).forEach((line, index) => {
     if (FENCE.test(line)) {
       inFence = !inFence;
       return;
     }
-    if (inFence) return;
+    if (inFence || !line.trim()) return;
+    const indent = /^[ \t]*/.exec(line)![0].replace(/\t/g, "    ").length;
+    while (above.length && above[above.length - 1].indent >= indent) above.pop();
     // CommonMark: trailing #s close the heading only after whitespace, so
     // "## C#" is "C#" while "## Todo ##" is "Todo".
     const heading = /^#{1,6}\s+(.+?)(?:\s+#+)?\s*$/.exec(line);
@@ -26,6 +31,9 @@ export function parseTasks(text: string): TaskItem[] {
       return;
     }
     const match = TASK_LINE.exec(line);
+    const item = match ? match[4].trim() : LIST_ITEM.exec(line)?.[1].trim();
+    const under = above[above.length - 1]?.text;
+    if (item !== undefined) above.push({ indent, text: item });
     if (!match) return;
     tasks.push({
       line: index,
@@ -34,6 +42,7 @@ export function parseTasks(text: string): TaskItem[] {
       due: DUE.exec(match[4])?.[1] ?? null,
       section,
       done: DONE.exec(match[4])?.[1] ?? null,
+      ...(under !== undefined && { under }),
     });
   });
   return tasks;

@@ -28,6 +28,14 @@ describe("takeTask", () => {
     expect(out.text.split("\n")).toEqual(["# Shed", "", "- [ ] Buy paint 📅 2026-11-20", "- [x] Pick colours", "", "Done for now."]);
   });
 
+  test("a blank line inside a task goes with it, one after it doesn't", () => {
+    const text = ["- [ ] Paint the shed", "    ", "    Two coats", "", "- [ ] Next"].join("\n");
+    expect(takeTask(text, { line: 0, status: " ", text: "Paint the shed" })).toEqual({
+      text: "\n- [ ] Next",
+      block: ["- [ ] Paint the shed", "    ", "    Two coats"],
+    });
+  });
+
   test("a subtask comes out without its indent, and leaves its parent", () => {
     const out = takeTask(NOTE, ref(4, " ", "Order hinges"))!;
     expect(out.block).toEqual(["- [ ] Order hinges"]);

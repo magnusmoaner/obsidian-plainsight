@@ -18,11 +18,18 @@ export interface TaskRef {
 const indentOf = (line: string) => /^[ \t]*/.exec(line)![0];
 const LIST_ITEM = /^[ \t]*(?:[-*+]|\d+[.)])\s/;
 
-/** One past the last line of the task that starts on `line`: its indented lines go with it. */
+/**
+ * One past the last line of the task that starts on `line`: its indented
+ * lines go with it, and so do blank lines with more of it after them.
+ */
 function blockEnd(lines: string[], line: number): number {
   const own = indentOf(lines[line]).length;
   let end = line + 1;
-  while (end < lines.length && lines[end].trim() !== "" && indentOf(lines[end]).length > own) end++;
+  for (let i = end; i < lines.length; i++) {
+    if (lines[i].trim() === "") continue;
+    if (indentOf(lines[i]).length <= own) break;
+    end = i + 1;
+  }
   return end;
 }
 
