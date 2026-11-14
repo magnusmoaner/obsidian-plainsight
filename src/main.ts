@@ -89,7 +89,7 @@ export default class WysiwygPlugin extends Plugin {
     this.applyRenderingMode();
     this.registerEditorExtension(this.extensions);
     // Always on, like the sidebar: a task dragged from the Tasks list can be dropped into any open note.
-    this.registerEditorExtension(taskDrop(this.app));
+    this.registerEditorExtension(taskDrop(this.app, () => this.settings.boards));
     this.addSettingTab(new WysiwygSettingTab(this.app, this));
 
     this.addCommand({

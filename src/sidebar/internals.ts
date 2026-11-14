@@ -1,4 +1,4 @@
-import { App, HoverPopover, normalizePath, TAbstractFile, TFolder } from "obsidian";
+import { App, HoverPopover, normalizePath, TAbstractFile, TFile, TFolder } from "obsidian";
 
 /**
  * Undocumented Obsidian and plugin APIs, isolated so they're easy to audit.
@@ -363,6 +363,12 @@ export function startFileDrag(
   // With a ghost of our own, the manager makes no line for the action: it gets ours.
   manager.actionEl = ghost.action;
   return true;
+}
+
+/** The one file being dragged, out of the sidebar or File explorer; null for anything else. */
+export function draggedFile(app: App): TFile | null {
+  const dragged = (dragManager(app) as { draggable?: Draggable | null } | null)?.draggable;
+  return dragged?.type === "file" && dragged.file instanceof TFile ? dragged.file : null;
 }
 
 /** What Obsidian's drag manager is told a dragged task is; nothing of its own takes one. */

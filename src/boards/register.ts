@@ -12,15 +12,17 @@ const EMBEDDED_IN = "embedded-in";
 
 const isBoard = (app: App, file: TFile) => isBoardFrontmatter(app.metadataCache.getFileCache(file)?.frontmatter);
 
+/**
+ * The other half of an embed: the board names the note. Written as one new
+ * line; a property in a shape that can't take one is left alone.
+ */
+export const linkBack = (app: App, board: TFile, note: TFile): Promise<string> =>
+  app.vault.process(board, (text) => addListItem(text, EMBEDDED_IN, `"[[${app.metadataCache.fileToLinktext(note, board.path)}]]"`) ?? text);
+
 /** Boards in notes and on their own page: the views, the commands, and keeping the two-way link. */
 export function registerBoards(plugin: Plugin, boardsOn: () => boolean, template: () => string, index: NoteIndex): void {
   const { app } = plugin;
   const open = (file: TFile, newLeaf: Parameters<typeof openFile>[2]) => void openFile(app, file, newLeaf);
-
-  // The other half of an embed: the board names the note. Written as one
-  // new line; a property in a shape that can't take one is left alone.
-  const linkBack = (board: TFile, note: TFile) =>
-    app.vault.process(board, (text) => addListItem(text, EMBEDDED_IN, `"[[${app.metadataCache.fileToLinktext(note, board.path)}]]"`) ?? text);
 
   const host: BoardHost = {
     // From the notes themselves, so it's true whoever wrote the embed block.
@@ -50,7 +52,7 @@ export function registerBoards(plugin: Plugin, boardsOn: () => boolean, template
         const link = app.metadataCache.fileToLinktext(board, note.path);
         void app.vault
           .process(note, (text) => appendEmbed(text, link))
-          .then(() => linkBack(board, note))
+          .then(() => linkBack(app, board, note))
           .then(() => new Notice(`Embedded at the end of “${note.basename}”.`))
           .catch((err: Error) => new Notice(`Couldn't embed the board: ${err.message}`));
       }).open();
@@ -77,7 +79,7 @@ export function registerBoards(plugin: Plugin, boardsOn: () => boolean, template
     const cursor = editor.getCursor();
     const prefix = editor.getLine(cursor.line).trim() ? "\n" : "";
     editor.replaceSelection(prefix + embedBlock(app.metadataCache.fileToLinktext(board, note.path)));
-    await linkBack(board, note);
+    await linkBack(app, board, note);
   };
   const failed = (err: Error) => new Notice(`Couldn't insert the board: ${err.message}`);
 
