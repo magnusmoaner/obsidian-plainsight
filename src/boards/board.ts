@@ -372,6 +372,25 @@ export function moveCard(text: string, ref: CardRef, to: LaneRef, index: number,
   });
 }
 
+/**
+ * After a card on list `lane` was ticked: the done card at position `index`
+ * there (or the one after it, when a repeating card left its next round on
+ * top) moves to the end of the done list ("done", or its own list if the
+ * board has none) or of its own list ("bottom"). The same text otherwise.
+ */
+export function settleDoneCard(text: string, lane: number, index: number, place: "done" | "bottom" | "stay"): string {
+  if (place === "stay") return text;
+  const lines = text.split(/\r?\n/);
+  const board = parseBoard(text);
+  const own = board.lanes[lane];
+  const at = [index, index + 1].find((i) => isDone(own?.cards[i]?.check ?? null));
+  if (!own || at === undefined) return text;
+  const done = place === "done" ? board.lanes.findIndex((l) => l.status === "x") : -1;
+  const to = done >= 0 ? done : lane;
+  const card: CardRef = { lane, card: at, raw: lines[own.cards[at].line] };
+  return moveCard(text, card, { lane: to, raw: lines[board.lanes[to].line] }, board.lanes[to].cards.length);
+}
+
 export function addLane(text: string, title: string): string {
   return edit(text, (lines, board) => {
     const block = [`## ${title}`, "", "", ""];

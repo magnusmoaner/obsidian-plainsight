@@ -2868,7 +2868,7 @@ export class SidebarView extends ItemView implements HoverParent {
     box.addEventListener("change", async () => {
       // On success the index update re-renders the row. When nothing was
       // written (stale line, or Tasks declined), put the box back.
-      const written = await toggleTask(this.app, note.path, task);
+      const written = await toggleTask(this.app, note.path, task, this.plugin.settings.noteDoneTasks === "bottom" && !holdsCards(note));
       if (!written) box.checked = isClosed(task);
     });
 

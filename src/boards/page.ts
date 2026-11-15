@@ -6,9 +6,10 @@ export const BOARD_VIEW = "plainsight-board";
 
 /**
  * Whether boards open on Plainsight's own page (the "Show boards" setting),
- * and whether the Kanban plugin's boards count as boards (its own setting).
+ * whether the Kanban plugin's boards count as boards (its own setting), and
+ * where a ticked card goes.
  */
-export const boardPages = { enabled: true, kanban: true };
+export const boardPages: { enabled: boolean; kanban: boolean; doneCards: "done" | "bottom" | "stay" } = { enabled: true, kanban: true, doneCards: "stay" };
 
 /**
  * Whether Plainsight's page shows a note with this frontmatter: its own

@@ -230,11 +230,13 @@ The settings are in five groups. A setting that depends on another shows only wh
 | ***Tasks*** | | |
 | Tasks | On | The Tasks place, the New task buttons, the task progress on note cards and tasks in Search everywhere. Off hides them; your tasks stay in your notes |
 | Default note for new tasks | (asked the first time) | Where the sidebar's New task button and the `+` on Tasks add tasks (any note except a board) |
+| Ticked tasks | Don't move | Where a task ticked in a note goes: below the other tasks in its list (with its subtasks), or nowhere. A task on its own stays. It counts a tick from the Tasks list, and one made in an open note (Cmd+L, the Tasks plugin, a checkbox) |
 | Board cards as tasks | Off | A board saves cards as checkbox lines. Off: they show on the Tasks page only when grouped by board. On: every card is listed among your tasks |
 | ***Boards*** | | |
 | Boards | On | Plainsight's boards, and the look of boards in the sidebar. Off: a board is listed like any other note, its cards are ordinary tasks, and an embedded board shows as its code block |
 | Kanban plugin boards | On | Boards made with the Kanban plugin count as boards. Off: they're listed like any other note |
 | Task List Kanban boards | On | The same, for the Task List Kanban plugin |
+| Ticked cards | Don't move | Where a card ticked on a board goes: to the end of the list set to “Cards here are done” (or, on a board without one, the bottom of its own list), to the bottom of its own list, or nowhere |
 | Template for new boards | (none) | A board or note that every new Plainsight board starts as a copy of, in place of the default lists. Chosen from your templates folder, if the Templates core plugin has one set; otherwise any note |
 | Narrowest list | 190 | How narrow a list on a board may get, in pixels (150 to 400), before the board scrolls sideways |
 | ***Editor (beta)*** | | |
