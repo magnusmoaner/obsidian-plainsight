@@ -18,7 +18,7 @@ Formatting renders as you type, and the syntax never comes back: there's no "rev
 - **Escaped characters.** `\[` shows as `[`: the backslash stays hidden, and Backspace or Delete removes the character together with it. (In tables, which show as Markdown, the backslash stays visible.)
 - **Headings.** `# ` disappears once you type the space, and each level is styled. Backspace at the start of a heading turns it back into a paragraph.
 - **Callouts.** `> [!type]` blocks render as boxes while you edit them. A `···` button changes the callout type.
-- **Links.** Only the link text shows: `[text](url)` shows *text*, `[[Note|alias]]` shows *alias*, `[[Note#Section]]` shows *Note › Section*, and bare URLs show shortened (`github.com/…/repo`). Text you wrote (link text, aliases) stays editable in place; text derived from the target moves as one unit. A plain click places the cursor; **Cmd/Ctrl+click opens** the link (add Opt/Alt to open it to the right). Links to notes that don't exist get a dashed underline, and imported `evernote:///` links are muted.
+- **Links.** Only the link text shows: `[text](url)` shows *text*, `[[Note|alias]]` shows *alias*, `[[Note#Section]]` shows *Note#Section*, and bare URLs show shortened (`github.com/…/repo`). The text of a link stays editable in place, a wikilink's name too; a shortened URL moves as one unit. **Edit link** in the right-click menu opens a dialog for where the link goes and the text it shows. A plain click places the cursor; **Cmd/Ctrl+click opens** the link (add Opt/Alt to open it to the right). Links to notes that don't exist get a dashed underline, and imported `evernote:///` links are muted.
 
 Anything Plainsight doesn't render yet (lists, tables, embeds and more) stays visible as plain Markdown and fully editable.
 
@@ -70,6 +70,7 @@ Cards, folders and tasks can be dragged, and so can a task line in a note. A cop
 | A note's card | **Templates** | It moves into the templates folder |
 | A folder | Another folder, or the **Folders** heading | It moves inside that folder, or to the top level |
 | A card or a folder | An open note, a tab or File explorer | What Obsidian does with a file dragged from File explorer: a link in the note, the file opened in the tab, a move in File explorer |
+| A card or a file, with Option (Alt) held | An open note | The note or file is embedded (`![[…]]`) on the line you drop it on, not linked |
 | A board's card (a Plainsight board or a Kanban plugin board) | An open note | The board is embedded on the line you drop it on (a mark shows where), not linked, and the board notes that it's embedded there. A board dragged out of File explorer lands the same way |
 | A task in the Tasks list | An open note | The task moves to the line you drop it on (a mark shows where), with its subtasks, and leaves the note it was in |
 | A task in the Tasks list | A list on an open board | The task becomes a card where you drop it and leaves its note. Over the board the copy turns into a card, and an empty slot shows where it would land. In a list with a status, it takes that status |
@@ -297,7 +298,7 @@ npm run deploy    # build and copy into a vault
 
 ## Roadmap
 
-In progress for the editor: link editing (a link toolbar, an Edit dialog and Cmd+K) and embeds (images, file chips, note previews). After that: frontmatter/properties, lists and task checkboxes, and tables. Embedded boards aren't drawn yet with Source mode on. For the sidebar, Spaces are planned (folders grouped into named spaces).
+In progress for the editor: link editing (a link toolbar and Cmd+K) and embeds (images, file chips, note previews). After that: frontmatter/properties, lists and task checkboxes, and tables. Embedded boards aren't drawn yet with Source mode on. For the sidebar, Spaces are planned (folders grouped into named spaces).
 
 ## License
 

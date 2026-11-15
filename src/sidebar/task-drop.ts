@@ -16,7 +16,8 @@ import { taskBadges } from "./task-badges";
  * a board or a task of the note itself can be dropped into it: it lands on a
  * line of its own, between two lines, where a line across the note shows. And
  * a task line has a grip to drag it by, to another line or onto a board. A
- * board dragged in as a file lands the same way, as an embed, not a link.
+ * board dragged in as a file lands the same way, as an embed, not a link,
+ * and so does any note dragged in with Option held.
  * This is in every Markdown editor, whether or not Plainsight's own editing
  * is on.
  */
@@ -161,11 +162,13 @@ export function taskDrop(app: App, boardsOn: () => boolean): Extension {
     const is = (f: TFile) => isBoardFrontmatter(app.metadataCache.getFileCache(f)?.frontmatter);
     return file && note && is(file) && !is(note) ? file : null;
   };
+  /** A note dragged with Option held: embedded on a line of its own, where Obsidian would write a link. */
+  const embedding = (evt: DragEvent): TFile | null => (evt.altKey ? draggedFile(app) : null);
   // Not over a board in the note: its lists take what's dropped on them, and
   // a card's editor isn't a place to drop a task.
   const ours = (view: EditorView, evt: DragEvent) => {
     const el = evt.target instanceof Element ? evt.target : evt.target instanceof Node ? evt.target.parentElement : null;
-    return (!!draggedTask() || !!board(view)) && !el?.closest(".psb-board");
+    return (!!draggedTask() || !!board(view) || !!embedding(evt)) && !el?.closest(".psb-board");
   };
   const clear = (view: EditorView) => {
     if (view.state.field(dropLine, false) != null) view.dispatch({ effects: setDrop.of(null) });
@@ -196,7 +199,7 @@ export function taskDrop(app: App, boardsOn: () => boolean): Extension {
           const before = target(view, evt);
           if (view.state.field(dropLine) !== before) view.dispatch({ effects: setDrop.of(before) });
           const task = draggedTask();
-          dragAction(app, !task ? "Embed the board here" : task.card ? "Move the card here" : "Move the task here");
+          dragAction(app, task ? (task.card ? "Move the card here" : "Move the task here") : board(view) ? "Embed the board here" : "Embed here");
           if (evt.dataTransfer) evt.dataTransfer.dropEffect = task ? "move" : "copy";
           evt.preventDefault();
           return true;
@@ -215,6 +218,7 @@ export function taskDrop(app: App, boardsOn: () => boolean): Extension {
           const file = view.state.field(editorInfoField, false)?.file;
           if (!file) return true;
           const embedded = task ? null : board(view);
+          const note = task || embedded ? null : embedding(evt);
           if (embedded) {
             // On lines of its own, at the margin: a block isn't drawn from inside a list.
             const lines = view.state.doc.toString().split("\n");
@@ -222,6 +226,10 @@ export function taskDrop(app: App, boardsOn: () => boolean): Extension {
             lines.splice(before, 0, ...block);
             applyText(view, lines.join("\n"));
             linkBack(app, embedded, file).catch((err: Error) => new Notice(`The board is embedded, but couldn't be told so: ${err.message}`));
+          } else if (note) {
+            const lines = view.state.doc.toString().split("\n");
+            lines.splice(before, 0, `![[${app.metadataCache.fileToLinktext(note, file.path)}]]`);
+            applyText(view, lines.join("\n"));
           } else if (!task) {
             return true;
           } else if (file.path === task.path) {

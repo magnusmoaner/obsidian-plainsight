@@ -12,7 +12,7 @@ import {
 } from "obsidian";
 import { CALLOUT_TYPES, calloutMenu } from "./editor/callout";
 import { linkOpener, linkResolver } from "./editor/link-facets";
-import type { LinkInfo } from "./editor/links";
+import { enclosingLink, LinkInfo, rewriteLink } from "./editor/links";
 import { enclosingCallout } from "./editor/syntax";
 import {
   setHeading,
@@ -31,7 +31,8 @@ import { cursorTracker } from "./sidebar/cursor";
 import { taskDrop } from "./sidebar/task-drop";
 import { Indexer } from "./sidebar/indexer";
 import { SIDEBAR_VIEW, SidebarView } from "./sidebar/view";
-import { readBookmarks, removeBookmark } from "./sidebar/internals";
+import { editLinkItem, readBookmarks, removeBookmark } from "./sidebar/internals";
+import { LinkModal } from "./sidebar/modals";
 import { ViewStateStore } from "./sidebar/view-state-store";
 import {
   DEFAULT_SETTINGS,
@@ -91,6 +92,7 @@ export default class WysiwygPlugin extends Plugin {
     // Always on, like the sidebar: a task dragged from the Tasks list can be dropped into any open note.
     this.registerEditorExtension(taskDrop(this.app, () => this.settings.boards));
     this.addSettingTab(new WysiwygSettingTab(this.app, this));
+    this.editLinkInDialog();
 
     this.addCommand({
       id: "toggle-wysiwyg",
@@ -430,6 +432,32 @@ export default class WysiwygPlugin extends Plugin {
     } catch {
       return path;
     }
+  }
+
+  /**
+   * Obsidian's "Edit link" selects the link's text so its syntax shows, and
+   * Plainsight never shows syntax: with Plainsight editing on, it opens a
+   * dialog for where the link goes and what it says instead.
+   */
+  private editLinkInDialog(): void {
+    let at = { x: 0, y: 0 };
+    this.registerDomEvent(document, "contextmenu", (evt) => (at = { x: evt.clientX, y: evt.clientY }), { capture: true });
+    this.registerEvent(
+      this.app.workspace.on("editor-menu", (menu, editor, info) => {
+        const view = (editor as unknown as { cm?: EditorView }).cm;
+        const item = editLinkItem(menu);
+        const pos = view && item && this.settings.enabled ? view.posAtCoords(at) : null;
+        const link = pos === null || !view ? null : enclosingLink(view.state, pos);
+        if (!item || !view || !link) return;
+        const text = link.text ? view.state.sliceDoc(link.text.from, link.text.to) : "";
+        const sourcePath = info.file?.path ?? "";
+        item.onClick(() =>
+          new LinkModal(this.app, { wiki: link.kind === "wiki", target: link.target, text, sourcePath }, (target, text) =>
+            view.dispatch({ changes: { from: link.from, to: link.to, insert: rewriteLink(link.kind, target, text) } })
+          ).open()
+        );
+      })
+    );
   }
 
   private resolvesLink(sourcePath: string, target: string): boolean {
