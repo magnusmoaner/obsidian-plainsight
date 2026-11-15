@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { appendTask, landing, moveTask, placeTask, takeTask, taskAsCard } from "../../sidebar/core/task-move";
+import { appendTask, landing, moveTask, placeTask, sinkDoneTask, takeTask, taskAsCard } from "../../sidebar/core/task-move";
 
 const NOTE = [
   "# Shed",
@@ -114,5 +114,24 @@ describe("taskAsCard", () => {
   test("a task becomes a card with its status and text; lines under it become the card's other lines", () => {
     expect(taskAsCard(["- [ ] Buy paint 📅 2026-11-20"])).toEqual({ check: " ", body: "Buy paint 📅 2026-11-20" });
     expect(taskAsCard(["- [/] Fix the gate", "    - [ ] Order hinges", "    a note"])).toEqual({ check: "/", body: "Fix the gate\n- [ ] Order hinges\na note" });
+  });
+});
+
+describe("sinkDoneTask", () => {
+  const list = ["Shed", "- [x] Paint", "    - [ ] Brushes", "- [ ] Gate", "- [ ] Hinges", "", "After"].join("\n");
+
+  test("goes below the tasks after it, taking its subtasks", () => {
+    expect(sinkDoneTask(list, 1)).toBe(["Shed", "- [ ] Gate", "- [ ] Hinges", "- [x] Paint", "    - [ ] Brushes", "", "After"].join("\n"));
+  });
+
+  test("stays when it's last, alone, or followed by something that isn't a task", () => {
+    expect(sinkDoneTask("- [ ] A\n- [x] B", 1)).toBe("- [ ] A\n- [x] B");
+    expect(sinkDoneTask("- [x] A\n\n- [ ] B", 0)).toBe("- [x] A\n\n- [ ] B");
+    expect(sinkDoneTask("- [x] A\n- plain\n- [ ] B", 0)).toBe("- [x] A\n- plain\n- [ ] B");
+  });
+
+  test("a subtask sinks among its own siblings only", () => {
+    const nested = ["- [ ] Gate", "    - [x] Hinges", "    - [ ] Paint", "- [ ] Shed"].join("\n");
+    expect(sinkDoneTask(nested, 1)).toBe(["- [ ] Gate", "    - [ ] Paint", "    - [x] Hinges", "- [ ] Shed"].join("\n"));
   });
 });

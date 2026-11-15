@@ -29,6 +29,7 @@ import { NoteIndex } from "./sidebar/core/note-index";
 import { legacyViewState } from "./sidebar/core/view-state";
 import { cursorTracker } from "./sidebar/cursor";
 import { taskDrop } from "./sidebar/task-drop";
+import { sinkDoneTasks } from "./sidebar/done-tasks";
 import { Indexer } from "./sidebar/indexer";
 import { SIDEBAR_VIEW, SidebarView } from "./sidebar/view";
 import { editLinkItem, readBookmarks, removeBookmark } from "./sidebar/internals";
@@ -91,6 +92,7 @@ export default class WysiwygPlugin extends Plugin {
     this.registerEditorExtension(this.extensions);
     // Always on, like the sidebar: a task dragged from the Tasks list can be dropped into any open note.
     this.registerEditorExtension(taskDrop(this.app, () => this.settings.boards));
+    this.registerEditorExtension(sinkDoneTasks(this.app, () => this.settings.tasks && this.settings.noteDoneTasks === "bottom"));
     this.addSettingTab(new WysiwygSettingTab(this.app, this));
     this.editLinkInDialog();
 
@@ -350,6 +352,7 @@ export default class WysiwygPlugin extends Plugin {
   private applyBoardPages(): void {
     boardPages.enabled = this.settings.boards;
     boardPages.kanban = this.settings.kanbanBoards;
+    boardPages.doneCards = this.settings.boardDoneCards;
     // Read by the boards' styles.
     // shortcut: set on the main window only; a board in a pop-out window keeps the default width until boards there need it.
     document.body.style.setProperty("--psb-list-min", `${listMinWidth(this.settings)}px`);
@@ -378,7 +381,7 @@ export default class WysiwygPlugin extends Plugin {
     // Which boards are on changes what every board file is: read them all again.
     const boardKinds = ["boards", "kanbanBoards", "taskListBoards"] as const;
     const boardsChanged = boardKinds.some((key) => before[key] !== now[key]);
-    if (boardsChanged || before.boardListMinWidth !== now.boardListMinWidth) this.applyBoardPages();
+    if (boardsChanged || before.boardListMinWidth !== now.boardListMinWidth || before.boardDoneCards !== now.boardDoneCards) this.applyBoardPages();
     if (boardsChanged) void this.indexer.build();
     if (
       boardsChanged ||

@@ -109,3 +109,22 @@ export function taskAsCard(block: string[]): { check: string; body: string } {
   const rest = block.slice(1).map((l) => l.replace(/^( {1,4}|\t)/, ""));
   return { check: first?.status ?? " ", body: [first?.text ?? block[0].trim(), ...rest].join("\n") };
 }
+
+/**
+ * A task just done on `line`, moved to the bottom of its task list: past the
+ * tasks after it at the same indent, each with what's indented under it. A
+ * task with no task after it in its list stays, so does one on its own. The
+ * same text when it stays.
+ */
+export function sinkDoneTask(text: string, line: number): string {
+  const { lines, eol } = split(text);
+  const own = indentOf(lines[line] ?? "");
+  const end = blockEnd(lines, line);
+  let to = end;
+  while (to < lines.length && indentOf(lines[to]) === own && matchTaskLine(lines[to])) to = blockEnd(lines, to);
+  if (to === end) return text;
+  const block = lines.splice(line, end - line);
+  lines.splice(to - block.length, 0, ...block);
+  return lines.join(eol);
+}
+

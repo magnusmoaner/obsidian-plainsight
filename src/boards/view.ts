@@ -7,6 +7,7 @@ import { taskAsCard } from "../sidebar/core/task-move";
 import { matchTaskLine } from "../sidebar/core/tasks";
 import { dragAction, startBoardDrag, tasksToggle } from "../sidebar/internals";
 import { CardEditor, openCardEditor } from "./card-editor";
+import { boardPages } from "./page";
 import {
   App,
   Component,
@@ -44,6 +45,7 @@ import {
   parseBoard,
   renameLane,
   setCardStatus,
+  settleDoneCard,
   setLaneCollapsed,
   setLaneColour,
   setLaneStatus,
@@ -162,6 +164,8 @@ export class BoardView extends MarkdownRenderChild {
 
   /** Completing a card goes through the Tasks plugin when it's there: a done date, and a repeating card's next round. */
   private viaTasks = (line: string) => tasksToggle(this.app, line, this.file!.path);
+  /** A card just ticked done goes where the settings say. */
+  private settle = (text: string, ref: CardRef) => settleDoneCard(text, ref.lane, ref.card, boardPages.doneCards);
 
   private async refresh(): Promise<void> {
     if (this.isTyping()) {
@@ -409,7 +413,7 @@ export class BoardView extends MarkdownRenderChild {
     });
     if (done) setIcon(box, "check");
     else if (card.check === "-") setIcon(box, "minus");
-    box.addEventListener("click", () => this.write((t) => toggleCard(t, ref, this.viaTasks)));
+    box.addEventListener("click", () => this.write((t) => (done ? toggleCard(t, ref, this.viaTasks) : this.settle(toggleCard(t, ref, this.viaTasks), ref))));
 
     // The card's text, with what reads better as badges taken out: Kanban's
     // date and time, and the first line's Tasks-plugin details and end tags.
@@ -582,7 +586,7 @@ export class BoardView extends MarkdownRenderChild {
         i
           .setTitle(`Mark as ${label.toLowerCase()}`)
           .setIcon(icon)
-          .onClick(() => this.write((t) => setCardStatus(t, ref, char, this.viaTasks)))
+          .onClick(() => this.write((t) => (char === "x" ? this.settle(setCardStatus(t, ref, char, this.viaTasks), ref) : setCardStatus(t, ref, char, this.viaTasks))))
       );
     }
     menu.addSeparator();

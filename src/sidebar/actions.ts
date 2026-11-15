@@ -2,6 +2,7 @@ import { App, moment, Notice, normalizePath, PaneType, TFile, WorkspaceLeaf } fr
 import { applyTemplate } from "./core/format";
 import { addTag, appendLine, markAsBoard } from "./core/edits";
 import { setPinned } from "./core/pin";
+import { sinkDoneTask } from "./core/task-move";
 import { matchTaskLine, toggleTaskLine } from "./core/tasks";
 import { TaskItem } from "./core/types";
 import { NEW_BOARD } from "../boards/board";
@@ -25,7 +26,7 @@ const now = moment as unknown as () => { format(pattern: string): string };
  * wrong line. Returns whether the file was changed, so the caller can reset
  * its checkbox when it wasn't.
  */
-export async function toggleTask(app: App, path: string, task: TaskItem): Promise<boolean> {
+export async function toggleTask(app: App, path: string, task: TaskItem, sink = false): Promise<boolean> {
   const file = app.vault.getAbstractFileByPath(path);
   if (!(file instanceof TFile)) return false;
   let written = false;
@@ -50,7 +51,10 @@ export async function toggleTask(app: App, path: string, task: TaskItem): Promis
     if (next === null || next === line) return data;
     lines[task.line] = next;
     written = true;
-    return lines.join("\n");
+    // Ticked done (a repeating task's done round may be its second line): to the bottom of its list.
+    const done = next.split("\n").findIndex((l) => /^[xX]$/.test(matchTaskLine(l)?.status ?? ""));
+    const ticked = !/^[xX]$/.test(task.status) && done >= 0;
+    return sink && ticked ? sinkDoneTask(lines.join("\n"), task.line + done) : lines.join("\n");
   });
   if (stale) new Notice("That task moved or changed in its note, so nothing was ticked.");
   return written;

@@ -22,6 +22,7 @@ import {
   setLaneCollapsed,
   setLaneColour,
   setLaneStatus,
+  settleDoneCard,
   StaleBoardError,
   cardParts,
   toggleCard,
@@ -452,5 +453,32 @@ describe("insertCard", () => {
 
   test("a list that changed since the board was drawn takes nothing", () => {
     expect(() => insertCard(BOARD.replace("## To do (3)", "## Later (3)"), laneRef(BOARD, 0), 0, "x", " ")).toThrow(StaleBoardError);
+  });
+});
+
+describe("settleDoneCard", () => {
+  const BOARD2 = ["## To do", "", "- [x] Paint", "- [ ] Gate", "- [ ] Hinges", "", "## Done", "", "**Complete**", "- [x] Colours", ""].join("\n");
+
+  test("done: to the end of the done list", () => {
+    const out = settleDoneCard(BOARD2, 0, 0, "done");
+    expect(out).toContain("- [ ] Gate\n- [ ] Hinges\n");
+    expect(out).toContain("- [x] Colours\n- [x] Paint");
+  });
+
+  test("bottom: to the end of its own list", () => {
+    expect(settleDoneCard(BOARD2, 0, 0, "bottom")).toContain("- [ ] Gate\n- [ ] Hinges\n- [x] Paint\n");
+  });
+
+  test("done without a done list: the bottom of its own list", () => {
+    const plain = BOARD2.replace("**Complete**\n", "");
+    expect(settleDoneCard(plain, 0, 0, "done")).toContain("- [ ] Hinges\n- [x] Paint\n");
+  });
+
+  test("a repeating card's next round stays; stay and open cards move nothing", () => {
+    const repeat = BOARD2.replace("- [x] Paint", "- [ ] Paint 🔁 every week\n- [x] Paint 🔁 every week");
+    const out = settleDoneCard(repeat, 0, 0, "bottom");
+    expect(out).toContain("## To do\n\n- [ ] Paint 🔁 every week\n- [ ] Gate\n- [ ] Hinges\n- [x] Paint 🔁 every week\n");
+    expect(settleDoneCard(BOARD2, 0, 0, "stay")).toBe(BOARD2);
+    expect(settleDoneCard(BOARD2, 0, 1, "bottom")).toBe(BOARD2);
   });
 });

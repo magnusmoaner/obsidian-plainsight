@@ -106,6 +106,10 @@ export interface WysiwygSettings {
   showBoardsRow: boolean;
   /** List board cards on the Tasks page (they're `- [ ]` lines too). */
   boardCardsInTasks: boolean;
+  /** Where a card goes when it's ticked on a board: the done list (else the bottom of its list), the bottom of its list, or nowhere. */
+  boardDoneCards: "done" | "bottom" | "stay";
+  /** Where a task goes when it's ticked in a note: the bottom of its task list, or nowhere. */
+  noteDoneTasks: "bottom" | "stay";
   /** Page Preview when the mouse rests on a note card or a task. */
   hoverPreviews: boolean;
   /** The sidebar's list panel: a gap (and rounded corners) on each side. */
@@ -144,6 +148,8 @@ export const DEFAULT_SETTINGS: WysiwygSettings = {
   boardListMinWidth: 190,
   showBoardsRow: true,
   boardCardsInTasks: false,
+  boardDoneCards: "stay",
+  noteDoneTasks: "stay",
   hoverPreviews: true,
   listInsetTop: false,
   listInsetBottom: true,
@@ -172,6 +178,12 @@ export function listMinWidth(settings: WysiwygSettings): number {
 
 const KNOWN = new Set<string>(Object.keys(DEFAULT_SETTINGS));
 
+/** Settings that are one of a few words: anything else in the file falls back to the default. */
+const CHOICES: Partial<Record<keyof WysiwygSettings, readonly string[]>> = {
+  boardDoneCards: ["done", "bottom", "stay"],
+  noteDoneTasks: ["bottom", "stay"],
+};
+
 /** Settings that no longer exist: `sidebar` (the sidebar is always on),
  * `showNoteButton` (the Note button shows whenever the action row does),
  * and the menu commands', which moved to Plainsight Menu Commands and were
@@ -194,6 +206,7 @@ export function parseSettings(raw: unknown): { settings: WysiwygSettings; extra:
       const name = key as keyof WysiwygSettings;
       // A list is checked item by item; everything else by its type.
       if (name === "savedSearches") settings.savedSearches = parseSavedSearches(value);
+      else if (CHOICES[name] && !CHOICES[name]!.includes(value as string)) continue;
       else if (typeof value === typeof DEFAULT_SETTINGS[name]) (settings as Record<string, unknown>)[name] = value;
     } else if (!LEGACY_VIEW_KEYS.includes(key) && !RETIRED.includes(key)) {
       extra[key] = value;

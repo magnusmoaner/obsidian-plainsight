@@ -20,6 +20,8 @@ describe("parseSettings", () => {
       boardListMinWidth: 260,
       showBoardsRow: false,
       boardCardsInTasks: true,
+      boardDoneCards: "done",
+      noteDoneTasks: "bottom",
       hoverPreviews: false,
       listInsetTop: true,
       listInsetBottom: false,
@@ -40,7 +42,7 @@ describe("parseSettings", () => {
   });
 
   test("a value of the wrong type falls back to its default", () => {
-    const { settings } = parseSettings({ enabled: "yes", boardCardsInTasks: 0, defaultTaskNote: 42 });
+    const { settings } = parseSettings({ enabled: "yes", boardCardsInTasks: 0, defaultTaskNote: 42, boardDoneCards: "sideways", noteDoneTasks: true });
     expect(settings).toEqual(DEFAULT_SETTINGS);
   });
 

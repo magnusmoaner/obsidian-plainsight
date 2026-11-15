@@ -114,6 +114,19 @@ export class WysiwygSettingTab extends PluginSettingTab {
           });
         })
     );
+    if (settings.tasks) tasks((setting) =>
+      setting
+        .setName("Ticked tasks")
+        .setDesc("Where a task goes when you tick it in a note. Moved, it goes below the other tasks in its list, with its subtasks; a task on its own stays.")
+        .addDropdown((dropdown) =>
+          dropdown
+            .addOptions({ stay: "Don't move", bottom: "Move to the bottom of its list" })
+            .setValue(settings.noteDoneTasks)
+            .onChange(async (value) => {
+              await this.plugin.updateSettings({ noteDoneTasks: value as "bottom" | "stay" });
+            })
+        )
+    );
     if (settings.tasks && settings.boards) {
       this.toggle(
         tasks,
@@ -147,6 +160,23 @@ export class WysiwygSettingTab extends PluginSettingTab {
         "Task List Kanban boards",
         "Shown as boards. They gather tasks from other notes, so they have no lists or cards to show or embed. " +
           "Off: listed like any other note."
+      );
+      boards((setting) =>
+        setting
+          .setName("Ticked cards")
+          .setDesc("Where a card goes when you tick it on a board. The done list is the one set to “Cards here are done”.")
+          .addDropdown((dropdown) =>
+            dropdown
+              .addOptions({
+                stay: "Don't move",
+                bottom: "Move to the bottom of its list",
+                done: "Move to the done list, or else to the bottom",
+              })
+              .setValue(settings.boardDoneCards)
+              .onChange(async (value) => {
+                await this.plugin.updateSettings({ boardDoneCards: value as "done" | "bottom" | "stay" });
+              })
+          )
       );
       // From the templates folder, when the Templates core plugin has one; else any note.
       const folder = templateOptions(this.app).folder;
