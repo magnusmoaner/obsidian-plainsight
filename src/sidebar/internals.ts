@@ -1,4 +1,4 @@
-import { App, HoverPopover, normalizePath, TAbstractFile, TFile, TFolder } from "obsidian";
+import { App, HoverPopover, Menu, MenuItem, normalizePath, TAbstractFile, TFile, TFolder } from "obsidian";
 
 /**
  * Undocumented Obsidian and plugin APIs, isolated so they're easy to audit.
@@ -433,4 +433,13 @@ export function onFilesDropped(
     if (!over) drop(files);
     return { action, dropEffect: "move", hoverEl: el, hoverClass: "is-drop-target" };
   });
+}
+
+/**
+ * Obsidian's own "Edit link" item in an editor's right-click menu, found by
+ * its section and icon (its title is translated). Null if it isn't there.
+ */
+export function editLinkItem(menu: Menu): MenuItem | null {
+  const items = (menu as unknown as { items?: Array<MenuItem & { section?: string; iconEl?: HTMLElement }> }).items ?? [];
+  return items.find((i) => i.section === "selection" && i.iconEl?.querySelector(".lucide-text-cursor-input")) ?? null;
 }

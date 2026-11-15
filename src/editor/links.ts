@@ -11,10 +11,9 @@ export interface LinkInfo {
   from: number;
   to: number;
   /**
-   * Text the user wrote (a markdown link's text, a wikilink's alias): shown
-   * and editable in place. Null when the visible text is derived from the
-   * target (unaliased wikilink, bare URL) — that is shown by a widget and is
-   * atomic, since typing over it would change where the link points.
+   * Text the user wrote (a markdown link's text, a wikilink's alias or else
+   * its target): shown and editable in place. Null for a bare URL, whose
+   * shortened form is shown by a widget and is atomic.
    */
   text: TextSpan | null;
   /** What a widget shows when `text` is null. */
@@ -69,21 +68,25 @@ function markdownLink(state: EditorState, node: SyntaxNode): LinkInfo | null {
 function wikiLink(state: EditorState, node: SyntaxNode): LinkInfo {
   const w = readWiki(node, state.doc);
   const aliased = w.alias !== null && w.alias.trim() !== "";
+  // Unaliased, the target itself is the text: editable, so the caret can go
+  // in and Obsidian's "Edit link" (a selection over it) shows.
+  const marks = node.getChildren("WikiMark");
+  const text = aliased
+    ? { from: w.aliasFrom, to: w.aliasTo }
+    : { from: marks[0].to, to: node.getChild("WikiAliasMark")?.from ?? marks[marks.length - 1].from };
   return {
     kind: "wiki",
     from: node.from,
     to: node.to,
-    text: aliased ? { from: w.aliasFrom, to: w.aliasTo } : null,
+    text,
     display: w.display,
     target: w.linktext,
     external: false,
     evernote: false,
-    hidden: aliased
-      ? [
-          { from: node.from, to: w.aliasFrom },
-          { from: w.aliasTo, to: node.to },
-        ]
-      : [],
+    hidden: [
+      { from: node.from, to: text.from },
+      { from: text.to, to: node.to },
+    ],
   };
 }
 
@@ -151,4 +154,16 @@ export function enclosingLink(state: EditorState, pos: number): LinkInfo | null 
     }
   }
   return null;
+}
+
+/**
+ * The link rewritten to point at `target` and show `text`. A wikilink whose
+ * text is just its target (or empty) gets no alias; a bare URL given text
+ * becomes a markdown link.
+ * shortcut: a wikilink in a table cell loses its "\|" escape, handle it if links in tables get edited.
+ */
+export function rewriteLink(kind: LinkKind, target: string, text: string): string {
+  if (kind === "wiki") return text && text !== target ? `[[${target}|${text}]]` : `[[${target}]]`;
+  if (kind === "url" && !text) return target;
+  return `[${text || target}](${target})`;
 }

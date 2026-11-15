@@ -461,6 +461,11 @@
   font-size: var(--font-ui-small);
   margin-top: calc(-1 * var(--size-4-2));
 }
+.ps-dialog-label {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  margin-bottom: calc(-1 * var(--size-4-1));
+}
 .ps-dialog .ps-dialog-input {
   width: 100%;
   height: 40px;

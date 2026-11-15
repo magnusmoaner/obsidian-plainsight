@@ -199,10 +199,14 @@ describe("buildDecorations on links", () => {
     expect(ranges(decorations)).toContainEqual([5, 9, "cm-wys-link is-external"]);
   });
 
-  test("unaliased wikilink: one atomic widget over the whole link", () => {
+  test("unaliased wikilink: brackets hidden, the name stays editable text", () => {
     const s = mkState("a [[Note]] b");
-    const { hidden } = buildDecorations(s, 0, s.doc.length);
-    expect(ranges(hidden)).toEqual([[2, 10, "replace"]]);
+    const { hidden, decorations } = buildDecorations(s, 0, s.doc.length);
+    expect(ranges(hidden)).toEqual([
+      [2, 4, "replace"],
+      [8, 10, "replace"],
+    ]);
+    expect(ranges(decorations)).toContainEqual([4, 8, "cm-wys-link"]);
   });
 
   test("bold inside link text still renders", () => {

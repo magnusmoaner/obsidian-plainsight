@@ -602,3 +602,43 @@ export class RenameModal extends Modal {
   }
 }
 
+
+/**
+ * Edit a link in the note: where it points and the text it shows. For a
+ * wikilink, "Link to" suggests notes as you type.
+ */
+export class LinkModal extends Modal {
+  constructor(
+    app: App,
+    private link: { wiki: boolean; target: string; text: string; sourcePath: string },
+    private onSubmit: (target: string, text: string) => void
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    let { target, text } = this.link;
+    const submit = () => {
+      if (!target.trim()) return void d.error.setText("Enter where the link goes.");
+      this.close();
+      this.onSubmit(target.trim(), text.trim());
+    };
+    const d = dialog(this, "Edit link", "Save", submit);
+    d.body.createDiv({ cls: "ps-dialog-label", text: "Link to" });
+    const to = dialogInput(d, { placeholder: this.link.wiki ? "Note" : "URL", value: target, select: true }, (v) => (target = v), submit);
+    if (this.link.wiki) {
+      new NoteSuggest(this.app, to, (file) => {
+        target = this.app.metadataCache.fileToLinktext(file, this.link.sourcePath);
+        to.value = target;
+      }, () => true);
+    }
+    d.body.createDiv({ cls: "ps-dialog-label", text: "Text" });
+    dialogInput(d, { placeholder: "Text", value: text }, (v) => (text = v), submit);
+    // Both inputs take focus on open; "Link to" is the one that should keep it.
+    window.setTimeout(() => to.select(), 0);
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
