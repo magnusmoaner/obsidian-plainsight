@@ -65,11 +65,15 @@ const WIP = /^(.*?)\s*\((\d+)\)$/;
 const INDENT = "    ";
 const SETTINGS = /^%%\s*kanban:settings/;
 /**
- * Where lists that mark their cards in progress or cancelled are kept: by
- * list name, in the Kanban settings block. Kanban keeps keys it doesn't
- * know there, while it drops any marker line but its own "**Complete**".
+ * The status a list gives its cards, by list name, in the Kanban settings
+ * block (Kanban keeps keys it doesn't know there). A Plainsight board keeps
+ * every status here; a Kanban plugin board keeps "done" as Kanban's own
+ * "**Complete**" line instead, which is still read on any board.
  */
 const STATUS_KEY = "plainsight-list-status";
+
+/** Plainsight's own board, not a Kanban plugin one: by its mark in the properties. */
+const ownBoard = (lines: string[]) => lines[0] === "---" && lines.slice(1, lines.indexOf("---", 1)).some((l) => /^plainsight-plugin\s*:/.test(l));
 
 /** The settings block's JSON line and what it holds; null if there's no (readable) block. */
 function readSettings(lines: string[]): { line: number; data: Record<string, unknown> } | null {
@@ -98,7 +102,7 @@ function readNamed(lines: string[], key: string, valid: (value: string) => boole
   return out;
 }
 
-const readStatuses = (lines: string[]) => readNamed(lines, STATUS_KEY, (v) => v === "/" || v === "-");
+const readStatuses = (lines: string[]) => readNamed(lines, STATUS_KEY, (v) => v === "x" || v === "/" || v === "-");
 /** Each coloured list's colour, by list name, for a board's text. */
 export const listColours = (text: string) => readColours(text.split(/\r?\n/));
 const readColours = (lines: string[]) => readNamed(lines, COLOUR_KEY, (v) => (LIST_COLOURS as readonly string[]).includes(v));
@@ -201,7 +205,7 @@ export function parseBoard(text: string): Board {
   const colours = readColours(lines);
   const collapsed = readSettings(lines)?.data[COLLAPSE_KEY];
   lanes.forEach((lane, i) => {
-    lane.status = lane.marker !== null ? "x" : statuses[lane.title] ?? null;
+    lane.status = statuses[lane.title] ?? (lane.marker !== null ? "x" : null);
     lane.colour = colours[lane.title] ?? null;
     lane.collapsed = Array.isArray(collapsed) && collapsed[i] === true;
   });
@@ -445,18 +449,20 @@ export function setLaneColour(text: string, ref: LaneRef, colour: string | null)
 }
 
 /**
- * The status cards take when they land in the list: "x" done (Kanban's own
- * "**Complete**" line), "/" in progress, "-" cancelled, or null for none.
- * Cards already in the list keep the status they have.
+ * The status cards take when they land in the list: "x" done, "/" in
+ * progress, "-" cancelled, or null for none. Cards already in the list keep
+ * the status they have. On a Kanban plugin board, done is Kanban's own
+ * "**Complete**" line; a Plainsight board loses that line for the key.
  */
 export function setLaneStatus(text: string, ref: LaneRef, status: string | null): string {
   return edit(text, (lines, board) => {
     const lane = findLane(lines, board, ref);
     const statuses = readStatuses(lines);
-    if (status === "/" || status === "-") statuses[lane.title] = status;
+    const complete = status === "x" && !ownBoard(lines);
+    if (status && !complete) statuses[lane.title] = status;
     else delete statuses[lane.title];
-    if (lane.marker !== null && status !== "x") lines.splice(lane.marker, 1);
-    if (lane.marker === null && status === "x") {
+    if (lane.marker !== null && !complete) lines.splice(lane.marker, 1);
+    if (lane.marker === null && complete) {
       let at = lane.line + 1;
       if (at < lane.end && !lines[at].trim()) at++;
       else lines.splice(at++, 0, "");
@@ -529,9 +535,10 @@ export function isBoardFrontmatter(frontmatter: Record<string, unknown> | undefi
 }
 
 /**
- * A new Plainsight board: Inbox, Doing and Done. Inbox is left the plain
- * grey of a list without a colour; Doing is blue and Done green. "Done"
- * marks its cards complete.
+ * A new Plainsight board: Inbox, Doing, Done and Abandoned. Inbox is left
+ * the plain grey of a list without a colour; Doing is blue and puts its
+ * cards in progress, Done is green and completes them, Abandoned is purple
+ * and cancels them.
  */
 export const NEW_BOARD = [
   "---",
@@ -548,12 +555,19 @@ export const NEW_BOARD = [
   "",
   "## Done",
   "",
-  "**Complete**",
+  "",
+  "",
+  "## Abandoned",
+  "",
   "",
   "",
   "%% kanban:settings",
   "```",
-  JSON.stringify({ "kanban-plugin": "board", [COLOUR_KEY]: { Doing: "blue", Done: "green" } }),
+  JSON.stringify({
+    "kanban-plugin": "board",
+    [STATUS_KEY]: { Doing: "/", Done: "x", Abandoned: "-" },
+    [COLOUR_KEY]: { Doing: "blue", Done: "green", Abandoned: "purple" },
+  }),
   "```",
   "%%",
 ].join("\n");
