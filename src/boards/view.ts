@@ -6,6 +6,7 @@ import { dragCopy, draggedTask, moveTaskOut, setDraggedTask } from "../drag";
 import { taskAsCard } from "../sidebar/core/task-move";
 import { matchTaskLine } from "../sidebar/core/tasks";
 import { dragAction, startBoardDrag, tasksToggle } from "../sidebar/internals";
+import { CodeModal } from "../sidebar/modals";
 import { CardEditor, openCardEditor } from "./card-editor";
 import { boardPages } from "./page";
 import {
@@ -110,7 +111,9 @@ export class BoardView extends MarkdownRenderChild {
     /** Open a board on its own page, or a note. */
     private open: (file: TFile, newLeaf: PaneType | boolean) => void,
     /** Given on the board's own page: it shows the board's description, tags and where it's embedded. */
-    private host?: BoardHost
+    private host?: BoardHost,
+    /** Given in a note: show the embed block's own text. */
+    private embedCode?: () => void
   ) {
     super(containerEl);
   }
@@ -235,6 +238,24 @@ export class BoardView extends MarkdownRenderChild {
         this.open(file, Keymap.isModEvent(evt));
       });
       head.createSpan({ cls: "psb-count", text: cards });
+      if (this.embedCode) {
+        const embed = head.createEl("button", { cls: "psb-code", attr: { "aria-label": "Embed code" } });
+        setIcon(embed, "code");
+        embed.addEventListener("click", () => this.embedCode?.());
+      }
+      head
+        .createEl("button", { cls: "psb-code mod-cta", text: "Markdown", attr: { "aria-label": "Board markdown" } })
+        .addEventListener("click", () => {
+          const original = this.lines.join("\n");
+          new CodeModal(this.app, file.basename, original, async (next) => {
+            // Refuse if the board changed since the modal opened, rather than overwrite it.
+            const saved = await this.write((t) => {
+              if (t.split(/\r?\n/).join("\n") !== original) throw new StaleBoardError();
+              return next;
+            });
+            if (!saved) throw new Error("the board changed while this was open");
+          }).open();
+        });
     }
 
     const lanesEl = this.containerEl.createDiv("psb-lanes");

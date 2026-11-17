@@ -603,6 +603,43 @@ export class RenameModal extends Modal {
 }
 
 
+/** Text to read, copy or change by hand: an embed block, a board's markdown. */
+export class CodeModal extends Modal {
+  constructor(
+    app: App,
+    private title: string,
+    private text: string,
+    private onSave: (text: string) => Promise<void>
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    const d = dialog(this, this.title, "Save", () => {
+      this.onSave(input.value).then(
+        () => this.close(),
+        (err: Error) => d.error.setText(`Couldn't save: ${err.message}`)
+      );
+    });
+    this.modalEl.addClass("ps-code-dialog");
+    const input = d.body.createEl("textarea", { cls: "ps-code-input", attr: { spellcheck: "false" } });
+    input.value = this.text;
+    const copy = createEl("button", { text: "Copy" });
+    copy.addEventListener("click", () => {
+      navigator.clipboard.writeText(input.value).then(
+        () => new Notice("Copied"),
+        () => new Notice("Couldn't copy")
+      );
+    });
+    d.cta.parentElement!.prepend(copy);
+    window.setTimeout(() => input.focus(), 0);
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
 /**
  * Edit a link in the note: where it points and the text it shows. For a
  * wikilink, "Link to" suggests notes as you type.

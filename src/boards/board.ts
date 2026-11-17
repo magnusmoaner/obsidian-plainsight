@@ -507,6 +507,19 @@ export function appendEmbed(text: string, link: string): string {
   return body ? `${body}\n\n${embedBlock(link)}` : embedBlock(link);
 }
 
+/**
+ * A note's text with the code block on lines `lineStart`–`lineEnd` (its
+ * fences) holding `next` instead of `old`. Throws if the block no longer holds `old`.
+ */
+export function replaceBlock(text: string, at: { lineStart: number; lineEnd: number }, old: string, next: string): string {
+  const eol = text.includes("\r\n") ? "\r\n" : "\n";
+  const lines = text.split(/\r?\n/);
+  const trim = (s: string) => s.replace(/\r?\n$/, "");
+  if (lines.slice(at.lineStart + 1, at.lineEnd).join("\n") !== trim(old).replace(/\r\n/g, "\n")) throw new StaleBoardError("the block changed in the note");
+  lines.splice(at.lineStart + 1, at.lineEnd - at.lineStart - 1, ...trim(next).split(/\r?\n/));
+  return lines.join(eol);
+}
+
 const EMBED = /^```(?:plainsight-board|kanban-embed)[^\n]*\n[\s\S]*?^```/gm;
 
 /**
