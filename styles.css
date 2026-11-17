@@ -1459,7 +1459,7 @@
 }
 .psb-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   margin-bottom: 8px;
 }
@@ -1476,6 +1476,32 @@
   flex: 0 0 auto;
   margin-left: auto;
   color: var(--text-muted);
+}
+/* An embedded board's code buttons, as the Mermaid plugins have them. */
+.psb-code {
+  flex: 0 0 auto;
+  height: 26px;
+  padding: 0 10px;
+  font-size: var(--font-ui-small);
+}
+.psb-code svg {
+  width: 16px;
+  height: 16px;
+}
+/* Our </> replaces Obsidian's hover one, which would sit on top of these. */
+.cm-embed-block:has(> .psb-board .psb-code) > .embed-actions {
+  display: none;
+}
+/* The code window: wide, with a monospace box to read and change. */
+.ps-dialog.ps-code-dialog {
+  width: min(720px, calc(100vw - 32px));
+}
+.ps-code-input {
+  width: 100%;
+  min-height: 320px;
+  resize: vertical;
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-small);
 }
 .psb-lanes {
   display: flex;

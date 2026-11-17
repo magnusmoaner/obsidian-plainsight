@@ -17,6 +17,7 @@ import {
   NEW_BOARD,
   parseBoard,
   renameLane,
+  replaceBlock,
   retargetEmbeds,
   setCardStatus,
   setLaneCollapsed,
@@ -494,5 +495,27 @@ describe("settleDoneCard", () => {
     expect(out).toContain("## To do\n\n- [ ] Paint 🔁 every week\n- [ ] Gate\n- [ ] Hinges\n- [x] Paint 🔁 every week\n");
     expect(settleDoneCard(BOARD2, 0, 0, "stay")).toBe(BOARD2);
     expect(settleDoneCard(BOARD2, 0, 1, "bottom")).toBe(BOARD2);
+  });
+});
+
+describe("replaceBlock", () => {
+  const note = "Intro\n\n```plainsight-board\nboard: [[Plans]]\n```\n\nAfter";
+  const at = { lineStart: 2, lineEnd: 4 };
+
+  test("swaps the lines between the fences", () => {
+    expect(replaceBlock(note, at, "board: [[Plans]]\n", "board: [[Trips]]")).toBe(
+      "Intro\n\n```plainsight-board\nboard: [[Trips]]\n```\n\nAfter"
+    );
+  });
+
+  test("keeps Windows line endings", () => {
+    const crlf = note.replace(/\n/g, "\r\n");
+    expect(replaceBlock(crlf, at, "board: [[Plans]]", "board: [[Trips]]")).toBe(
+      "Intro\r\n\r\n```plainsight-board\r\nboard: [[Trips]]\r\n```\r\n\r\nAfter"
+    );
+  });
+
+  test("refuses when the block changed", () => {
+    expect(() => replaceBlock(note, at, "board: [[Other]]", "board: [[Trips]]")).toThrow(StaleBoardError);
   });
 });

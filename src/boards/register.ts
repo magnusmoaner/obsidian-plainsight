@@ -2,8 +2,8 @@ import { App, Editor, MarkdownPostProcessorContext, Notice, Plugin, TFile } from
 import { addTagToNote, createBoard, openFile } from "../sidebar/actions";
 import { addListItem } from "../sidebar/core/edits";
 import { NoteIndex } from "../sidebar/core/note-index";
-import { NotePickerModal, TagModal } from "../sidebar/modals";
-import { appendEmbed, embedBlock, embedTarget, isBoardFrontmatter, retargetEmbeds } from "./board";
+import { CodeModal, NotePickerModal, TagModal } from "../sidebar/modals";
+import { appendEmbed, embedBlock, embedTarget, isBoardFrontmatter, replaceBlock, retargetEmbeds } from "./board";
 import { BOARD_VIEW, BoardPage, keptAsMarkdown, openBoardPage, ownsBoard } from "./page";
 import { BoardHost, BoardView } from "./view";
 
@@ -66,7 +66,19 @@ export function registerBoards(plugin: Plugin, boardsOn: () => boolean, template
     const target = embedTarget(source);
     if (!boardsOn()) el.createEl("pre", { text: source });
     else if (!target) el.createDiv({ cls: "psb-missing", text: "Name the board to show, like this: board: [[Board name]]" });
-    else ctx.addChild(new BoardView(app, el, target, ctx.sourcePath, open));
+    else ctx.addChild(new BoardView(app, el, target, ctx.sourcePath, open, undefined, embedCode(source, el, ctx)));
+  };
+  // The embed block's text, saved back over the block in the note.
+  const embedCode = (source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => {
+    const note = app.vault.getAbstractFileByPath(ctx.sourcePath);
+    if (!(note instanceof TFile)) return undefined;
+    return () =>
+      new CodeModal(app, "Embed code", source, async (next) => {
+        // Read now: lines above the block may have changed since it was drawn.
+        const at = ctx.getSectionInfo(el);
+        if (!at) throw new Error("the block is no longer in the note");
+        await app.vault.process(note, (t) => replaceBlock(t, at, source, next));
+      }).open();
   };
   plugin.registerMarkdownCodeBlockProcessor("plainsight-board", draw);
   // Kanban Embed draws its own blocks while it's on; a second processor for
