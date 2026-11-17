@@ -119,13 +119,15 @@ describe("parseBoard", () => {
     expect(parseBoard(PLAIN).lanes[2].marker).not.toBeNull();
   });
 
-  test("a new board has Inbox, Doing and Done, coloured, and Done completes its cards", () => {
+  test("a new board has Inbox, Doing, Done and Abandoned, coloured, each giving its cards a status", () => {
     const lanes = parseBoard(NEW_BOARD).lanes;
     expect(lanes.map((l) => [l.title, l.colour, l.status, l.cards.length])).toEqual([
       ["Inbox", null, null, 0],
-      ["Doing", "blue", null, 0],
+      ["Doing", "blue", "/", 0],
       ["Done", "green", "x", 0],
+      ["Abandoned", "purple", "-", 0],
     ]);
+    expect(NEW_BOARD).not.toContain("**Complete**");
   });
 
   test("a new board takes cards and lists like any other, keeping its colours", () => {
@@ -133,7 +135,7 @@ describe("parseBoard", () => {
     expect(card).toContain("## Inbox\n\n- [ ] Buy paint\n");
     expect(shape(addCard(NEW_BOARD, laneRef(NEW_BOARD, 2), "Old job"))[2]).toEqual(["Done", "[x] Old job"]);
     const more = addLane(card, "Later");
-    expect(parseBoard(more).lanes.map((l) => `${l.title}:${l.colour}`)).toEqual(["Inbox:null", "Doing:blue", "Done:green", "Later:null"]);
+    expect(parseBoard(more).lanes.map((l) => `${l.title}:${l.colour}`)).toEqual(["Inbox:null", "Doing:blue", "Done:green", "Abandoned:purple", "Later:null"]);
   });
 });
 
@@ -267,8 +269,14 @@ describe("statuses", () => {
   });
 
   test("a list's done status is Kanban's Complete line; other statuses go in the settings block", () => {
+    // A Plainsight board keeps done in the key; a Kanban board as its "**Complete**" line.
     const done = setLaneStatus(PLAIN, laneRef(PLAIN, 0), "x");
-    expect(done).toContain("## To do\n\n**Complete**\n");
+    expect(done).toContain('"plainsight-list-status":{"To do":"x"}');
+    expect(done.match(/\*\*Complete\*\*/g)).toHaveLength(1);
+    expect(parseBoard(done).lanes[0].status).toBe("x");
+    const kanbanDone = setLaneStatus(BOARD, laneRef(BOARD, 0), "x");
+    expect(kanbanDone).toContain("## To do (3)\n\n**Complete**\n");
+    expect(kanbanDone).not.toContain("plainsight-list-status");
     const doing = setLaneStatus(BOARD, laneRef(BOARD, 0), "/");
     expect(doing).toContain('{"kanban-plugin":"board","plainsight-list-status":{"To do":"/"}}');
     expect(parseBoard(doing).lanes.map((l) => l.status)).toEqual(["/", "x"]);
@@ -278,6 +286,12 @@ describe("statuses", () => {
     const out = setLaneStatus(PLAIN, laneRef(PLAIN, 1), "-");
     expect(out.endsWith('%% kanban:settings\n```\n{"kanban-plugin":"board","plainsight-list-status":{"Doing":"-"}}\n```\n%%')).toBe(true);
     expect(parseBoard(out).lanes.map((l) => l.status)).toEqual([null, "-", "x"]);
+  });
+
+  test("a Plainsight board's old Complete line goes when its list's status changes", () => {
+    const doing = setLaneStatus(PLAIN, laneRef(PLAIN, 2), "/");
+    expect(doing).not.toContain("**Complete**");
+    expect(parseBoard(doing).lanes[2].status).toBe("/");
   });
 
   test("clearing a status removes the Complete line and the stored entry", () => {

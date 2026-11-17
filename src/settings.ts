@@ -187,7 +187,7 @@ export class WysiwygSettingTab extends PluginSettingTab {
           .setName("Template for new boards")
           .setDesc(
             `A board or note${folder ? ` in your templates folder (“${folder}”)` : ""} that every new Plainsight board starts as a copy of: ` +
-              "its lists, their colours and any cards. Leave empty for the default lists: Inbox, Doing and Done."
+              "its lists, their colours and any cards. Leave empty for the default lists: Inbox, Doing, Done and Abandoned."
           )
           .addText((text) => {
             text.setPlaceholder(`e.g. ${folder ?? "Templates"}/Board.md`).setValue(settings.boardTemplate);

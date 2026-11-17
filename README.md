@@ -135,7 +135,7 @@ In a list of notes, a task query keeps the notes that have a matching task.
 
 A board is a set of lists holding cards, for a project, a trip or a week. Plainsight has its own, and they live where your notes do.
 
-- **A new board** starts with three lists: Inbox, Doing (blue) and Done (green), with Done marking its cards done. To start from your own lists instead, set up a board the way you like it and name it under **Template for new boards** in the settings: every new board is then a copy of it, lists, colours, cards and all. `{{title}}`, `{{date}}` and `{{time}}` in it are filled in as in any template.
+- **A new board** starts with four lists: Inbox, Doing (blue), Done (green) and Abandoned (purple). A card that lands in Doing is in progress, in Done it's done, and in Abandoned it's cancelled. To start from your own lists instead, set up a board the way you like it and name it under **Template for new boards** in the settings: every new board is then a copy of it, lists, colours, cards and all. `{{title}}`, `{{date}}` and `{{time}}` in it are filled in as in any template.
 - **On a page of its own, or inside a note.** A board opens as a board from the sidebar, the file explorer or a link. To put one inside a note, run **Insert new board** (it makes `<note name> board` next to the note and embeds it) or **Embed existing board**, or drag the board's card from the sidebar into the note: it's embedded on the line you drop it on. An embedded board is worked on in place, without leaving the note.
 - **Cards.** Add, edit, tick, drag and delete them. A dragged card hangs from the pointer, with a line beside it naming the list a drop would put it in, and leaves an empty slot where it would land. It can also be dragged off its board: into the note around an embedded board, where it becomes a task, or onto a list of another board that's open. A card is edited in Obsidian's own editor, so links and tags complete as you type, and with the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) plugin its suggestions for dates, priority and recurrence come up too. Those details, and tags at the start or end of the card, show as badges along the bottom of the card. Task lines indented under a card are its subtasks: each shows as a small box under the card's text, with its own circle to tick, and one under another steps in.
 - **Statuses.** A card is open `[ ]`, in progress `[/]`, done `[x]` or cancelled `[-]`, set from its menu. Ticking a card goes through the Tasks plugin when it's installed, so the card gets its done date and a repeating card leaves its next round behind.
@@ -156,8 +156,13 @@ plainsight-plugin: board
 
 ## Done
 
-**Complete**
 - [x] Choose the worktop ✅ 2026-11-06
+
+%% kanban:settings
+```
+{"kanban-plugin":"board","plainsight-list-status":{"Done":"x"}}
+```
+%%
 ```
 
 **The embed** is a code block naming the board. A board embedded with one of the two commands lists that note in turn, in an `embedded-in` property, so when the board is renamed the block follows. (A block you type yourself works too; it just isn't followed on a rename.)
@@ -170,7 +175,7 @@ board: [[Kitchen renovation board]]
 
 Good to know:
 
-- **Kanban plugin boards** can be embedded and edited the same way. Without that plugin, Plainsight opens them on its own board page. A list's done status and its minimized state are stored the way the Kanban plugin stores them, so both agree; in-progress and cancelled lists are Plainsight's own and are kept in the board's settings block, which Kanban leaves alone. List colours are kept there too, and are for Plainsight boards only: a Kanban plugin board shows none.
+- **Kanban plugin boards** can be embedded and edited the same way. Without that plugin, Plainsight opens them on its own board page. On those boards a list's done status (a `**Complete**` line under its heading) and its minimized state are stored the way the Kanban plugin stores them, so both agree; in-progress and cancelled lists are Plainsight's own and are kept in the board's settings block, which Kanban leaves alone. A Plainsight board keeps every list status in that block, done too, and still reads a `**Complete**` line from older boards. List colours are kept there too, and are for Plainsight boards only: a Kanban plugin board shows none.
 - **`kanban-embed` blocks**, from the Kanban Embed plugin, are drawn too while that plugin is off (reload Plainsight after switching it).
 - **Open as Markdown**, a button on the board page, shows the note behind a board.
 - **With "Let Plainsight draw everything (Source mode)" on**, an embedded board shows as its code block for now.
