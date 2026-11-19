@@ -1510,6 +1510,19 @@
   overflow-x: auto;
   padding-bottom: 6px;
 }
+/* In a note, the lists break out of the text column to the pane's edges
+   (100cqw is the pane: Obsidian's tab container is a size container). The
+   first list still lines up with the text; the rest scroll into the margins. */
+/* Obsidian clips every widget (contain: paint !important, overflow hidden on hover). */
+.workspace-leaf-content .markdown-source-view.mod-cm6 .cm-content > .cm-embed-block:has(> .psb-board) {
+  contain: none !important;
+  overflow: visible !important;
+}
+.workspace-leaf-content :is(.cm-embed-block, .markdown-preview-sizer > div) > .psb-board > .psb-lanes {
+  --psb-bleed: max(0px, (100cqw - 100%) / 2);
+  margin-inline: calc(-1 * var(--psb-bleed));
+  padding-inline: var(--psb-bleed);
+}
 .psb-lane {
   /* Lists give a little before they scroll, so three fit the width of a note:
      from 240 wide down to the narrowest the settings allow. */
