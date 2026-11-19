@@ -1,11 +1,11 @@
 import { folderNameError, setTextProperty } from "../sidebar/core/edits";
 import { localISODate } from "../sidebar/core/format";
 import { cardTitle, taskDetails } from "../sidebar/core/task-details";
-import { badge, taskBadges } from "../sidebar/task-badges";
+import { BadgeEdits, badge, taskBadges } from "../sidebar/task-badges";
 import { dragCopy, draggedTask, moveTaskOut, setDraggedTask } from "../drag";
 import { taskAsCard } from "../sidebar/core/task-move";
 import { matchTaskLine } from "../sidebar/core/tasks";
-import { dragAction, startBoardDrag, tasksToggle } from "../sidebar/internals";
+import { dragAction, startBoardDrag, tasksEditLine, tasksToggle } from "../sidebar/internals";
 import { CodeModal } from "../sidebar/modals";
 import { CardEditor, openCardEditor } from "./card-editor";
 import { boardPages } from "./page";
@@ -480,8 +480,28 @@ export class BoardView extends MarkdownRenderChild {
     const foot = el.createDiv("psb-card-foot");
     if (date) badge(foot, "calendar", date, `Date ${date}`);
     if (time) badge(foot, "clock", time, `Time ${time}`);
-    taskBadges(foot, details, done || card.check === "-", localISODate());
+    taskBadges(foot, details, done || card.check === "-", localISODate(), {}, this.cardEdits(card.text, card.check, ref));
     if (!foot.childElementCount) foot.remove();
+  }
+
+  /** A card's badges change the first line of its text, as Edit does. */
+  private cardEdits(text: string, check: string | null, ref: CardRef): BadgeEdits {
+    const [first, ...rest] = text.split("\n");
+    const save = (line: string) => void this.write((t) => editCard(t, ref, [line, ...rest].join("\n")));
+    const inTasks = tasksEditLine(this.app);
+    return {
+      app: this.app,
+      change: (edit) => save(edit(first)),
+      status: check ?? " ",
+      setStatus: (status) => void this.write((t) => setCardStatus(t, ref, status, this.viaTasks)),
+      inTasks: inTasks
+        ? async () => {
+            // Tasks edits a whole task line; the card keeps its own checkbox.
+            const edited = matchTaskLine((await inTasks(`- [${check ?? " "}] ${first}`)).split("\n")[0]);
+            if (edited && edited.text !== first.trim()) save(edited.text);
+          }
+        : undefined,
+    };
   }
 
   /** After the last list, on the board's own page: a small outlined +. */
