@@ -12,6 +12,10 @@ import {
 } from "obsidian";
 import { CALLOUT_TYPES, calloutMenu } from "./editor/callout";
 import { linkOpener, linkResolver } from "./editor/link-facets";
+import { taskBadgeServices } from "./editor/tasks";
+import { localISODate } from "./sidebar/core/format";
+import { taskBadges } from "./sidebar/task-badges";
+import { registerReadingTasks } from "./reading-tasks";
 import { enclosingLink, LinkInfo, rewriteLink } from "./editor/links";
 import { enclosingCallout } from "./editor/syntax";
 import {
@@ -32,7 +36,7 @@ import { taskDrop } from "./sidebar/task-drop";
 import { sinkDoneTasks } from "./sidebar/done-tasks";
 import { Indexer } from "./sidebar/indexer";
 import { SIDEBAR_VIEW, SidebarView } from "./sidebar/view";
-import { editLinkItem, readBookmarks, removeBookmark } from "./sidebar/internals";
+import { editLinkItem, readBookmarks, removeBookmark, tasksEditLine } from "./sidebar/internals";
 import { LinkModal } from "./sidebar/modals";
 import { ViewStateStore } from "./sidebar/view-state-store";
 import {
@@ -176,6 +180,7 @@ export default class WysiwygPlugin extends Plugin {
         }),
     });
 
+    registerReadingTasks(this, () => this.settings.enabled);
     this.applyBoardPages();
     registerBoards(this, () => this.settings.boards, () => this.settings.boardTemplate, this.index);
     this.indexer = new Indexer(this.app, this.index, () => {
@@ -590,6 +595,10 @@ export default class WysiwygPlugin extends Plugin {
         linkOpener.of((view, link, split) =>
           this.openLink(view.state.field(editorInfoField, false)?.file?.path ?? "", link, split)
         ),
+        taskBadgeServices.of({
+          render: (el, details, closed, edits) => taskBadges(el, details, closed, localISODate(), {}, { ...edits, app: this.app }),
+          editLine: () => tasksEditLine(this.app),
+        }),
         // Bound as a key, not just a palette command: the palette blurs the
         // editor, and the blurred state is exactly what we must not measure.
         Prec.high(

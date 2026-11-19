@@ -64,7 +64,7 @@ import { cardTitle, taskDetails } from "./core/task-details";
 import { listChips, listGrouping, listSorts } from "../settings-data";
 import type { KindFilter } from "./core/view-state";
 import type { SavedSearch } from "../settings-data";
-import { taskBadges } from "./task-badges";
+import { BadgeEdits, taskBadges } from "./task-badges";
 import { PRIORITIES } from "./core/task-line";
 import { taskTextColumn } from "./core/tasks";
 import { holdsCards, inFolder, isClosed, NoteSummary, renamedPath, TaskItem } from "./core/types";
@@ -77,9 +77,12 @@ import {
   createCanvas,
   createNote,
   createTaskListBoard,
+  editTaskLine,
   openFile,
   toggleTask,
   togglePin,
+  withTaskStatus,
+  withTaskText,
 } from "./actions";
 import {
   canHoldTasks,
@@ -115,6 +118,7 @@ import {
   TASK_LIST_KANBAN_NEW_BOARD,
   tasksLineOptions,
   tasksCreateModal,
+  tasksEditLine,
   templateOptions,
 } from "./internals";
 
@@ -2851,6 +2855,18 @@ export class SidebarView extends ItemView implements HoverParent {
     return entries;
   }
 
+  /** A task row's badges change its line in the note; the index update redraws the row. */
+  private taskEdits(path: string, task: TaskItem): BadgeEdits {
+    const inTasks = tasksEditLine(this.app);
+    return {
+      app: this.app,
+      change: (edit) => void editTaskLine(this.app, path, task, (line) => withTaskText(line, edit)),
+      status: task.status,
+      setStatus: (status) => void editTaskLine(this.app, path, task, (line) => withTaskStatus(line, status)),
+      inTasks: inTasks ? () => void editTaskLine(this.app, path, task, inTasks) : undefined,
+    };
+  }
+
   private renderTaskRow(item: TaskRow, today: string): HTMLElement {
     const { note, task } = item;
     const row = this.bodyEl.createDiv("ps-task");
@@ -2892,7 +2908,7 @@ export class SidebarView extends ItemView implements HoverParent {
       setIcon(under.createSpan(), "corner-down-right");
       under.createSpan({ text: cardTitle(task.under) });
     }
-    taskBadges(meta, details, closed, today, { due: task.due, done: task.done });
+    taskBadges(meta, details, closed, today, { due: task.due, done: task.done }, this.taskEdits(note.path, task));
 
     row.addEventListener("click", (evt) => void this.openTask(note.path, task.line, evt));
     this.previewOnHover(row, note.path, task.line);

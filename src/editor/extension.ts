@@ -11,6 +11,7 @@ import { markdownTree } from "./parser";
 import { wysiwygKeymap } from "./edit-semantics";
 import { linkOpener } from "./link-facets";
 import { enclosingLink } from "./links";
+import { taskFieldExtensions, typingAt } from "./tasks";
 
 class WysiwygView {
   decorations: DecorationSet = Decoration.none;
@@ -23,7 +24,9 @@ class WysiwygView {
   update(update: ViewUpdate): void {
     // Never-reveal invariant: selection changes never affect rendering, so we
     // deliberately do NOT recompute on update.selectionSet.
-    if (update.docChanged || update.viewportChanged) this.compute(update.view);
+    // The one exception: a field just typed becomes a badge once the caret moves on.
+    const typingChanged = update.startState.field(typingAt, false) !== update.state.field(typingAt, false);
+    if (update.docChanged || update.viewportChanged || typingChanged) this.compute(update.view);
   }
 
   private compute(view: EditorView): void {
@@ -84,5 +87,5 @@ const linkClicks = Prec.highest(
 export function wysiwyg(): Extension {
   // Returned as a flat array: CM6 deduplicates the StateField/keymap when the
   // host app also adds markdownTree explicitly.
-  return [markdownTree, decorationPlugin, wysiwygKeymap, linkClicks];
+  return [markdownTree, ...taskFieldExtensions(), decorationPlugin, wysiwygKeymap, linkClicks];
 }

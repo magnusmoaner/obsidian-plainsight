@@ -2,6 +2,8 @@ import { EditorState, Range as RangeValue, RangeSet } from "@codemirror/state";
 import { Decoration, DecorationSet, WidgetType } from "@codemirror/view";
 import { CalloutIconWidget } from "./callout";
 import { linkResolver } from "./link-facets";
+import { taskFields } from "../sidebar/core/task-fields";
+import { TaskBadgesWidget, tasksIn, typingAt } from "./tasks";
 import { LinkInfo, linksIn } from "./links";
 import {
   InlineMarkType,
@@ -146,6 +148,17 @@ export function buildDecorations(
   for (const mark of inlineMarksIn(state, from, to)) {
     all.push(contentMark[mark.type].range(mark.from, mark.to));
     delims.push(...mark.delims);
+  }
+  // A task's Tasks fields: hidden, and shown as a badge row under its text.
+  const typing = state.field(typingAt, false) ?? null;
+  for (const task of tasksIn(state, from, to)) {
+    const text = state.doc.sliceString(task.from, task.to);
+    const cursor = typing !== null && typing >= task.from && typing <= task.to ? typing - task.from : -1;
+    const { hidden, details } = taskFields(text, cursor);
+    if (!hidden.length) continue;
+    for (const s of hidden) delims.push({ from: task.from + s.from, to: task.from + s.to });
+    const widget = new TaskBadgesWidget(`${task.status}\u0000${text}\u0000${cursor}`, details, task.status);
+    all.push(Decoration.widget({ widget, side: 1 }).range(task.to));
   }
   // `\[` shows as `[`: the backslash is hidden, like a delimiter.
   delims.push(...escapesIn(state, from, to));

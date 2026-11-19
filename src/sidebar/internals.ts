@@ -250,6 +250,16 @@ export function tasksToggle(app: App, line: string, path: string): string | null
   return api.executeToggleTaskDoneCommand(line, path);
 }
 
+/**
+ * Tasks' own Edit dialog for one task line, which resolves to the edited
+ * line (unchanged if cancelled). Null when Tasks or that API is missing.
+ */
+export function tasksEditLine(app: App): ((line: string) => Promise<string>) | null {
+  const api = tasksApi(app) as { editTaskLineModal?(line: string): Promise<string> } | undefined;
+  if (typeof api?.editTaskLineModal !== "function") return null;
+  return (line) => api.editTaskLineModal!(line);
+}
+
 /** Registered only while the Kanban plugin is enabled. */
 export const KANBAN_NEW_BOARD = "obsidian-kanban:create-new-kanban-board";
 /** Registered only while the Task List Kanban plugin is enabled. */

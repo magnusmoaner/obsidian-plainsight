@@ -3,7 +3,7 @@ import { applyTemplate } from "./core/format";
 import { addTag, appendLine, markAsBoard } from "./core/edits";
 import { setPinned } from "./core/pin";
 import { sinkDoneTask } from "./core/task-move";
-import { matchTaskLine, toggleTaskLine } from "./core/tasks";
+import { matchTaskLine, taskTextColumn, toggleTaskLine } from "./core/tasks";
 import { TaskItem } from "./core/types";
 import { NEW_BOARD } from "../boards/board";
 import { openBoardPage, ownsBoard } from "../boards/page";
@@ -58,6 +58,52 @@ export async function toggleTask(app: App, path: string, task: TaskItem, sink = 
   });
   if (stale) new Notice("That task moved or changed in its note, so nothing was ticked.");
   return written;
+}
+
+/**
+ * Rewrite the task on `task.line` with `edit` (the line in, its replacement
+ * out), only if that line is still the task we rendered, both before `edit`
+ * (which may wait on a dialog) and when writing. Returns whether it wrote.
+ */
+export async function editTaskLine(
+  app: App,
+  path: string,
+  task: Pick<TaskItem, "line" | "status" | "text">,
+  edit: (line: string) => string | Promise<string>
+): Promise<boolean> {
+  const file = app.vault.getAbstractFileByPath(path);
+  if (!(file instanceof TFile)) return false;
+  const stale = () => new Notice("That task moved or changed in its note, so nothing was changed.");
+  const line = (await app.vault.read(file)).split("\n")[task.line];
+  const current = line === undefined ? null : matchTaskLine(line);
+  if (!current || current.status !== task.status || current.text !== task.text) return void stale(), false;
+  const cr = line.endsWith("\r") ? "\r" : "";
+  const next = (await edit(line.slice(0, line.length - cr.length)))
+    .split("\n")
+    .map((l) => l + cr)
+    .join("\n");
+  if (next === line) return false;
+  let written = false;
+  await app.vault.process(file, (data) => {
+    const lines = data.split("\n");
+    if (lines[task.line] !== line) return data;
+    lines[task.line] = next;
+    written = true;
+    return lines.join("\n");
+  });
+  if (!written) stale();
+  return written;
+}
+
+/** A task line with its status character set to `status`. */
+export function withTaskStatus(line: string, status: string): string {
+  return line.replace(/^(\s*(?:[-*+]|\d+[.)])\s+\[).(\])/, `$1${status}$2`);
+}
+
+/** A task line with its text (what follows "- [ ] ") rewritten by `edit`. */
+export function withTaskText(line: string, edit: (text: string) => string): string {
+  const at = taskTextColumn(line);
+  return at ? line.slice(0, at) + edit(line.slice(at)) : line;
 }
 
 /** Flip `pinned: true` by editing that one frontmatter line (see setPinned). */

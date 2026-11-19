@@ -1176,6 +1176,81 @@
   padding-left: 0;
   color: var(--text-faint);
 }
+/* A badge that changes its field: a menu on click. */
+.ps-badge.is-clickable {
+  cursor: pointer;
+}
+.ps-badge.is-clickable:hover {
+  filter: brightness(0.94);
+  color: var(--text-normal);
+}
+.theme-dark .ps-badge.is-clickable:hover {
+  filter: brightness(1.25);
+}
+/* The + after a task's badges: a small dashed square, like the board's
+   "+ Tag", faint until the task is hovered. */
+.ps-badge.ps-badge-add {
+  background: transparent;
+  gap: 0;
+  padding: 0 3px;
+  border: 1px dashed var(--background-modifier-border-hover);
+  color: var(--text-muted);
+  opacity: 0;
+}
+.ps-badge.ps-badge-add.is-clickable:hover {
+  filter: none;
+  border-style: solid;
+  color: var(--text-normal);
+}
+:is(.ps-task, .psb-card, .cm-wys-task-badges, li.task-list-item):hover .ps-badge-add,
+.ps-badge-add:focus-visible {
+  opacity: 1;
+}
+/* A task's badges in a note: a row of their own under its text, lined up
+   with it (the line's hanging indent is undone). */
+/* inline-flex at full width: a row of its own, and out of reach of a done
+   task's strike-through, which doesn't carry into inline blocks. */
+.cm-wys-task-badges,
+.ps-task-badges {
+  display: inline-flex;
+  width: 100%;
+  vertical-align: top;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 2px 0 4px;
+  text-indent: 0;
+  font-size: var(--font-ui-smaller);
+  line-height: var(--line-height-tight);
+  text-decoration: none;
+  cursor: default;
+}
+.cm-wys-task-badges.is-empty,
+.ps-task-badges.is-empty {
+  display: none;
+}
+/* CodeMirror ends a line that ends in a widget with a <br>, which would add an
+   empty row under the badges. The caret never sits there (it stays before the fields). */
+.cm-line > .cm-wys-task-badges:not(.is-empty) ~ br {
+  display: none;
+}
+/* A done task's details: greyed, not struck through. */
+.cm-wys-task-badges.is-closed .ps-badge,
+.ps-task-badges.is-closed .ps-badge {
+  background: transparent;
+  padding-left: 0;
+  color: var(--text-faint);
+}
+/* The date picker a badge opens: an invisible input at the badge. */
+body > input.ps-badge-date {
+  position: fixed;
+  width: 1px;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
 
 /* Mobile: one column at a time */
 .ps-sidebar.is-mobile .ps-divider {
@@ -1810,8 +1885,9 @@
   gap: 4px;
   font-size: var(--font-ui-smaller);
 }
-.psb-card-foot .ps-badge-tag,
-.psb-tags .ps-badge-tag {
+/* Tag badges in Obsidian's tag colours, wherever they show: boards, the Tasks
+   page and notes. */
+.ps-badge.ps-badge-tag {
   background: var(--tag-background);
   color: var(--tag-color);
 }
