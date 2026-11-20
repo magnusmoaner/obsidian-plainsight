@@ -1,4 +1,5 @@
-import { EditorState, Extension } from "@codemirror/state";
+import { Annotation, EditorState, Extension } from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
 import { App, editorInfoField } from "obsidian";
 import { isBoardFrontmatter } from "../boards/board";
 import { sinkDoneTask } from "./core/task-move";
@@ -13,6 +14,29 @@ const isDoneTask = (line: string) => /^[xX]$/.test(matchTaskLine(line)?.status ?
  * moves its own cards.
  */
 export function sinkDoneTasks(app: App, on: () => boolean): Extension {
+  return [sink(app, on), syncCheckboxes];
+}
+
+/** On the change that moves a ticked task down. */
+const sunk = Annotation.define<boolean>();
+
+/*
+ * The checkbox that was clicked can be kept for the line that moves up into
+ * its place, and the Tasks plugin ticks the clicked one again 1 ms after the
+ * click. So once a task has moved, each checkbox is set from its line's
+ * status, after that.
+ */
+const syncCheckboxes = EditorView.updateListener.of((u) => {
+  if (!u.transactions.some((tr) => tr.annotation(sunk))) return;
+  const dom = u.view.contentDOM;
+  window.setTimeout(() => {
+    dom.querySelectorAll<HTMLInputElement>("input.task-list-item-checkbox").forEach((box) => {
+      box.checked = (box.dataset.task ?? " ") !== " ";
+    });
+  }, 20);
+});
+
+function sink(app: App, on: () => boolean): Extension {
   return EditorState.transactionFilter.of((tr) => {
     if (!tr.docChanged || !on() || tr.isUserEvent("undo") || tr.isUserEvent("redo")) return tr;
     const file = tr.startState.field(editorInfoField, false)?.file;
@@ -37,6 +61,6 @@ export function sinkDoneTasks(app: App, on: () => boolean): Extension {
     while (text[from] === next[from]) from++;
     let end = 0;
     while (end < text.length - from && text[text.length - 1 - end] === next[next.length - 1 - end]) end++;
-    return [tr, { changes: { from, to: text.length - end, insert: next.slice(from, next.length - end) }, sequential: true }];
+    return [tr, { changes: { from, to: text.length - end, insert: next.slice(from, next.length - end) }, sequential: true, annotations: sunk.of(true) }];
   });
 }
