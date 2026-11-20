@@ -11,6 +11,7 @@ import {
   TFile,
 } from "obsidian";
 import { isBoardFrontmatter } from "../boards/board";
+import { openDatePicker } from "./date-picker";
 import { folderNameError, normalizeTag } from "./core/edits";
 import { dueDateLabel } from "./core/format";
 import {
@@ -385,27 +386,15 @@ export class QuickTaskModal extends Modal {
         refocus();
       };
       const f = field(container, label, (evt) => {
+        const at = (evt.currentTarget as HTMLElement).getBoundingClientRect();
         const menu = new Menu();
         for (const p of duePresets(today)) {
           menu.addItem((i) => i.setTitle(p.label).setChecked(t[key] === p.date).onClick(() => set(p.date)));
         }
-        menu.addItem((i) =>
-          i.setTitle("Pick a date…").onClick(() => {
-            picker.value = t[key] ?? "";
-            try {
-              picker.showPicker();
-            } catch {
-              picker.addClass("is-shown");
-              picker.focus();
-            }
-          })
-        );
+        menu.addItem((i) => i.setTitle("Pick a date…").onClick(() => openDatePicker(this.app, at, t[key] ?? null, today, set, refocus)));
         if (t[key]) menu.addItem((i) => i.setTitle("None").onClick(() => set("")));
         showUnder(menu, evt);
       });
-      // Invisible; only opened through showPicker(), so kept out of the Tab order.
-      const picker = f.row.createEl("input", { type: "date", cls: "ps-dialog-date", attr: { tabindex: "-1" } });
-      picker.addEventListener("change", () => set(picker.value));
       f.set("None", false);
     };
 
