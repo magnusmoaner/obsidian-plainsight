@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTaskLine, duePresets } from "../../sidebar/core/task-line";
+import { addMonths, buildTaskLine, duePresets, monthGrid } from "../../sidebar/core/task-line";
 
 describe("buildTaskLine", () => {
   it("writes a plain open task", () => {
@@ -66,5 +66,25 @@ describe("duePresets", () => {
     ]);
     // From a Monday, next week is seven days on.
     expect(duePresets("2026-10-12")[2]).toEqual({ label: "Next week", date: "2026-10-19" });
+  });
+});
+
+describe("monthGrid", () => {
+  it("starts on the Monday on or before the 1st and runs six weeks", () => {
+    const days = monthGrid("2026-11-20"); // November 2026 starts on a Sunday
+    expect(days).toHaveLength(42);
+    expect(days[0]).toBe("2026-10-26");
+    expect(days[6]).toBe("2026-11-01");
+    expect(days[41]).toBe("2026-12-06");
+  });
+  it("starts on the 1st when it is a Monday", () => {
+    expect(monthGrid("2026-06-15")[0]).toBe("2026-06-01");
+  });
+});
+
+describe("addMonths", () => {
+  it("moves to the first of another month, across years", () => {
+    expect(addMonths("2026-11-20", 1)).toBe("2026-12-01");
+    expect(addMonths("2026-01-31", -1)).toBe("2025-12-01");
   });
 });

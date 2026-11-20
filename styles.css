@@ -517,23 +517,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Only shown if the browser can't open the date picker directly. Specific
-   enough to beat Obsidian's own input[type=date] padding and width, which
-   otherwise leave an invisible gap in the chip row. */
-.ps-dialog input.ps-dialog-date {
-  position: absolute;
-  width: 0;
-  height: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-.ps-dialog input.ps-dialog-date.is-shown {
-  position: static;
-  width: auto;
-  height: 28px;
-  opacity: 1;
-  pointer-events: auto;
-}
 /* Labelled fields: label on the left, a dropdown-styled button on the right. */
 .ps-dialog-fields {
   display: flex;
@@ -545,11 +528,6 @@
   display: flex;
   align-items: center;
   gap: var(--size-4-3);
-}
-/* The hidden date input sits under the value button, so the calendar opens there. */
-.ps-dialog-field input.ps-dialog-date {
-  left: calc(84px + var(--size-4-3));
-  bottom: 0;
 }
 .ps-dialog-field-label {
   flex: 0 0 84px;
@@ -1240,16 +1218,63 @@
   padding-left: 0;
   color: var(--text-faint);
 }
-/* The date picker a badge opens: an invisible input at the badge. */
-body > input.ps-badge-date {
+/* Plainsight's calendar (date-picker.ts), for badges and the New task dialog.
+   It also has Obsidian's .menu class, so it looks like a menu in any theme. */
+.menu.ps-date-picker {
   position: fixed;
-  width: 1px;
-  min-width: 0;
-  padding: 0;
-  margin: 0;
-  border: 0;
-  opacity: 0;
-  pointer-events: none;
+  padding: 8px;
+  font-size: var(--font-ui-small);
+  user-select: none;
+}
+.ps-date-picker-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 0 6px 6px;
+}
+.ps-date-picker-title {
+  flex: 1;
+  font-weight: var(--font-semibold);
+  color: var(--text-normal);
+}
+.ps-date-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 32px);
+  gap: 2px;
+}
+.ps-date-picker-weekday {
+  text-align: center;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  padding-bottom: 2px;
+}
+.ps-date-picker-day {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-s);
+  color: var(--text-normal);
+  cursor: var(--cursor);
+  font-variant-numeric: tabular-nums;
+}
+.ps-date-picker-day:hover {
+  background: var(--background-modifier-hover);
+}
+.ps-date-picker-day.is-outside {
+  color: var(--text-faint);
+}
+.ps-date-picker-day.is-today {
+  color: var(--text-accent);
+  font-weight: var(--font-semibold);
+}
+.ps-date-picker-day.is-selected {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.ps-date-picker-day:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }
 
 /* Mobile: one column at a time */

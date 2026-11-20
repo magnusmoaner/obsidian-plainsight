@@ -2,6 +2,7 @@ import { App, Menu, setIcon } from "obsidian";
 import { dueDateLabel } from "./core/format";
 import { TaskDetails } from "./core/task-details";
 import { EditableField, addTaskTag, setTaskField } from "./core/task-fields";
+import { openDatePicker } from "./date-picker";
 import { TagModal } from "./modals";
 import { PRIORITIES, RECURRENCES, duePresets } from "./core/task-line";
 
@@ -128,7 +129,7 @@ function fieldMenu(anchor: HTMLElement, kind: EditableField | "tag", current: st
     for (const p of duePresets(today)) {
       menu.addItem((i) => i.setTitle(p.label).setChecked(current === p.date).onClick(() => set(p.date)));
     }
-    menu.addItem((i) => i.setTitle("Pick a date…").onClick(() => pickDate(at, current, set)));
+    menu.addItem((i) => i.setTitle("Pick a date…").onClick(() => openDatePicker(edits.app, at, current, today, set)));
   } else if (kind === "priority") {
     for (const p of PRIORITIES) {
       menu.addItem((i) => i.setTitle(p.label).setChecked(current === p.value).onClick(() => set(p.value)));
@@ -194,24 +195,4 @@ function inTasksItem(menu: Menu, edits: BadgeEdits): void {
   if (!edits.inTasks) return;
   menu.addSeparator();
   menu.addItem((i) => i.setTitle("Edit in Tasks…").setIcon("pencil").onClick(() => edits.inTasks!()));
-}
-
-/** The system date picker under the badge (`at`): an invisible input there, opened through showPicker(). */
-function pickDate(at: DOMRect, current: string | null, set: (date: string) => void): void {
-  // One left behind by a picker that was dismissed.
-  document.querySelectorAll(".ps-badge-date").forEach((el) => el.remove());
-  const input = document.body.createEl("input", { type: "date", cls: "ps-badge-date", attr: { tabindex: "-1" } });
-  input.style.left = `${at.left}px`;
-  input.style.top = `${at.top}px`;
-  input.style.height = `${at.height}px`;
-  input.value = current ?? "";
-  input.addEventListener("change", () => {
-    if (input.value) set(input.value);
-    input.remove();
-  });
-  try {
-    input.showPicker();
-  } catch {
-    input.remove();
-  }
 }

@@ -78,3 +78,17 @@ export function duePresets(today: string): { label: string; date: string }[] {
     { label: "Next week", date: addDays(today, toMonday) },
   ];
 }
+
+/** The 42 days (six Monday-first weeks) a calendar shows for the month `date` (YYYY-MM-DD) is in. */
+export function monthGrid(date: string): string[] {
+  const first = `${date.slice(0, 7)}-01`;
+  const [y, m] = first.split("-").map(Number);
+  const back = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7; // days since Monday
+  return Array.from({ length: 42 }, (_, i) => addDays(first, i - back));
+}
+
+/** The first of the month `months` away from `date`'s (YYYY-MM-DD). */
+export function addMonths(date: string, months: number): string {
+  const [y, m] = date.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1 + months, 1)).toISOString().slice(0, 10);
+}
