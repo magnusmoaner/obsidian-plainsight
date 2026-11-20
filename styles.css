@@ -1168,9 +1168,14 @@
 /* The + after a task's badges: a small dashed square, like the board's
    "+ Tag", faint until the task is hovered. */
 .ps-badge.ps-badge-add {
+  /* Square, as tall as a badge with text (line-height 1.5 + 1px padding each side). */
+  box-sizing: border-box;
+  width: calc(1.5em + 2px);
+  height: calc(1.5em + 2px);
+  justify-content: center;
   background: transparent;
   gap: 0;
-  padding: 0 3px;
+  padding: 0;
   border: 1px dashed var(--background-modifier-border-hover);
   color: var(--text-muted);
   opacity: 0;
