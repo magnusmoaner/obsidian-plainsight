@@ -20,7 +20,8 @@ const IMAGE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
 const EMBED = /!\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]|!\[[^\]]*\]\(([^)\s]+)[^)]*\)/g;
 const SEARCH_CAP = 20000;
 
-const FILE_LINK = /(?<!!)\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g;
+// Embeds (![[…]]) match too and are skipped: no lookbehind, which older iOS lacks.
+const FILE_LINK = /(!?)\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g;
 
 /**
  * Plain (non-embed) wikilinks whose target has a file extension, e.g.
@@ -30,7 +31,8 @@ const FILE_LINK = /(?<!!)\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g;
 export function fileLinks(text: string): string[] {
   const out: string[] = [];
   for (const match of text.matchAll(FILE_LINK)) {
-    const target = match[1].trim();
+    if (match[1]) continue;
+    const target = match[2].trim();
     if (/\.[a-z0-9]{2,5}$/i.test(target) && !/\.md$/i.test(target)) out.push(target);
   }
   return out;

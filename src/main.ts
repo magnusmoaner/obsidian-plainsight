@@ -1,5 +1,5 @@
-import { Extension, Prec } from "@codemirror/state";
-import { EditorView, keymap } from "@codemirror/view";
+import { Extension } from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
 import {
   Editor,
   editorInfoField,
@@ -17,7 +17,6 @@ import { localISODate } from "./sidebar/core/format";
 import { taskBadges } from "./sidebar/task-badges";
 import { registerReadingTasks } from "./reading-tasks";
 import { enclosingLink, LinkInfo, rewriteLink } from "./editor/links";
-import { enclosingCallout } from "./editor/syntax";
 import {
   setHeading,
   toggleCode,
@@ -27,7 +26,6 @@ import {
 import { boardPages } from "./boards/page";
 import { registerBoards } from "./boards/register";
 import { wysiwyg } from "./editor/extension";
-import { treeOf } from "./editor/parser";
 import { listMinWidth, parseSettings, serializeSettings } from "./settings-data";
 import { NoteIndex } from "./sidebar/core/note-index";
 import { legacyViewState } from "./sidebar/core/view-state";
@@ -158,26 +156,6 @@ export default class WysiwygPlugin extends Plugin {
           });
         });
       }
-    });
-
-    this.addCommand({
-      id: "dump-syntax-tree",
-      name: "Dump syntax tree to console (debug)",
-      editorCheckCallback: (checking, editor) =>
-        this.withView(checking, editor, (cm) => {
-          console.log(treeOf(cm.state).toString());
-          return true;
-        }),
-    });
-
-    this.addCommand({
-      id: "dump-block-dom",
-      name: "Copy block DOM at cursor (debug)",
-      editorCheckCallback: (checking, editor) =>
-        this.withView(checking, editor, (cm) => {
-          copyDump(describeBlockDom(cm));
-          return true;
-        }),
     });
 
     registerReadingTasks(this, () => this.settings.enabled);
@@ -598,34 +576,11 @@ export default class WysiwygPlugin extends Plugin {
         taskBadgeServices.of({
           render: (el, details, closed, edits) => taskBadges(el, details, closed, localISODate(), {}, { ...edits, app: this.app }),
           editLine: () => tasksEditLine(this.app),
-        }),
-        // Bound as a key, not just a palette command: the palette blurs the
-        // editor, and the blurred state is exactly what we must not measure.
-        Prec.high(
-          keymap.of([
-            {
-              key: "Mod-Alt-d",
-              run: (view) => {
-                copyDump(describeBlockDom(view));
-                return true;
-              },
-            },
-          ])
-        )
+        })
       );
     }
     this.app.workspace.updateOptions();
   }
-}
-
-/** Clipboard rather than console only: the console needs devtools open, which
- * is a needless hurdle for a one-shot diagnostic. */
-function copyDump(dump: string): void {
-  console.log(dump);
-  navigator.clipboard.writeText(dump).then(
-    () => new Notice(`Block DOM copied (${dump.split("\n").length} lines)`),
-    () => new Notice("Copy failed — see the developer console")
-  );
 }
 
 /** Injected into the editor via the calloutMenu facet so the decoration path
@@ -646,68 +601,3 @@ const openCalloutMenu = (
   }
   menu.showAtMouseEvent(event);
 };
-
-/**
- * Structure-only dump of the DOM around the cursor: element tags and classes,
- * never text. Tells us whether Obsidian renders a callout as line decorations
- * on each `.cm-line`, as a wrapper element, or as a replacing widget — which
- * decides whether our own rendering can coexist with it.
- */
-function describeBlockDom(view: EditorView): string {
-  const out: string[] = [];
-  const state = view.state;
-  const describe = (node: Node | null): string => {
-    if (!node) return "(none)";
-    if (node === view.contentDOM) return "div.cm-content";
-    if (!(node instanceof HTMLElement)) {
-      return `#${node.nodeName}<${describe(node.parentNode)}>`;
-    }
-    const cls = node.className
-      ? `.${node.className.trim().split(/\s+/).join(".")}`
-      : "";
-    return `${node.tagName.toLowerCase()}${cls}`;
-  };
-
-  const head = state.selection.main.head;
-  const cursorLine = state.doc.lineAt(head);
-  out.push(
-    `cursor ${head}, line ${cursorLine.number}/${state.doc.lines}, ` +
-      `${state.doc.length} chars`
-  );
-  // Decisive for interpreting the rest: Obsidian re-renders blocks as widgets
-  // when the editor blurs, and opening the command palette blurs it. A dump
-  // taken with focus=false says nothing about the editing state.
-  out.push(`editor focused: ${view.hasFocus}`);
-
-  // The decisive question: are the callout's source lines rendered as text
-  // (our decorations can apply) or swallowed by a replacing widget?
-  const callout = enclosingCallout(state, head);
-  out.push("=== callout at cursor (our parse tree) ===");
-  if (!callout) {
-    out.push("NONE — put the caret inside the box's text and re-run");
-  } else {
-    const first = state.doc.lineAt(callout.from).number;
-    const last = state.doc.lineAt(callout.to).number;
-    out.push(`[!${callout.type}] spans lines ${first}..${last}`);
-    for (let n = first; n <= last; n++) {
-      const at = view.domAtPos(state.doc.line(n).from);
-      const el =
-        at.node instanceof HTMLElement ? at.node : at.node.parentElement;
-      const inLine = el?.closest(".cm-line") ? "IN .cm-line" : "NOT in .cm-line";
-      out.push(`  line ${n}: ${describe(at.node)} — ${inLine}`);
-    }
-  }
-
-  out.push("=== callout elements present ===");
-  const found = view.contentDOM.querySelectorAll("[class*='allout']");
-  out.push(`${found.length} matching elements, ${
-    view.contentDOM.querySelectorAll(".cm-line").length
-  } .cm-line total`);
-  for (const el of Array.from(found)) {
-    if (!el.className.includes("cm-")) continue; // only the editor-level wrappers
-    out.push(
-      `${describe(el)} [${el.querySelectorAll(".cm-line").length} .cm-line inside]`
-    );
-  }
-  return out.join("\n");
-}

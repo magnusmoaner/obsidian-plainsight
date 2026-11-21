@@ -2,8 +2,8 @@
   "id": "plainsight",
   "name": "Plainsight",
   "version": "0.2.10",
-  "minAppVersion": "1.5.0",
-  "description": "Calm, syntax-free Markdown editing: formatting renders as you type, syntax stays hidden, and Markdown remains the file format.",
+  "minAppVersion": "1.7.2",
+  "description": "A calm notes app on plain Markdown: an editor without visible syntax, a notes sidebar that previews every note, all your tasks on one page, and boards you can keep inside a note.",
   "author": "Magnus",
   "isDesktopOnly": false
 }
