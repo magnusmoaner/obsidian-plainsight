@@ -79,6 +79,10 @@ describe("fileLinks", () => {
     expect(fileLinks("![[pic.png]] [[Note.md]] [[Note]]")).toEqual([]);
   });
 
+  test("an embed right before a link doesn't hide the link", () => {
+    expect(fileLinks("![[pic.png]][[scan.pdf]]")).toEqual(["scan.pdf"]);
+  });
+
   test("a dotted note name is a candidate too; resolution decides", () => {
     expect(fileLinks("[[Møde 2026.10.07]] [[scan.pdf]]")).toEqual(["Møde 2026.10.07", "scan.pdf"]);
   });
