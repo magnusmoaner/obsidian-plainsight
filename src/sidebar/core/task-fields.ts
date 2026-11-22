@@ -5,7 +5,9 @@ import { PRIORITIES, Priority } from "./task-line";
  * A task's Tasks-plugin fields and tags with where they sit in its text, so
  * a note can hide them behind badges and a badge can rewrite just its field.
  * Fields are read in both of Tasks' formats: emoji (📅 2026-11-25) and
- * Dataview ([due:: 2026-11-25] or (due:: 2026-11-25)).
+ * Dataview ([due:: 2026-11-25] or (due:: 2026-11-25)). Plainlist's own
+ * Dataview fields are read too: [date:: …] as the due date, [done:: …] as
+ * the done date, and its board column [col:: …], hidden.
  * `text` is what follows "- [ ] ", one line.
  */
 
@@ -23,7 +25,8 @@ export type TaskFieldKind =
   | "scheduled"
   | "due"
   | "cancelled"
-  | "done";
+  | "done"
+  | "column";
 
 interface Piece {
   kind: TaskFieldKind | "tag" | "word";
@@ -39,7 +42,7 @@ export interface Span {
 
 /** Tasks' own order, used when a field is added. */
 const ORDER: TaskFieldKind[] = [
-  "id", "dependsOn", "priority", "recurrence", "onCompletion", "created", "start", "scheduled", "due", "cancelled", "done",
+  "id", "dependsOn", "priority", "recurrence", "onCompletion", "created", "start", "scheduled", "due", "cancelled", "done", "column",
 ];
 
 const VS = "\\uFE0F?";
@@ -55,6 +58,8 @@ const dataview = (key: string, value: string) => {
 const DATE = "\\d{4}-\\d{2}-\\d{2}";
 const DATAVIEW_DATES: [string, TaskFieldKind][] = [
   ["due", "due"], ["scheduled", "scheduled"], ["start", "start"], ["created", "created"], ["completion", "done"], ["cancelled", "cancelled"],
+  // Plainlist's
+  ["date", "due"], ["done", "done"],
 ];
 const dv = (m: RegExpExecArray) => m[1] ?? m[2];
 const FIELDS: [RegExp, (m: RegExpExecArray) => { kind: TaskFieldKind; value: string }][] = [
@@ -68,6 +73,7 @@ const FIELDS: [RegExp, (m: RegExpExecArray) => { kind: TaskFieldKind; value: str
   [dataview("id", "[\\w-]+"), (m) => ({ kind: "id", value: dv(m) })],
   [dataview("dependsOn", "[\\w-]+(?:\\s*,\\s*[\\w-]+)*"), (m) => ({ kind: "dependsOn", value: dv(m) })],
   [dataview("onCompletion", "keep|delete"), (m) => ({ kind: "onCompletion", value: dv(m) })],
+  [dataview("col", "[^\\])]*[^\\s\\])]"), (m) => ({ kind: "column", value: dv(m) })],
   [new RegExp(`([📅⏳⌛🛫✅➕❌])${VS}\\s*(\\d{4}-\\d{2}-\\d{2})(?![\\w-])`, "uy"), (m) => ({ kind: DATE_KINDS[m[1]], value: m[2] })],
   [new RegExp(`([🔺⏫🔼🔽⏬])${VS}`, "uy"), (m) => ({ kind: "priority", value: PRIORITIES.find((p) => p.emoji === m[1])!.value })],
   // A repeat rule runs to the next field or tag.
@@ -224,7 +230,10 @@ export function setTaskField(text: string, kind: EditableField | "tag", value: s
   if (existing.length) {
     const [first, ...rest] = existing;
     const kept = without(rest);
-    return kept.slice(0, first.from) + field + kept.slice(first.to);
+    const old = kept.slice(first.from, first.to);
+    // A Dataview field keeps its key (Plainlist's date::) and brackets: only the value changes.
+    const next = as === "dataview" ? old.replace(/(::\s*).*?(\s*[\])])$/, `$1${value}$2`) : field;
+    return kept.slice(0, first.from) + next + kept.slice(first.to);
   }
   // Tasks puts two spaces before a Dataview field.
   const gap = as === "dataview" ? "  " : " ";

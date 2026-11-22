@@ -292,7 +292,7 @@ export class SidebarView extends ItemView implements HoverParent {
   }
 
   getDisplayText(): string {
-    return "Notes";
+    return "Plainsight";
   }
 
   getIcon(): string {
@@ -1563,7 +1563,8 @@ export class SidebarView extends ItemView implements HoverParent {
         else if (note?.folder) place = { kind: "notebook", folder: note.folder };
         // A remembered kind filter that leaves this note out would hide it here too.
         const kind = this.plugin.viewState.state.noteKindFilter;
-        if (note && kind !== "all" && kind !== note.kind) this.plugin.viewState.update({ noteKindFilter: "all" });
+        const shown = kind === "plainlist" ? !!note?.plainlist || this.plainlistProjects().has(path) : kind === note?.kind;
+        if (note && kind !== "all" && !shown) this.plugin.viewState.update({ noteKindFilter: "all" });
         this.showPlace(place);
         this.revealInList(card(path))?.addClass("is-active");
         open(path, newTab);
@@ -1732,9 +1733,13 @@ export class SidebarView extends ItemView implements HoverParent {
     const everything = notesFor(this.partition().notes, this.place, this.queryOptions());
     const onBoards = this.place.kind === "boards";
     const counts = kindCounts(everything);
+    const projects = this.plainlistProjects();
+    const ofPlainlist = (n: NoteSummary) => !!n.plainlist || projects.has(n.path);
+    const plainlist = everything.filter(ofPlainlist).length;
     // A remembered kind this place doesn't have would show an empty list
     // with no visible cause; fall back to all.
-    const kind = view.noteKindFilter !== "all" && counts[view.noteKindFilter] ? view.noteKindFilter : null;
+    const wantedKind = view.noteKindFilter;
+    const kind = wantedKind !== "all" && (wantedKind === "plainlist" ? plainlist : counts[wantedKind]) ? wantedKind : null;
     // The Boards list filters by type of board instead.
     const wanted = this.boardTypeFilter;
     const type = onBoards && wanted !== "all" && everything.some((n) => boardType(n) === wanted) ? wanted : null;
@@ -1743,24 +1748,28 @@ export class SidebarView extends ItemView implements HoverParent {
         ? everything.filter((n) => boardType(n) === type)
         : everything
       : kind
-        ? everything.filter((n) => n.kind === kind)
+        ? everything.filter((n) => (kind === "plainlist" ? ofPlainlist(n) : n.kind === kind))
         : everything;
     const datedOnly = this.place.kind === "daily" || this.place.kind === "templates";
     const grouping: NoteGrouping = datedOnly ? "date" : view.noteGroupBy;
     this.renderHeader(this.placeTitle(), list.length);
     if (onBoards) this.boardTypeChips(everything, type);
-    else this.kindChips(counts, kind);
+    else this.kindChips(counts, kind, plainlist);
     if (!list.length) {
       const none = onBoards ? "No boards" : "No notes";
       return this.plugin.index.loading ? "Loading notes…" : this.search ? "No matches" : none;
     }
     const entries: ListEntry[] = [];
     const embeddedIn = onBoards ? this.embeddingNotes() : undefined;
+    const today = localISODate();
     for (const group of groupNotesBy(list, this.sort, grouping, embeddedIn && ((b) => embeddedIn.get(b.path) ?? null))) {
       if (group.label) entries.push(this.labelEntry(group.label, group.label));
       for (const note of group.notes) {
-        // A changed note is a new summary object, so the reference says it all.
-        entries.push({ key: `note:${note.path}`, data: [note], draw: () => this.renderCard(note), el: null });
+        // A changed note is a new summary object, so the reference says it all;
+        // what a card shows from other notes goes alongside.
+        const project = projects.get(note.path) ?? null;
+        const due = note.plainlist ? this.plainlistToday(note, today) : null;
+        entries.push({ key: `note:${note.path}`, data: [note, project, due], draw: () => this.renderCard(note, project, due), el: null });
       }
     }
     return entries;
@@ -1779,14 +1788,16 @@ export class SidebarView extends ItemView implements HoverParent {
    * All · Notes · Boards · Canvases, with counts. Shown only when the place
    * holds more than one kind — a folder of plain notes needs no filter.
    */
-  private kindChips(counts: Record<"note" | "board" | "canvas", number>, active: string | null): void {
+  /** All · Notes · Boards · Canvases · Plainlist (its file and projects, which are notes too). Shown with two or more. */
+  private kindChips(counts: Record<"note" | "board" | "canvas", number>, active: string | null, plainlist: number): void {
     const kinds = (["note", "board", "canvas"] as const).filter((k) => counts[k] > 0);
-    if (kinds.length < 2) return;
+    if (kinds.length + (plainlist ? 1 : 0) < 2) return;
     const labels = { note: "Notes", board: "Boards", canvas: "Canvases" };
-    const chip = (label: string, value: "all" | "note" | "board" | "canvas", count: number) =>
+    const chip = (label: string, value: KindFilter, count: number) =>
       this.filterChip(label, count, (active ?? "all") === value, () => this.plugin.viewState.update({ noteKindFilter: value }));
     chip("All", "all", counts.note + counts.board + counts.canvas);
     for (const k of kinds) chip(labels[k], k, counts[k]);
+    if (plainlist) chip("Plainlist", "plainlist", plainlist);
   }
 
   /** The Boards list's own chips: All · Plainsight · Kanban · Task List Kanban. Shown with two types or more. */
@@ -2223,6 +2234,48 @@ export class SidebarView extends ItemView implements HoverParent {
     return board && board.columns.length ? board : null;
   }
 
+  /** Notes the Plainlist file lists as projects, with each one's badge text. */
+  private plainlistProjects(): Map<string, string> {
+    const out = new Map<string, string>();
+    for (const list of this.plugin.index.all()) {
+      for (const p of list.plainlist?.projects ?? []) {
+        const file = this.app.metadataCache.getFirstLinkpathDest(p.link, list.path);
+        if (file) out.set(file.path, p.done ? "Project · done" : p.area ? `Project · ${p.area}` : "Project");
+      }
+    }
+    return out;
+  }
+
+  /** Plainlist's Today: open to-dos dated today or earlier, in its file and its open projects. */
+  private plainlistToday(note: NoteSummary, today: string): number {
+    const notes = [note];
+    for (const p of note.plainlist?.projects ?? []) {
+      const file = p.done ? null : this.app.metadataCache.getFirstLinkpathDest(p.link, note.path);
+      const project = file && this.plugin.index.get(file.path);
+      if (project) notes.push(project);
+    }
+    return notes.flatMap((n) => n.tasks).filter((t) => !isClosed(t) && t.due !== null && t.due <= today).length;
+  }
+
+  /** The Plainlist file's counts as tiles, like a board's lists: Inbox, Today, Projects, Areas. */
+  private renderPlainlist(parent: HTMLElement, note: NoteSummary, today: number): void {
+    const plainlist = note.plainlist!;
+    // Plainlist's Inbox leaves out what's put off to "someday".
+    const inbox = note.tasks.filter((t) => !isClosed(t) && !/[[(] *date:: *someday *[\])]/i.test(t.text)).length;
+    const tiles = parent.createDiv("ps-card-board is-compact is-outline");
+    const counts: [string, number][] = [
+      ["Inbox", inbox],
+      ["Today", today],
+      ["Projects", plainlist.projects.filter((p) => !p.done).length],
+      ["Areas", plainlist.areas.length],
+    ];
+    for (const [name, count] of counts) {
+      const head = tiles.createDiv("ps-card-lane").createDiv("ps-card-lane-head");
+      head.createDiv({ cls: "ps-card-lane-name", text: name });
+      head.createDiv({ cls: "ps-card-lane-count", text: String(count) });
+    }
+  }
+
   /**
    * A board's lists as tiles: name and card count; past 4, a "+N" tile.
    * `compact`: one line per tile, for a board embedded in a note. A board's
@@ -2267,19 +2320,21 @@ export class SidebarView extends ItemView implements HoverParent {
     }
   }
 
-  private renderCard(note: NoteSummary): HTMLElement {
+  /** `project`: its badge when the Plainlist file lists it as a project; `today`: the Plainlist file's Today count. */
+  private renderCard(note: NoteSummary, project: string | null = null, today: number | null = null): HTMLElement {
     const card = this.bodyEl.createDiv({ cls: "ps-card", attr: { "data-path": note.path } });
     card.toggleClass("is-active", this.activeFile()?.path === note.path);
     this.draggable(card, note.path);
     const text = card.createDiv("ps-card-text");
 
     const title = text.createDiv("ps-card-title");
-    if (note.kind !== "note") {
-      setIcon(title.createSpan("ps-card-kind"), note.kind === "board" ? "kanban" : "layout-dashboard");
+    if (note.kind !== "note" || note.plainlist) {
+      setIcon(title.createSpan("ps-card-kind"), note.plainlist ? "list-checks" : note.kind === "board" ? "kanban" : "layout-dashboard");
     }
     title.createSpan({ text: note.title });
     if (note.pinned) setIcon(title.createSpan("ps-card-pin"), "pin");
     if (note.columns.length) this.renderMiniBoard(text, note);
+    else if (note.plainlist) this.renderPlainlist(text, note, today ?? 0);
     else if (note.snippet) text.createDiv({ cls: "ps-card-snippet", text: note.snippet });
     // An embedded board spans the card, under the text and the image; the
     // meta line follows it (CSS orders both after the image).
@@ -2316,6 +2371,13 @@ export class SidebarView extends ItemView implements HoverParent {
       const chip = meta.createSpan("ps-card-tasks");
       setIcon(chip.createSpan(), "check-circle-2");
       chip.createSpan({ text: `${closed}/${total}` });
+    }
+    // What the Plainlist plugin makes of the note: its file, or one of its projects.
+    const label = note.plainlist ? "Plainlist" : project;
+    if (label) {
+      const chip = meta.createSpan("ps-card-tasks ps-card-items");
+      setIcon(chip.createSpan(), note.plainlist ? "list-checks" : "briefcase");
+      chip.createSpan({ text: label });
     }
     for (const tag of note.tags) meta.createSpan({ cls: "ps-card-tag", text: tag });
     if (note.tags.length) meta.createSpan({ cls: "ps-card-more" });

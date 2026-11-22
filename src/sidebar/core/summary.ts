@@ -1,6 +1,7 @@
 import { listColours } from "../../boards/board";
 import { extractSnippet } from "./snippet";
 import { ocrBoxes } from "./ocr-boxes";
+import { isPlainlist, parsePlainlist } from "./plainlist";
 import { parseTasks } from "./tasks";
 import { NoteSummary } from "./types";
 
@@ -138,6 +139,8 @@ export function summarize(facts: FileFacts, text: string, boards: BoardKinds | n
   // List colours are a Plainsight board's; on a Kanban plugin board they're not shown.
   const ownBoard = !!board && facts.frontmatter?.["plainsight-plugin"] !== undefined;
   const colours = ownBoard ? listColours(text) : {};
+  const plainlist = !board && isPlainlist(facts.frontmatter) ? parsePlainlist(text) : undefined;
+  const projectLines = new Set(plainlist?.projects.map((p) => p.line));
   return {
     path: facts.path,
     kind: board || taskListBoard ? "board" : "note",
@@ -155,7 +158,7 @@ export function summarize(facts: FileFacts, text: string, boards: BoardKinds | n
     snippet: board ? board.columns.join(" · ") : extractSnippet(text),
     // A board's archived cards are done and hidden in the plugin; keep them
     // off the Tasks page too.
-    tasks: board ? parseTasks(text).filter((t) => t.line < board.end) : parseTasks(text),
+    tasks: board ? parseTasks(text).filter((t) => t.line < board.end) : parseTasks(text).filter((t) => !projectLines.has(t.line)),
     thumbnail: firstImage(text),
     embeddedBoard: boards && !board ? embeddedBoard(text) : null,
     searchText: `${facts.basename} ${tags.join(" ")} ${text.slice(0, SEARCH_CAP)}`.toLowerCase(),
@@ -164,6 +167,7 @@ export function summarize(facts: FileFacts, text: string, boards: BoardKinds | n
     ocrBoxes: board ? [] : ocrBoxes(text),
     taskListBoard,
     ownBoard,
+    ...(plainlist && { plainlist }),
   };
 }
 

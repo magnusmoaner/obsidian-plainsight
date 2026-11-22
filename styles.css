@@ -706,20 +706,14 @@
  * column is narrow.
  */
 .ps-filters {
-  /* A scroll container in a flex column gets min-height 0 and is squashed
-     flat by the list below it; it must not shrink. */
+  /* In a flex column, it must not be squashed by the list below it. Chips
+     that don't fit wrap onto another line rather than scroll out of sight. */
   flex: 0 0 auto;
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   gap: 5px;
   padding: 0 14px 6px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-}
-.ps-filters::-webkit-scrollbar {
-  display: none;
 }
 .ps-filters:empty {
   display: none;
@@ -733,7 +727,7 @@
   cursor: pointer;
 }
 /* The note chip truncates its title at a fixed maximum width, so its ✕
-   always shows; the chip row scrolls sideways when it doesn't fit. */
+   always shows. */
 .ps-filter-note {
   display: inline-flex;
   align-items: center;
@@ -989,6 +983,12 @@
 }
 .ps-card-board.is-compact .ps-card-lane {
   padding: 2px 8px 4px;
+}
+/* Counts rather than lists (the Plainlist file's): outlined on the note's
+   background, so they don't read as a board, on a selected card too. */
+.ps-card-board.is-outline .ps-card-lane {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
 }
 .ps-card-board.is-compact .ps-card-lane-count,
 .ps-card-board.has-titles .ps-card-lane-count {

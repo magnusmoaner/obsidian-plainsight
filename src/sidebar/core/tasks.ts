@@ -2,10 +2,11 @@ import { TaskItem } from "./types";
 
 const TASK_LINE = /^(\s*(?:[-*+]|\d+[.)])\s+\[)(.)(\]\s?)(.*)$/;
 const LIST_ITEM = /^\s*(?:[-*+]|\d+[.)])\s+(.*)$/;
-// A date field in either of Tasks' formats: 📅 2026-11-25 or [due:: 2026-11-25].
+// A date field in either of Tasks' formats, 📅 2026-11-25 or [due:: 2026-11-25],
+// or Plainlist's ([date:: …] for due, [done:: …] for done).
 const date = (emoji: string, key: string) => new RegExp(`${emoji}\\uFE0F?\\s*(\\d{4}-\\d{2}-\\d{2})|[[(] *${key}:: *(\\d{4}-\\d{2}-\\d{2}) *[\\])]`, "u");
-const DUE = date("📅", "due");
-const DONE = date("✅", "completion");
+const DUE = date("📅", "(?:due|date)");
+const DONE = date("✅", "(?:completion|done)");
 const dateIn = (re: RegExp, text: string) => {
   const m = re.exec(text);
   return m ? m[1] ?? m[2] : null;
