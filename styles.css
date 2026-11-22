@@ -1179,6 +1179,14 @@
   border: 1px dashed var(--background-modifier-border-hover);
   color: var(--text-muted);
   opacity: 0;
+  /* Takes no width in its row, gap included (6px at most), so it never wraps
+     onto a line of its own and leaves an empty one while hidden. It may hang
+     up to 18px past the row, into the padding of the task or card around it. */
+  margin-inline-end: calc(-1.5em - 8px);
+}
+:is(.ps-task-meta, .psb-card-foot, .cm-wys-task-badges, .ps-task-badges):has(> .ps-badge-add) {
+  box-sizing: border-box;
+  padding-inline-end: 8px;
 }
 .ps-badge.ps-badge-add.is-clickable:hover {
   filter: none;
