@@ -189,6 +189,7 @@ export default class WysiwygPlugin extends Plugin {
       // read, rather than after the whole vault has been.
       this.indexer.start((ref) => this.registerEvent(ref));
       void this.indexer.build();
+      this.closeExtraSidebars();
       void this.openSidebar();
     });
   }
@@ -498,6 +499,13 @@ export default class WysiwygPlugin extends Plugin {
         ? "No bookmarks point to deleted notes."
         : `Removed ${removed} of ${dead.length} bookmark${dead.length === 1 ? "" : "s"} to deleted notes.`
     );
+  }
+
+  /** One sidebar is enough: close any others (the one in view stays), left over from earlier layouts. */
+  private closeExtraSidebars(): void {
+    const leaves = this.app.workspace.getLeavesOfType(SIDEBAR_VIEW);
+    const keep = leaves.find((l) => !(l as WorkspaceLeaf & { isDeferred?: boolean }).isDeferred) ?? leaves[0];
+    for (const leaf of leaves) if (leaf !== keep) leaf.detach();
   }
 
   async openSidebar(): Promise<void> {

@@ -243,12 +243,33 @@ describe("summarizeCanvas", () => {
     edges: [],
   });
 
-  test("text boxes become the snippet and search text", () => {
+  test("text boxes, then the other boxes' names, become the snippet; text boxes the search text", () => {
     const s = summarizeCanvas(facts({ path: "Board.canvas", basename: "Board" }), json);
     expect(s.kind).toBe("canvas");
     expect(s.items).toBe(3);
-    expect(s.snippet).toBe("First idea Second idea");
+    expect(s.snippet).toBe("First idea Second idea · pic.png");
     expect(s.searchText).toContain("second **idea**");
+  });
+
+  test("a map of its boxes and lines, with their colours", () => {
+    const laid = JSON.stringify({
+      nodes: [
+        { id: "a", type: "group", label: "Ideas", x: 0, y: 0, width: 400, height: 300, color: "4" },
+        { id: "b", type: "file", file: "Notes/Plan.md", x: 20, y: 40, width: 100, height: 60 },
+        { id: "c", type: "link", url: "https://www.example.com/", x: 200, y: 40, width: 100, height: 60, color: "url(x)" },
+      ],
+      edges: [{ fromNode: "b", toNode: "c" }, { fromNode: "b", toNode: "gone" }],
+    });
+    const s = summarizeCanvas(facts({ path: "Map.canvas", basename: "Map" }), laid);
+    expect(s.snippet).toBe("Ideas · Plan · example.com");
+    expect(s.canvasMap).toEqual({
+      nodes: [
+        { x: 0, y: 0, w: 400, h: 300, color: "4", group: true, label: "Ideas" },
+        { x: 20, y: 40, w: 100, h: 60, color: null, group: false, label: "Plan" },
+        { x: 200, y: 40, w: 100, h: 60, color: null, group: false, label: "example.com" },
+      ],
+      edges: [[1, 2]],
+    });
   });
 
   test("never has tasks, even if a box holds a checkbox", () => {
