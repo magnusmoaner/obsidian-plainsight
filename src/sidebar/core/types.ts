@@ -87,6 +87,15 @@ export interface NoteSummary {
   ownBoard: boolean;
   /** The Plainlist plugin's file (`plainlist: true`): its projects and areas. Its project lines aren't in `tasks`. */
   plainlist?: Plainlist;
+  /** A canvas: its boxes and lines, for a small map of it. */
+  canvasMap?: CanvasMap;
+}
+
+/** A canvas's layout: boxes in canvas coordinates, and lines as pairs of box indexes. */
+export interface CanvasMap {
+  /** `label`: what the box says, in short: a text box's first words, a file's or link's name, a group's label. */
+  nodes: { x: number; y: number; w: number; h: number; color: string | null; group: boolean; label: string | null }[];
+  edges: [number, number][];
 }
 
 /** A Kanban plugin board, whose checkbox lines are cards in its lists. */

@@ -3,7 +3,7 @@ import { extractSnippet } from "./snippet";
 import { ocrBoxes } from "./ocr-boxes";
 import { isPlainlist, parsePlainlist } from "./plainlist";
 import { parseTasks } from "./tasks";
-import { NoteSummary } from "./types";
+import { CanvasMap, NoteSummary } from "./types";
 
 /** What the Obsidian layer knows about a file without reading it. */
 export interface FileFacts {
@@ -177,14 +177,22 @@ export function summarize(facts: FileFacts, text: string, boards: BoardKinds | n
  */
 export function summarizeCanvas(facts: FileFacts, json: string): NoteSummary {
   let texts: string[] = [];
+  let names: string[] = [];
   let nodes = 0;
+  let map: CanvasMap | undefined;
   try {
-    const data = JSON.parse(json) as { nodes?: Array<{ type?: string; text?: unknown }> };
+    const data = JSON.parse(json) as { nodes?: CanvasNode[]; edges?: Array<{ fromNode?: unknown; toNode?: unknown }> };
     const list = Array.isArray(data.nodes) ? data.nodes : [];
     nodes = list.length;
     texts = list
       .filter((n) => n.type === "text" && typeof n.text === "string")
       .map((n) => n.text as string);
+    // What the other boxes hold, top to bottom: files, links and groups by name.
+    names = [...list]
+      .sort((a, b) => num(a.y) - num(b.y) || num(a.x) - num(b.x))
+      .map(nodeName)
+      .filter((n): n is string => !!n);
+    map = canvasMap(list, Array.isArray(data.edges) ? data.edges : []);
   } catch {
     // Unreadable or mid-write canvas: still list it, just without content.
   }
@@ -202,7 +210,7 @@ export function summarizeCanvas(facts: FileFacts, json: string): NoteSummary {
     pinned: false,
     mtime: facts.mtime,
     ctime: facts.ctime,
-    snippet: extractSnippet(body),
+    snippet: [extractSnippet(body), ...names].filter(Boolean).join(" · "),
     tasks: [],
     thumbnail: firstImage(body),
     embeddedBoard: null,
@@ -212,5 +220,57 @@ export function summarizeCanvas(facts: FileFacts, json: string): NoteSummary {
     ocrBoxes: [],
     taskListBoard: false,
     ownBoard: false,
+    ...(map && { canvasMap: map }),
+  };
+}
+
+interface CanvasNode {
+  id?: unknown;
+  type?: string;
+  text?: unknown;
+  file?: unknown;
+  url?: unknown;
+  label?: unknown;
+  x?: unknown;
+  y?: unknown;
+  width?: unknown;
+  height?: unknown;
+  color?: unknown;
+}
+
+const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+
+/** A file, link or group box's name; null for a text box (its text is the snippet). */
+function nodeName(n: CanvasNode): string | null {
+  if (n.type === "file" && typeof n.file === "string") return n.file.split("/").pop()!.replace(/\.md$/i, "");
+  if (n.type === "link" && typeof n.url === "string") return n.url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
+  if (n.type === "group" && typeof n.label === "string" && n.label.trim()) return n.label.trim();
+  return null;
+}
+
+/** Up to this many boxes are drawn: enough to see a canvas's shape. */
+const MAP_NODES = 80;
+
+function canvasMap(list: CanvasNode[], edges: Array<{ fromNode?: unknown; toNode?: unknown }>): CanvasMap | undefined {
+  const boxes = list.filter((n) => num(n.width) > 0 && num(n.height) > 0).slice(0, MAP_NODES);
+  if (!boxes.length) return undefined;
+  const index = new Map(boxes.map((n, i) => [n.id, i]));
+  return {
+    nodes: boxes.map((n) => ({
+      x: num(n.x),
+      y: num(n.y),
+      w: num(n.width),
+      h: num(n.height),
+      color: typeof n.color === "string" && /^([1-6]|#[0-9a-f]{3,8})$/i.test(n.color) ? n.color : null,
+      group: n.type === "group",
+      label: (n.type === "text" && typeof n.text === "string" ? extractSnippet(n.text) : nodeName(n))?.slice(0, 60) || null,
+    })),
+    edges: edges
+      .map((e): [number, number] | null => {
+        const from = index.get(e.fromNode);
+        const to = index.get(e.toNode);
+        return from !== undefined && to !== undefined ? [from, to] : null;
+      })
+      .filter((e): e is [number, number] => e !== null),
   };
 }

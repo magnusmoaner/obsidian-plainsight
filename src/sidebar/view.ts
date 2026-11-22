@@ -19,6 +19,7 @@ import {
   WorkspaceLeaf,
 } from "obsidian";
 import type WysiwygPlugin from "../main";
+import { edgeEnds, wrapLabel } from "./core/canvas-map";
 import { cardDate, dueDateLabel, localISODate } from "./core/format";
 import {
   filterTaskRows,
@@ -67,7 +68,7 @@ import type { SavedSearch } from "../settings-data";
 import { BadgeEdits, taskBadges } from "./task-badges";
 import { PRIORITIES } from "./core/task-line";
 import { taskTextColumn } from "./core/tasks";
-import { holdsCards, inFolder, isClosed, NoteSummary, renamedPath, TaskItem } from "./core/types";
+import { CanvasMap, holdsCards, inFolder, isClosed, NoteSummary, renamedPath, TaskItem } from "./core/types";
 import { NAV_WIDTH } from "./core/view-state";
 import { SearchModal, SearchSource } from "./search-modal";
 import {
@@ -2335,6 +2336,8 @@ export class SidebarView extends ItemView implements HoverParent {
     if (note.pinned) setIcon(title.createSpan("ps-card-pin"), "pin");
     if (note.columns.length) this.renderMiniBoard(text, note);
     else if (note.plainlist) this.renderPlainlist(text, note, today ?? 0);
+    // A canvas: a map of it, in the space a board's lists take.
+    else if (note.canvasMap) this.renderCanvasMap(text.createDiv("ps-card-canvas"), note.canvasMap);
     else if (note.snippet) text.createDiv({ cls: "ps-card-snippet", text: note.snippet });
     // An embedded board spans the card, under the text and the image; the
     // meta line follows it (CSS orders both after the image).
@@ -2547,6 +2550,53 @@ export class SidebarView extends ItemView implements HoverParent {
     menu.addSeparator();
     this.app.workspace.trigger("file-menu", menu, file, "file-explorer-context-menu", null);
     menu.showAtMouseEvent(evt);
+  }
+
+  /**
+   * A canvas in miniature, across the card: its boxes where they are, in
+   * their colours, with the lines between them, and what each says where it's
+   * big enough to read. Like a picture that covers its frame: scaled evenly
+   * until it fills it, centred, and cut off where it runs over. Drawn in screen
+   * pixels, so text and lines keep their size.
+   */
+  private renderCanvasMap(parent: HTMLElement, map: CanvasMap): void {
+    const FONT = 9;
+    const PAD = 6;
+    const H = 110; // .ps-card-canvas svg's height in styles.css
+    const { nodes, edges } = map;
+    const left = Math.min(...nodes.map((n) => n.x));
+    const top = Math.min(...nodes.map((n) => n.y));
+    const width = Math.max(1, Math.max(...nodes.map((n) => n.x + n.w)) - left);
+    const height = Math.max(1, Math.max(...nodes.map((n) => n.y + n.h)) - top);
+    // The width the card will give it.
+    const W = Math.max(120, (this.bodyEl.clientWidth || 340) - 52);
+    const scale = Math.max((W - 2 * PAD) / width, (H - 2 * PAD) / height);
+    const ox = (W - width * scale) / 2;
+    const oy = (H - height * scale) / 2;
+    const box = (n: CanvasMap["nodes"][number]) => ({ x: ox + (n.x - left) * scale, y: oy + (n.y - top) * scale, w: n.w * scale, h: n.h * scale });
+    // Slices off what runs over, keeping the middle, if the card ends up another width.
+    const svg = parent.createSvg("svg", { attr: { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "xMidYMid slice", "aria-hidden": "true" } });
+    for (const [from, to] of edges) {
+      const [x1, y1, x2, y2] = edgeEnds(box(nodes[from]), box(nodes[to]));
+      svg.createSvg("line", { cls: "ps-canvas-edge", attr: { x1, y1, x2, y2 } });
+    }
+    // Groups under the boxes in them.
+    for (const n of [...nodes.filter((n) => n.group), ...nodes.filter((n) => !n.group)]) {
+      const b = box(n);
+      const rect = svg.createSvg("rect", { cls: n.group ? "ps-canvas-group" : "ps-canvas-box", attr: { x: b.x, y: b.y, width: b.w, height: b.h, rx: 3 } });
+      // Canvas colours 1–6 are Obsidian's red … purple; others are hex.
+      const named = ["red", "orange", "yellow", "green", "cyan", "purple"][Number(n.color) - 1];
+      if (n.color) rect.style.setProperty("--ps-canvas-colour", named ? `var(--color-${named})` : n.color);
+      if (!n.label) continue;
+      // About 4.8px a letter; a line every 11px. A group's label sits above it, as on the canvas.
+      const perLine = Math.floor((b.w - 6) / 4.8);
+      if (perLine < 3) continue;
+      const lines = wrapLabel(n.label, perLine, n.group ? 1 : Math.floor((b.h - 4) / 11));
+      lines.forEach((line, i) => {
+        const y = n.group ? b.y - 3 : b.y + 3 + 11 * i + FONT * 0.85;
+        svg.createSvg("text", { cls: "ps-canvas-label", attr: { x: b.x + (n.group ? 0 : 3), y, "font-size": FONT } }).textContent = line;
+      });
+    }
   }
 
   private imageSrc(note: NoteSummary): string | null {

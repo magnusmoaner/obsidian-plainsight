@@ -1067,6 +1067,44 @@
   object-fit: cover;
   border-radius: 4px;
 }
+/* A canvas's map, across the card where a board's lists go. */
+.ps-card-canvas {
+  margin-top: 6px;
+  border-radius: 6px;
+  background: var(--background-modifier-hover);
+}
+.ps-card-canvas {
+  overflow: hidden;
+}
+.ps-card-canvas svg {
+  display: block;
+  width: 100%;
+  height: 110px;
+}
+.ps-canvas-box,
+.ps-canvas-group {
+  stroke: var(--ps-canvas-colour, var(--text-faint));
+  stroke-width: 1;
+}
+.ps-canvas-box {
+  fill: var(--ps-canvas-colour, var(--background-primary));
+  fill-opacity: 0.35;
+}
+.ps-canvas-box:not([style]) {
+  fill-opacity: 1;
+}
+.ps-canvas-group {
+  fill: var(--ps-canvas-colour, transparent);
+  fill-opacity: 0.08;
+}
+.ps-canvas-label {
+  fill: var(--text-muted);
+  font-family: var(--font-interface);
+}
+.ps-canvas-edge {
+  stroke: var(--text-faint);
+  stroke-width: 1;
+}
 
 /* Task rows */
 .ps-task {
