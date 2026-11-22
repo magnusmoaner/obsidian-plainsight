@@ -2,12 +2,15 @@ import { TaskItem } from "./types";
 
 const TASK_LINE = /^(\s*(?:[-*+]|\d+[.)])\s+\[)(.)(\]\s?)(.*)$/;
 const LIST_ITEM = /^\s*(?:[-*+]|\d+[.)])\s+(.*)$/;
-const DUE = /📅\s*(\d{4}-\d{2}-\d{2})/u;
-const DONE = /✅\s*(\d{4}-\d{2}-\d{2})/u;
+// A date field in either of Tasks' formats: 📅 2026-11-25 or [due:: 2026-11-25].
+const date = (emoji: string, key: string) => new RegExp(`${emoji}\\uFE0F?\\s*(\\d{4}-\\d{2}-\\d{2})|[[(] *${key}:: *(\\d{4}-\\d{2}-\\d{2}) *[\\])]`, "u");
+const DUE = date("📅", "due");
+const DONE = date("✅", "completion");
+const dateIn = (re: RegExp, text: string) => {
+  const m = re.exec(text);
+  return m ? m[1] ?? m[2] : null;
+};
 const FENCE = /^\s*(```|~~~)/;
-// Tasks-plugin field markers. They always follow the description, so the
-// text before the first one is the human-readable task.
-const TASKS_FIELD = /[📅⏳🛫✅➕❌🔁⏫🔼🔽⏬🔺🆔⛔]/u;
 
 export function parseTasks(text: string): TaskItem[] {
   const tasks: TaskItem[] = [];
@@ -39,9 +42,9 @@ export function parseTasks(text: string): TaskItem[] {
       line: index,
       status: match[2],
       text: match[4].trim(),
-      due: DUE.exec(match[4])?.[1] ?? null,
+      due: dateIn(DUE, match[4]),
       section,
-      done: DONE.exec(match[4])?.[1] ?? null,
+      done: dateIn(DONE, match[4]),
       ...(under !== undefined && { under }),
     });
   });
@@ -52,10 +55,6 @@ export function parseTasks(text: string): TaskItem[] {
 export function matchTaskLine(line: string): { status: string; text: string } | null {
   const match = TASK_LINE.exec(line.replace(/\r$/, ""));
   return match ? { status: match[2], text: match[4].trim() } : null;
-}
-
-export function taskDisplayText(text: string): string {
-  return text.split(TASKS_FIELD)[0].trim();
 }
 
 /**

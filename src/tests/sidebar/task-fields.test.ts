@@ -130,3 +130,34 @@ describe("addTaskTag", () => {
     expect(addTaskTag("Buy milk #shop", "shop")).toBe("Buy milk #shop");
   });
 });
+
+describe("the Dataview format", () => {
+  const text = "Pay rent #home  [priority:: high]  [repeat:: every month]  [due:: 2026-12-01]";
+
+  test("reads each field, in square or round brackets, and hides it like an emoji one", () => {
+    const { details } = taskFields(text);
+    expect(details).toMatchObject({ description: "Pay rent", priority: "high", recurrence: "every month", due: "2026-12-01", badgeTags: ["home"] });
+    expect(shown(text)).toBe("Pay rent");
+    expect(taskFields("Pay rent (due:: 2026-12-01)").details.due).toBe("2026-12-01");
+    const closed = taskFields("Pay rent [completion:: 2026-11-30] [cancelled:: 2026-11-29] [start:: 2026-11-01] [scheduled:: 2026-11-02]").details;
+    expect(closed).toMatchObject({ done: "2026-11-30", cancelled: "2026-11-29", start: "2026-11-01", scheduled: "2026-11-02" });
+  });
+
+  test("leaves mismatched brackets and other inline fields as text", () => {
+    expect(taskFields("Pay rent [due:: 2026-12-01)").details.due).toBeNull();
+    expect(shown("Pay rent [where:: bank]")).toBe("Pay rent [where:: bank]");
+  });
+
+  test("a field keeps its format when changed; a new one follows the task's other fields", () => {
+    expect(setTaskField(text, "due", "2026-12-05")).toBe("Pay rent #home  [priority:: high]  [repeat:: every month]  [due:: 2026-12-05]");
+    expect(setTaskField(text, "scheduled", "2026-11-28")).toBe("Pay rent #home  [priority:: high]  [repeat:: every month]  [scheduled:: 2026-11-28]  [due:: 2026-12-01]");
+    expect(setTaskField(text, "priority", null)).toBe("Pay rent #home  [repeat:: every month]  [due:: 2026-12-01]");
+    expect(setTaskField("Pay rent 📅 2026-12-01", "priority", "high", "dataview")).toBe("Pay rent ⏫ 📅 2026-12-01");
+  });
+
+  test("a task without fields gets them in the format asked for", () => {
+    expect(setTaskField("Pay rent", "due", "2026-12-01", "dataview")).toBe("Pay rent  [due:: 2026-12-01]");
+    expect(setTaskField("Pay rent", "priority", "low", "dataview")).toBe("Pay rent  [priority:: low]");
+    expect(setTaskField("Pay rent", "due", "2026-12-01")).toBe("Pay rent 📅 2026-12-01");
+  });
+});

@@ -1,8 +1,9 @@
 import { addDays } from "./queries";
+import type { TaskFormat } from "./task-fields";
 
 /*
- * The quick-add task dialog's output: one line in the Tasks plugin's emoji
- * format, so Tasks reads it exactly as if its own dialog had written it.
+ * The quick-add task dialog's output: one line in the Tasks plugin's format,
+ * emoji or Dataview, so Tasks reads it exactly as if its own dialog had written it.
  */
 
 export type Priority = "highest" | "high" | "medium" | "low" | "lowest";
@@ -21,6 +22,8 @@ export interface TaskLineOptions {
   globalFilter?: string;
   /** Today's date (YYYY-MM-DD) when Tasks' "set created date" is on. */
   created?: string;
+  /** Tasks' "Task format"; emoji when not given. */
+  format?: TaskFormat;
 }
 
 /** Repeat rules offered in the dialog; all are valid Tasks recurrence text. */
@@ -55,16 +58,19 @@ export function buildTaskLine(task: NewTask): string | null {
     if (!task.due && !task.scheduled && !task.start) return null;
   }
   const filter = task.globalFilter?.trim();
+  const dataview = task.format === "dataview";
+  const field = (emoji: string, key: string, value: string) => (dataview ? `[${key}:: ${value}]` : `${emoji} ${value}`);
   // Tasks' own order: description, priority, recurrence, created, start, scheduled, due.
   const parts = [filter && !text.split(" ").includes(filter) ? `- [ ] ${filter} ${text}` : `- [ ] ${text}`];
   const priority = PRIORITIES.find((p) => p.value === task.priority);
-  if (priority) parts.push(priority.emoji);
-  if (task.recurrence) parts.push(`🔁 ${task.recurrence}${task.whenDone ? " when done" : ""}`);
-  if (task.created) parts.push(`➕ ${task.created}`);
-  if (task.start) parts.push(`🛫 ${task.start}`);
-  if (task.scheduled) parts.push(`⏳ ${task.scheduled}`);
-  if (task.due) parts.push(`📅 ${task.due}`);
-  return parts.join(" ");
+  if (priority) parts.push(dataview ? `[priority:: ${priority.value}]` : priority.emoji);
+  if (task.recurrence) parts.push(field("🔁", "repeat", `${task.recurrence}${task.whenDone ? " when done" : ""}`));
+  if (task.created) parts.push(field("➕", "created", task.created));
+  if (task.start) parts.push(field("🛫", "start", task.start));
+  if (task.scheduled) parts.push(field("⏳", "scheduled", task.scheduled));
+  if (task.due) parts.push(field("📅", "due", task.due));
+  // Tasks puts two spaces before a Dataview field.
+  return parts.join(dataview ? "  " : " ");
 }
 
 /** Quick dates relative to `today` (YYYY-MM-DD); next week is the coming Monday. */

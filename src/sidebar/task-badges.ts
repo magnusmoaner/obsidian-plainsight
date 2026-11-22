@@ -3,6 +3,7 @@ import { dueDateLabel } from "./core/format";
 import { TaskDetails } from "./core/task-details";
 import { EditableField, addTaskTag, setTaskField } from "./core/task-fields";
 import { openDatePicker } from "./date-picker";
+import { tasksFormat } from "./internals";
 import { TagModal } from "./modals";
 import { PRIORITIES, RECURRENCES, duePresets } from "./core/task-line";
 
@@ -117,7 +118,9 @@ const HEADINGS: Record<EditableField, [string, string]> = {
 
 /** The menu for one field: its name, its choices, Remove, and Edit in Tasks. */
 function fieldMenu(anchor: HTMLElement, kind: EditableField | "tag", current: string | null, today: string, edits: BadgeEdits): void {
-  const set = (value: string | null) => edits.change((text) => setTaskField(text, kind, value));
+  // A task with no fields yet gets them in the format Tasks writes.
+  const set = (value: string | null) =>
+    void tasksFormat(edits.app).then((format) => edits.change((text) => setTaskField(text, kind, value, format)));
   // Where the badge is now: by the time a date is picked it may have been drawn again, or gone.
   const at = anchor.getBoundingClientRect();
   const menu = new Menu();
