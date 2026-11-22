@@ -5,5 +5,6 @@
   "minAppVersion": "1.7.2",
   "description": "A calm notes app on plain Markdown: an editor without visible syntax, a notes sidebar that previews every note, all your tasks on one page, and boards you can keep inside a note.",
   "author": "Magnus",
+  "authorUrl": "https://plainsight.kodepartiet.dk",
   "isDesktopOnly": false
 }
