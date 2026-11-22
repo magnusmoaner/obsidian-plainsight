@@ -1,4 +1,6 @@
 import { App, HoverPopover, Menu, MenuItem, normalizePath, TAbstractFile, TFile, TFolder } from "obsidian";
+import type { TaskFormat } from "./core/task-fields";
+import type { TaskLineOptions } from "./core/task-line";
 
 /**
  * Undocumented Obsidian and plugin APIs, isolated so they're easy to audit.
@@ -199,27 +201,35 @@ function tasksApi(app: App): Record<string, unknown> | undefined {
 }
 
 /**
- * What Tasks' own dialog adds to a new task: its global filter, and today's
- * date when "set created date" is on. Read from the plugin's saved settings.
- * Returns {} without Tasks, and null when Tasks is installed but its settings
- * can't be read, so the caller can fall back to Tasks' own dialog.
+ * What Tasks' own dialog adds to a new task: its global filter, today's date
+ * when "set created date" is on, and the format it writes fields in. Read
+ * from the plugin's saved settings. Without Tasks, only a format: Dataview's
+ * when that plugin is on (its users write [due:: …] fields), else emoji.
+ * Returns null when Tasks is installed but its settings can't be read, so the
+ * caller can fall back to Tasks' own dialog.
  */
-export async function tasksLineOptions(
-  app: App,
-  today: string
-): Promise<{ globalFilter?: string; created?: string } | null> {
-  if (!tasksApi(app)) return {};
+export async function tasksLineOptions(app: App, today: string): Promise<TaskLineOptions | null> {
+  if (!tasksApi(app)) {
+    const plugins = (app as unknown as { plugins?: { plugins?: Record<string, unknown> } }).plugins?.plugins;
+    return { format: plugins?.["dataview"] ? "dataview" : "emoji" };
+  }
   try {
     const raw = await app.vault.adapter.read(`${app.vault.configDir}/plugins/obsidian-tasks-plugin/data.json`);
-    const data = JSON.parse(raw) as { globalFilter?: unknown; setCreatedDate?: unknown };
+    const data = JSON.parse(raw) as { globalFilter?: unknown; setCreatedDate?: unknown; taskFormat?: unknown };
     if (data.globalFilter !== undefined && typeof data.globalFilter !== "string") return null;
     return {
       globalFilter: (data.globalFilter as string | undefined) ?? "",
       created: data.setCreatedDate === true ? today : undefined,
+      format: data.taskFormat === "dataview" ? "dataview" : "emoji",
     };
   } catch {
     return null;
   }
+}
+
+/** The format new task fields are written in (see tasksLineOptions); emoji if Tasks' settings can't be read. */
+export async function tasksFormat(app: App): Promise<TaskFormat> {
+  return (await tasksLineOptions(app, ""))?.format ?? "emoji";
 }
 
 /** Whether the Tasks plugin is enabled (its API is there). */

@@ -56,6 +56,14 @@ describe("buildTaskLine", () => {
   });
 });
 
+describe("buildTaskLine in the Dataview format", () => {
+  it("writes each field as [key:: value], two spaces apart, in Tasks' order", () => {
+    expect(
+      buildTaskLine({ text: "Pay rent", format: "dataview", priority: "high", recurrence: "every month", whenDone: true, created: "2026-11-22", due: "2026-12-01" })
+    ).toBe("- [ ] Pay rent  [priority:: high]  [repeat:: every month when done]  [created:: 2026-11-22]  [due:: 2026-12-01]");
+  });
+});
+
 describe("duePresets", () => {
   it("gives today, tomorrow and next Monday", () => {
     // 2026-10-11 is a Sunday.

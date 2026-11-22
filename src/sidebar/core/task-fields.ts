@@ -4,8 +4,13 @@ import { PRIORITIES, Priority } from "./task-line";
 /*
  * A task's Tasks-plugin fields and tags with where they sit in its text, so
  * a note can hide them behind badges and a badge can rewrite just its field.
+ * Fields are read in both of Tasks' formats: emoji (📅 2026-11-25) and
+ * Dataview ([due:: 2026-11-25] or (due:: 2026-11-25)).
  * `text` is what follows "- [ ] ", one line.
  */
+
+/** How Tasks writes fields: its setting "Task format". */
+export type TaskFormat = "emoji" | "dataview";
 
 export type TaskFieldKind =
   | "id"
@@ -42,7 +47,27 @@ const MARKERS = "📅⏳⌛🛫✅➕❌🔁🔺⏫🔼🔽⏬🆔⛔🏁";
 const DATE_KINDS: Record<string, TaskFieldKind> = {
   "📅": "due", "⏳": "scheduled", "⌛": "scheduled", "🛫": "start", "✅": "done", "➕": "created", "❌": "cancelled",
 };
+/** A Dataview-format field, [key:: value] or (key:: value); the value is m[1] or m[2]. */
+const dataview = (key: string, value: string) => {
+  const inner = ` *${key}:: *(${value}) *`;
+  return new RegExp(`(?:\\[${inner}\\]|\\(${inner}\\))`, "uy");
+};
+const DATE = "\\d{4}-\\d{2}-\\d{2}";
+const DATAVIEW_DATES: [string, TaskFieldKind][] = [
+  ["due", "due"], ["scheduled", "scheduled"], ["start", "start"], ["created", "created"], ["completion", "done"], ["cancelled", "cancelled"],
+];
+const dv = (m: RegExpExecArray) => m[1] ?? m[2];
 const FIELDS: [RegExp, (m: RegExpExecArray) => { kind: TaskFieldKind; value: string }][] = [
+  ...DATAVIEW_DATES.map(([key, kind]): [RegExp, (m: RegExpExecArray) => { kind: TaskFieldKind; value: string }] => [
+    dataview(key, DATE),
+    (m) => ({ kind, value: dv(m) }),
+  ]),
+  [dataview("priority", "highest|high|medium|low|lowest"), (m) => ({ kind: "priority", value: dv(m) })],
+  // Tasks' own pattern for a Dataview repeat rule.
+  [dataview("repeat", "[a-zA-Z0-9, !]*[a-zA-Z0-9,!]"), (m) => ({ kind: "recurrence", value: dv(m) })],
+  [dataview("id", "[\\w-]+"), (m) => ({ kind: "id", value: dv(m) })],
+  [dataview("dependsOn", "[\\w-]+(?:\\s*,\\s*[\\w-]+)*"), (m) => ({ kind: "dependsOn", value: dv(m) })],
+  [dataview("onCompletion", "keep|delete"), (m) => ({ kind: "onCompletion", value: dv(m) })],
   [new RegExp(`([📅⏳⌛🛫✅➕❌])${VS}\\s*(\\d{4}-\\d{2}-\\d{2})(?![\\w-])`, "uy"), (m) => ({ kind: DATE_KINDS[m[1]], value: m[2] })],
   [new RegExp(`([🔺⏫🔼🔽⏬])${VS}`, "uy"), (m) => ({ kind: "priority", value: PRIORITIES.find((p) => p.emoji === m[1])!.value })],
   // A repeat rule runs to the next field or tag.
@@ -137,7 +162,8 @@ export function taskFields(text: string, cursor = -1): TaskFields {
   return {
     hidden,
     details: {
-      description: words.map((w) => w.value).join(" "),
+      // What stays text: the words, and tags kept in the sentence.
+      description: all.filter((p) => !shown.includes(p)).map((p) => text.slice(p.from, p.to)).join(" "),
       tags: all.filter((p) => p.kind === "tag").map((p) => p.value),
       badgeTags: shown.filter((p) => p.kind === "tag").map((p) => p.value),
       priority: value("priority") as Priority | null,
@@ -154,10 +180,16 @@ export function taskFields(text: string, cursor = -1): TaskFields {
 /** The fields a badge can set. */
 export type EditableField = "priority" | "recurrence" | "start" | "scheduled" | "due";
 
-function written(kind: EditableField, value: string): string {
-  if (kind === "priority") return PRIORITIES.find((p) => p.value === value)?.emoji ?? "";
+const DATAVIEW_KEYS: Record<EditableField, string> = { priority: "priority", recurrence: "repeat", start: "start", scheduled: "scheduled", due: "due" };
+
+function written(kind: EditableField, value: string, format: TaskFormat): string {
+  if (kind === "priority" && !PRIORITIES.some((p) => p.value === value)) return "";
+  if (format === "dataview") return `[${DATAVIEW_KEYS[kind]}:: ${value}]`;
+  if (kind === "priority") return PRIORITIES.find((p) => p.value === value)!.emoji;
   return `${{ recurrence: "🔁", start: "🛫", scheduled: "⏳", due: "📅" }[kind]} ${value}`;
 }
+
+const formatOf = (text: string, p: Piece): TaskFormat => (text[p.from] === "[" || text[p.from] === "(" ? "dataview" : "emoji");
 
 /** `text` without `p` and the space before it (after it, at the start). */
 function cut(text: string, p: Piece): string {
@@ -171,9 +203,10 @@ function cut(text: string, p: Piece): string {
 /**
  * The task's text with one field set (`value`) or removed (null), everything
  * else as it was. A new field goes where Tasks would write it. For a tag,
- * `value` names the tag to remove.
+ * `value` names the tag to remove. A field is written in the format it's in,
+ * a new one in that of the task's other fields, or `format` if it has none.
  */
-export function setTaskField(text: string, kind: EditableField | "tag", value: string | null): string {
+export function setTaskField(text: string, kind: EditableField | "tag", value: string | null, format: TaskFormat = "emoji"): string {
   const all = pieces(text);
   if (kind === "tag") {
     const tag = all.find((p) => p.kind === "tag" && p.value === value);
@@ -183,19 +216,23 @@ export function setTaskField(text: string, kind: EditableField | "tag", value: s
   // Cut from the end, so earlier positions stay right.
   const without = (ps: Piece[]) => ps.reduceRight(cut, text);
   if (value === null) return without(existing);
-  const field = written(kind, value);
+  const fields = all.filter(isField);
+  const like = existing[0] ?? fields[0];
+  const as = like ? formatOf(text, like) : format;
+  const field = written(kind, value, as);
   if (!field) return text;
   if (existing.length) {
     const [first, ...rest] = existing;
     const kept = without(rest);
     return kept.slice(0, first.from) + field + kept.slice(first.to);
   }
+  // Tasks puts two spaces before a Dataview field.
+  const gap = as === "dataview" ? "  " : " ";
   const rank = ORDER.indexOf(kind);
-  const fields = all.filter(isField);
   const next = fields.find((p) => ORDER.indexOf(p.kind as TaskFieldKind) > rank);
-  if (next) return `${text.slice(0, next.from)}${field} ${text.slice(next.from)}`;
+  if (next) return `${text.slice(0, next.from)}${field}${gap}${text.slice(next.from)}`;
   const at = fields.length ? fields[fields.length - 1].to : text.trimEnd().length;
-  return `${text.slice(0, at)} ${field}${text.slice(at)}`;
+  return `${text.slice(0, at)}${gap}${field}${text.slice(at)}`;
 }
 
 /** The task's text with `#tag` added after its words, before its fields; unchanged if it has it. */

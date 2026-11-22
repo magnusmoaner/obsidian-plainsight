@@ -2,7 +2,6 @@ import { describe, expect, test } from "vitest";
 import {
   matchTaskLine,
   parseTasks,
-  taskDisplayText,
   taskTextColumn,
   toggleTaskLine,
 } from "../../sidebar/core/tasks";
@@ -67,13 +66,14 @@ describe("parseTasks", () => {
   });
 });
 
-describe("taskDisplayText", () => {
-  test("cuts at the first Tasks-plugin field", () => {
-    expect(taskDisplayText("Pay bill 📅 2026-10-09 🔁 every month")).toBe("Pay bill");
-  });
-
-  test("leaves plain text alone", () => {
-    expect(taskDisplayText("Call the school")).toBe("Call the school");
+describe("parseTasks dates", () => {
+  test("reads due and done dates in the emoji and the Dataview format", () => {
+    const [emoji, square, round] = parseTasks(
+      ["- [x] Pay rent 📅 2026-11-01 ✅ 2026-10-30", "- [x] Pay rent  [due:: 2026-11-01]  [completion:: 2026-10-30]", "- [ ] Pay rent (due:: 2026-11-01)"].join("\n")
+    );
+    expect([emoji.due, emoji.done]).toEqual(["2026-11-01", "2026-10-30"]);
+    expect([square.due, square.done]).toEqual(["2026-11-01", "2026-10-30"]);
+    expect([round.due, round.done]).toEqual(["2026-11-01", null]);
   });
 });
 
