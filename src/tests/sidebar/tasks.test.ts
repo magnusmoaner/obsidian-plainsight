@@ -75,6 +75,11 @@ describe("parseTasks dates", () => {
     expect([square.due, square.done]).toEqual(["2026-11-01", "2026-10-30"]);
     expect([round.due, round.done]).toEqual(["2026-11-01", null]);
   });
+
+  test("reads Plainlist's date:: and done:: as due and done", () => {
+    const [task] = parseTasks("- [x] Water the plants [date:: 2026-11-23] [done:: 2026-11-22]");
+    expect([task.due, task.done]).toEqual(["2026-11-23", "2026-11-22"]);
+  });
 });
 
 describe("toggleTaskLine", () => {

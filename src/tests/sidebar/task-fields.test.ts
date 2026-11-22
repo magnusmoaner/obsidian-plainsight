@@ -161,3 +161,23 @@ describe("the Dataview format", () => {
     expect(setTaskField("Pay rent", "due", "2026-12-01")).toBe("Pay rent 📅 2026-12-01");
   });
 });
+
+describe("Plainlist's fields", () => {
+  const text = "Water the plants [date:: 2026-11-23] [repeat:: every 2 weeks] [col:: Doing]";
+
+  test("date:: is the due date, done:: the done date, and col:: is hidden", () => {
+    const { details } = taskFields(text);
+    expect(details).toMatchObject({ description: "Water the plants", due: "2026-11-23", recurrence: "every 2 weeks" });
+    expect(shown(text)).toBe("Water the plants");
+    expect(taskFields("Water the plants [done:: 2026-11-22]").details.done).toBe("2026-11-22");
+  });
+
+  test("a changed field keeps its key and brackets", () => {
+    expect(setTaskField(text, "due", "2026-11-30")).toBe("Water the plants [date:: 2026-11-30] [repeat:: every 2 weeks] [col:: Doing]");
+    expect(setTaskField("Pay rent (due:: 2026-12-01)", "due", "2026-12-05")).toBe("Pay rent (due:: 2026-12-05)");
+  });
+
+  test("someday isn't a date, so it stays text", () => {
+    expect(taskFields("Learn Italian [date:: someday]").details.due).toBeNull();
+  });
+});

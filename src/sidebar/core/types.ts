@@ -1,4 +1,5 @@
 import type { OcrBox } from "./ocr-boxes";
+import type { Plainlist } from "./plainlist";
 
 /** A Markdown task line, as found in a note. */
 export interface TaskItem {
@@ -84,6 +85,8 @@ export interface NoteSummary {
   taskListBoard: boolean;
   /** A Plainsight board (its own mark), rather than a board plugin's. */
   ownBoard: boolean;
+  /** The Plainlist plugin's file (`plainlist: true`): its projects and areas. Its project lines aren't in `tasks`. */
+  plainlist?: Plainlist;
 }
 
 /** A Kanban plugin board, whose checkbox lines are cards in its lists. */

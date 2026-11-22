@@ -1,8 +1,9 @@
 import { ATTACHMENT_GROUPINGS, AttachmentGrouping } from "./attachments";
 import { NOTE_GROUPINGS, NoteGrouping, TASK_GROUPINGS, TaskFilter, TaskGrouping } from "./queries";
 
-export type KindFilter = "all" | "note" | "board" | "canvas";
-const KIND_FILTERS: KindFilter[] = ["all", "note", "board", "canvas"];
+/** "plainlist": the Plainlist plugin's file and the notes it lists as projects. */
+export type KindFilter = "all" | "note" | "board" | "canvas" | "plainlist";
+const KIND_FILTERS: KindFilter[] = ["all", "note", "board", "canvas", "plainlist"];
 const TASK_FILTERS: TaskFilter[] = ["open", "overdue", "done"];
 
 /**
