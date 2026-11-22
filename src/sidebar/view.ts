@@ -2562,14 +2562,14 @@ export class SidebarView extends ItemView implements HoverParent {
   private renderCanvasMap(parent: HTMLElement, map: CanvasMap): void {
     const FONT = 9;
     const PAD = 6;
-    const H = 110; // .ps-card-canvas svg's height in styles.css
+    const H = 100; // .ps-card-canvas svg's height in styles.css
     const { nodes, edges } = map;
     const left = Math.min(...nodes.map((n) => n.x));
     const top = Math.min(...nodes.map((n) => n.y));
     const width = Math.max(1, Math.max(...nodes.map((n) => n.x + n.w)) - left);
     const height = Math.max(1, Math.max(...nodes.map((n) => n.y + n.h)) - top);
-    // The width the card will give it.
-    const W = Math.max(120, (this.bodyEl.clientWidth || 340) - 52);
+    // The width the card will give it, inside the frame's padding.
+    const W = Math.max(120, (this.bodyEl.clientWidth || 340) - 64);
     const scale = Math.max((W - 2 * PAD) / width, (H - 2 * PAD) / height);
     const ox = (W - width * scale) / 2;
     const oy = (H - height * scale) / 2;
@@ -2588,13 +2588,18 @@ export class SidebarView extends ItemView implements HoverParent {
       const named = ["red", "orange", "yellow", "green", "cyan", "purple"][Number(n.color) - 1];
       if (n.color) rect.style.setProperty("--ps-canvas-colour", named ? `var(--color-${named})` : n.color);
       if (!n.label) continue;
+      // In the part of the box that's in view, as it's cut off at the frame.
+      const x = Math.max(b.x, 0);
+      const y = Math.max(b.y, 0);
+      const w = Math.min(b.x + b.w, W) - x;
+      const h = Math.min(b.y + b.h, H) - y;
       // About 4.8px a letter; a line every 11px. A group's label sits above it, as on the canvas.
-      const perLine = Math.floor((b.w - 6) / 4.8);
+      const perLine = Math.floor((w - 6) / 4.8);
       if (perLine < 3) continue;
-      const lines = wrapLabel(n.label, perLine, n.group ? 1 : Math.floor((b.h - 4) / 11));
+      const lines = wrapLabel(n.label, perLine, n.group ? 1 : Math.floor((h - 4) / 11));
       lines.forEach((line, i) => {
-        const y = n.group ? b.y - 3 : b.y + 3 + 11 * i + FONT * 0.85;
-        svg.createSvg("text", { cls: "ps-canvas-label", attr: { x: b.x + (n.group ? 0 : 3), y, "font-size": FONT } }).textContent = line;
+        const at = n.group ? b.y - 3 : y + 3 + 11 * i + FONT * 0.85;
+        svg.createSvg("text", { cls: "ps-canvas-label", attr: { x: x + (n.group ? 0 : 3), y: at, "font-size": FONT } }).textContent = line;
       });
     }
   }
