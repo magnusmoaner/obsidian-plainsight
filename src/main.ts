@@ -190,6 +190,8 @@ export default class WysiwygPlugin extends Plugin {
       this.indexer.start((ref) => this.registerEvent(ref));
       void this.indexer.build();
       this.closeExtraSidebars();
+      // Obsidian may put back sidebar tabs after Plainsight has loaded (a plugin reload does): close those too.
+      this.registerEvent(this.app.workspace.on("layout-change", () => this.closeExtraSidebars()));
       void this.openSidebar();
     });
   }
@@ -504,6 +506,7 @@ export default class WysiwygPlugin extends Plugin {
   /** One sidebar is enough: close any others (the one in view stays), left over from earlier layouts. */
   private closeExtraSidebars(): void {
     const leaves = this.app.workspace.getLeavesOfType(SIDEBAR_VIEW);
+    if (leaves.length < 2) return;
     const keep = leaves.find((l) => !(l as WorkspaceLeaf & { isDeferred?: boolean }).isDeferred) ?? leaves[0];
     for (const leaf of leaves) if (leaf !== keep) leaf.detach();
   }

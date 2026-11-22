@@ -1074,12 +1074,14 @@
   background: var(--background-modifier-hover);
 }
 .ps-card-canvas {
-  overflow: hidden;
+  /* The map is cut off inside this padding, not at the frame's edge. */
+  padding: 6px;
 }
 .ps-card-canvas svg {
   display: block;
   width: 100%;
-  height: 110px;
+  height: 100px;
+  overflow: hidden;
 }
 .ps-canvas-box,
 .ps-canvas-group {
