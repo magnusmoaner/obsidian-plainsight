@@ -1,7 +1,7 @@
 {
   "id": "plainsight",
   "name": "Plainsight",
-  "version": "0.2.13",
+  "version": "0.2.14",
   "minAppVersion": "1.7.2",
   "description": "A calm notes app on plain Markdown: an editor without visible syntax, a notes sidebar that previews every note, all your tasks on one page, and boards you can keep inside a note.",
   "author": "Magnus",
