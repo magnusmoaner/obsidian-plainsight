@@ -496,9 +496,14 @@ export function embedTarget(source: string): string | null {
   return match ? (match[1] ?? match[2]).trim() : null;
 }
 
+/** How an embed block shows its board: `view: timeline`, or as a board. */
+export function embedView(source: string): "board" | "timeline" {
+  return /^view\s*:\s*timeline\s*$/im.test(source) ? "timeline" : "board";
+}
+
 /** The embed block for a board, as inserted into a note. */
-export function embedBlock(link: string): string {
-  return "```plainsight-board\nboard: [[" + link + "]]\n```\n";
+export function embedBlock(link: string, view: "board" | "timeline" = "board"): string {
+  return "```plainsight-board\nboard: [[" + link + "]]\n" + (view === "timeline" ? "view: timeline\n" : "") + "```\n";
 }
 
 /** A note's text with the board's embed block after everything in it. */

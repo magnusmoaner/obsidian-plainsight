@@ -140,6 +140,7 @@ A board is a set of lists holding cards, for a project, a trip or a week. Plains
 - **Cards.** Add, edit, tick, drag and delete them. A dragged card hangs from the pointer, with a line beside it naming the list a drop would put it in, and leaves an empty slot where it would land. It can also be dragged off its board: into the note around an embedded board, where it becomes a task, or onto a list of another board that's open. A card is edited in Obsidian's own editor, so links and tags complete as you type, and with the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) plugin its suggestions for dates, priority and recurrence come up too. Those details, and tags at the start or end of the card, show as badges along the bottom of the card. Task lines indented under a card are its subtasks: each shows as a small box under the card's text, with its own circle to tick, and one under another steps in.
 - **Statuses.** A card is open `[ ]`, in progress `[/]`, done `[x]` or cancelled `[-]`, set from its menu. Ticking a card goes through the Tasks plugin when it's installed, so the card gets its done date and a repeating card leaves its next round behind.
 - **Lists.** Rename, drag to reorder (by its header, with the same hanging copy and empty slot), minimize or delete a list from its header and menu. On a Plainsight board a list can also have a colour, one of eight that follow your theme, shown on the board and on its tile in the note list. A list can give a status to the cards that land in it (in progress, done or cancelled); a card that leaves for a plain list is open again. New lists are added on the board's own page, with the **+** after the last list or the one at the page's top right; the new list's name is ready to type over.
+- **Timeline.** **Board** and **Timeline**, at the top of a board, switch how it's shown. On the timeline the cards are laid out in time, in columns of days, weeks or months (whichever suits the board's dates, or as you pick), each drawn just as on the board. A card sits in the column of its date, in date order, and one that runs from a start to a due (or scheduled) date spans its columns. A strip across the top of each card, in its list's colour, marks the days it runs. Done and cancelled cards sit on the day they were finished, and cards with no dates wait in a **No date** tray underneath. Drag a card to another day to move its dates; drag either end of a bar's strip to change its start or end. A card from the tray gets the day it's dropped on as its due date, and a task dragged in from a note lands on that day, in the board's first list. Cards are edited, ticked and moved between lists as on the board, and can be dragged off the timeline into the note around it. Dates are written in the Tasks plugin's format, emoji or Dataview, as the card already has them or as Tasks is set up.
 - **About the board.** On its own page a board starts with its name, a description, its tags and the notes it's embedded in, each a link. Click the name to rename the board, or the description to write or change it; **Tag** adds a tag. A board that isn't in any note yet offers **Embed in note**, which puts it at the end of a note you pick. Both are ordinary properties of the board's note (`description` and `tags`), so the tags also show on the board's card and under Tags.
 
 **A board is a Markdown note.** Each list is a `## ` heading and each card a checkbox line under it, which is the Kanban plugin's file format. A Plainsight board is marked `plainsight-plugin: board` in its properties; one made by the Kanban plugin is marked `kanban-plugin`, and that plugin keeps opening it. Every edit changes only the lines of the cards or lists involved.
@@ -165,11 +166,20 @@ plainsight-plugin: board
 %%
 ```
 
-**The embed** is a code block naming the board. A board embedded with one of the two commands lists that note in turn, in an `embedded-in` property, so when the board is renamed the block follows. (A block you type yourself works too; it just isn't followed on a rename.)
+**The embed** is a code block naming the board. A board embedded with one of the commands lists that note in turn, in an `embedded-in` property, so when the board is renamed the block follows. (A block you type yourself works too; it just isn't followed on a rename.)
 
 ````markdown
 ```plainsight-board
 board: [[Kitchen renovation board]]
+```
+````
+
+Add `view: timeline` to show it on a timeline instead (or run **Embed existing board as a timeline**). One note can hold the same board twice, as a board and as a timeline.
+
+````markdown
+```plainsight-board
+board: [[Kitchen renovation board]]
+view: timeline
 ```
 ````
 
@@ -204,7 +214,7 @@ Heading shortcuts use `Opt/Alt` because Obsidian already binds `Cmd + 1…8` to 
 | **Toggle WYSIWYG editing** | Switches between Plainsight's editor and plain Markdown, handy for a quick look at the raw text while the editor is in beta. |
 | **Remove bookmarks to deleted notes** | Tidies Bookmarks. Rarely needed, so the palette is usually enough. |
 
-The board commands, **Insert new board**, **Embed existing board** and **Open this note as a board**, are in the palette too.
+The board commands, **Insert new board**, **Embed existing board**, **Embed existing board as a timeline** and **Open this note as a board**, are in the palette too.
 
 To set one, open **Settings → Hotkeys** and search for *Plainsight*, or click **Set hotkeys** at the bottom of Plainsight's settings, which opens that list for you. Click the `+` next to a command and press the keys. Obsidian warns you if they're already in use. The editor shortcuts above can be changed there too.
 
