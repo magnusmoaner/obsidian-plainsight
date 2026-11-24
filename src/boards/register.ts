@@ -3,7 +3,7 @@ import { addTagToNote, createBoard, openFile } from "../sidebar/actions";
 import { addListItem } from "../sidebar/core/edits";
 import { NoteIndex } from "../sidebar/core/note-index";
 import { CodeModal, NotePickerModal, TagModal } from "../sidebar/modals";
-import { appendEmbed, embedBlock, embedTarget, isBoardFrontmatter, replaceBlock, retargetEmbeds } from "./board";
+import { appendEmbed, embedBlock, embedTarget, embedView, isBoardFrontmatter, replaceBlock, retargetEmbeds } from "./board";
 import { BOARD_VIEW, BoardPage, keptAsMarkdown, openBoardPage, ownsBoard } from "./page";
 import { BoardHost, BoardView } from "./view";
 
@@ -66,7 +66,7 @@ export function registerBoards(plugin: Plugin, boardsOn: () => boolean, template
     const target = embedTarget(source);
     if (!boardsOn()) el.createEl("pre", { text: source });
     else if (!target) el.createDiv({ cls: "psb-missing", text: "Name the board to show, like this: board: [[Board name]]" });
-    else ctx.addChild(new BoardView(app, el, target, ctx.sourcePath, open, undefined, embedCode(source, el, ctx)));
+    else ctx.addChild(new BoardView(app, el, target, ctx.sourcePath, open, undefined, embedCode(source, el, ctx), embedView(source)));
   };
   // The embed block's text, saved back over the block in the note.
   const embedCode = (source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => {
@@ -87,10 +87,10 @@ export function registerBoards(plugin: Plugin, boardsOn: () => boolean, template
   const enabled = (app as unknown as { plugins?: { enabledPlugins?: Set<string> } }).plugins?.enabledPlugins;
   if (!enabled?.has("kanban-embed")) plugin.registerMarkdownCodeBlockProcessor("kanban-embed", draw);
 
-  const insert = async (editor: Editor, note: TFile, board: TFile) => {
+  const insert = async (editor: Editor, note: TFile, board: TFile, view: "board" | "timeline" = "board") => {
     const cursor = editor.getCursor();
     const prefix = editor.getLine(cursor.line).trim() ? "\n" : "";
-    editor.replaceSelection(prefix + embedBlock(app.metadataCache.fileToLinktext(board, note.path)));
+    editor.replaceSelection(prefix + embedBlock(app.metadataCache.fileToLinktext(board, note.path), view));
     await linkBack(app, board, note);
   };
   const failed = (err: Error) => new Notice(`Couldn't insert the board: ${err.message}`);
@@ -117,6 +117,17 @@ export function registerBoards(plugin: Plugin, boardsOn: () => boolean, template
       const note = ctx.file;
       if (!note || !boardsOn()) return false;
       if (!checking) new BoardPicker(app, "Board to embed", (board) => void insert(editor, note, board).catch(failed)).open();
+      return true;
+    },
+  });
+
+  plugin.addCommand({
+    id: "embed-board-timeline",
+    name: "Embed existing board as a timeline",
+    editorCheckCallback: (checking, editor, ctx) => {
+      const note = ctx.file;
+      if (!note || !boardsOn()) return false;
+      if (!checking) new BoardPicker(app, "Board to embed as a timeline", (board) => void insert(editor, note, board, "timeline").catch(failed)).open();
       return true;
     },
   });

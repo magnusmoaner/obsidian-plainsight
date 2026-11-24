@@ -6,6 +6,7 @@
  */
 
 import { matchTaskLine, toggleTaskLine } from "../sidebar/core/tasks";
+import type { Unit } from "./timeline";
 
 export interface Card {
   /** First line, and one past the last line, of the card. */
@@ -496,9 +497,17 @@ export function embedTarget(source: string): string | null {
   return match ? (match[1] ?? match[2]).trim() : null;
 }
 
+/** How an embed block shows its board: `view: days`, `weeks` or `months` on a timeline grouped so, `view: timeline` grouped as suits its dates, else as a board. */
+export function embedView(source: string): { mode: "board" | "timeline"; zoom: Unit | null } {
+  const view = /^view\s*:\s*(timeline|days|weeks|months)\s*$/im.exec(source)?.[1].toLowerCase();
+  if (!view) return { mode: "board", zoom: null };
+  const zoom = view === "days" ? "day" : view === "weeks" ? "week" : view === "months" ? "month" : null;
+  return { mode: "timeline", zoom };
+}
+
 /** The embed block for a board, as inserted into a note. */
-export function embedBlock(link: string): string {
-  return "```plainsight-board\nboard: [[" + link + "]]\n```\n";
+export function embedBlock(link: string, view: "board" | "timeline" = "board"): string {
+  return "```plainsight-board\nboard: [[" + link + "]]\n" + (view === "timeline" ? "view: timeline\n" : "") + "```\n";
 }
 
 /** A note's text with the board's embed block after everything in it. */

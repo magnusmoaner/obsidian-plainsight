@@ -1671,7 +1671,8 @@
   contain: none !important;
   overflow: visible !important;
 }
-.workspace-leaf-content :is(.cm-embed-block, .markdown-preview-sizer > div) > .psb-board > .psb-lanes {
+.workspace-leaf-content :is(.cm-embed-block, .markdown-preview-sizer > div) > .psb-board > .psb-lanes,
+.workspace-leaf-content :is(.cm-embed-block, .markdown-preview-sizer > div) > .psb-board > .psb-timeline > .psb-tl-scroll {
   --psb-bleed: max(0px, (100cqw - 100%) / 2);
   margin-inline: calc(-1 * var(--psb-bleed));
   padding-inline: var(--psb-bleed);
@@ -1692,21 +1693,29 @@
 /* A list's colour: a soft tint of one of Obsidian's named colours, so it
    follows the theme. Cards keep their own background. */
 .psb-lane[data-colour="red"],
-.ps-card-lane[data-colour="red"] { --psb-lane-rgb: var(--color-red-rgb); }
+.ps-card-lane[data-colour="red"],
+.psb-tl-item[data-colour="red"] { --psb-lane-rgb: var(--color-red-rgb); }
 .psb-lane[data-colour="orange"],
-.ps-card-lane[data-colour="orange"] { --psb-lane-rgb: var(--color-orange-rgb); }
+.ps-card-lane[data-colour="orange"],
+.psb-tl-item[data-colour="orange"] { --psb-lane-rgb: var(--color-orange-rgb); }
 .psb-lane[data-colour="yellow"],
-.ps-card-lane[data-colour="yellow"] { --psb-lane-rgb: var(--color-yellow-rgb); }
+.ps-card-lane[data-colour="yellow"],
+.psb-tl-item[data-colour="yellow"] { --psb-lane-rgb: var(--color-yellow-rgb); }
 .psb-lane[data-colour="green"],
-.ps-card-lane[data-colour="green"] { --psb-lane-rgb: var(--color-green-rgb); }
+.ps-card-lane[data-colour="green"],
+.psb-tl-item[data-colour="green"] { --psb-lane-rgb: var(--color-green-rgb); }
 .psb-lane[data-colour="cyan"],
-.ps-card-lane[data-colour="cyan"] { --psb-lane-rgb: var(--color-cyan-rgb); }
+.ps-card-lane[data-colour="cyan"],
+.psb-tl-item[data-colour="cyan"] { --psb-lane-rgb: var(--color-cyan-rgb); }
 .psb-lane[data-colour="blue"],
-.ps-card-lane[data-colour="blue"] { --psb-lane-rgb: var(--color-blue-rgb); }
+.ps-card-lane[data-colour="blue"],
+.psb-tl-item[data-colour="blue"] { --psb-lane-rgb: var(--color-blue-rgb); }
 .psb-lane[data-colour="purple"],
-.ps-card-lane[data-colour="purple"] { --psb-lane-rgb: var(--color-purple-rgb); }
+.ps-card-lane[data-colour="purple"],
+.psb-tl-item[data-colour="purple"] { --psb-lane-rgb: var(--color-purple-rgb); }
 .psb-lane[data-colour="pink"],
-.ps-card-lane[data-colour="pink"] { --psb-lane-rgb: var(--color-pink-rgb); }
+.ps-card-lane[data-colour="pink"],
+.psb-tl-item[data-colour="pink"] { --psb-lane-rgb: var(--color-pink-rgb); }
 .psb-lane[data-colour] {
   background: rgba(var(--psb-lane-rgb), 0.12);
   border-color: rgba(var(--psb-lane-rgb), 0.35);
@@ -2343,3 +2352,86 @@
   width: 12px;
   height: 12px;
 }
+
+/* ---- Board: timeline ---------------------------------------------------- */
+
+.psb-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.psb-view .psb-view-name { font-weight: var(--font-bold); }
+.psb-view .psb-view-icon { display: inline-flex; color: var(--text-muted); }
+.psb-view .psb-view-icon svg { width: 14px; height: 14px; }
+.psb-about-row .psb-view { margin-left: auto; }
+
+/* The groups scroll sideways, as a board's lists do. */
+.psb-tl-scroll {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+/* A group is drawn as a list, but isn't one: nothing to drag or rename. */
+.psb-timeline .psb-lane-head,
+.psb-timeline .psb-lane-title { cursor: default; }
+.psb-timeline .psb-lane.is-today .psb-lane-title { color: var(--text-accent); }
+.psb-timeline .psb-lane.is-drop-target {
+  outline: 2px dashed var(--interactive-accent);
+  outline-offset: -2px;
+}
+/* Time with no cards: a narrow strip, like a minimized list, with the time running down it. */
+.psb-tl-gap {
+  flex: 0 0 auto;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border: 1px dashed var(--background-modifier-border-hover);
+  border-radius: 10px;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+.psb-tl-gap-icon { display: inline-flex; }
+.psb-tl-gap-icon svg { width: 14px; height: 14px; }
+.psb-tl-gap-title {
+  writing-mode: vertical-rl;
+  white-space: nowrap;
+}
+/* Only colours change, so nothing shifts while a card is held over it. */
+.psb-tl-gap.is-drop-target {
+  border-color: var(--interactive-accent);
+  background: rgba(var(--interactive-accent-rgb), 0.1);
+  color: var(--text-accent);
+}
+.psb-tl-item { --psb-lane-rgb: var(--mono-rgb-100); }
+/* A card being dragged leaves an empty place, its size, until it's dropped. */
+.psb-tl-item.is-dragging {
+  border-radius: 8px;
+  background: var(--background-modifier-hover);
+}
+/* The board hides a dragged card; here it stays, unseen, to keep the place its size. */
+.psb-tl-item.is-dragging > .psb-card { display: flex; visibility: hidden; }
+/* The card's list, along its foot from edge to edge (the card's padding is 8px). */
+.psb-tl-list {
+  flex: 1 0 calc(100% + 16px);
+  margin: 0 -8px -8px;
+  padding: 1px 8px;
+  border-radius: 0 0 7px 7px;
+  background: rgba(var(--psb-lane-rgb), 0.12);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.psb-tl-item[data-colour] .psb-tl-list { background: rgba(var(--psb-lane-rgb), 0.22); }
+.psb-tl-empty { color: var(--text-muted); }

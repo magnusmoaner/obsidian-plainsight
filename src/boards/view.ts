@@ -5,13 +5,17 @@ import { BadgeEdits, badge, taskBadges } from "../sidebar/task-badges";
 import { dragCopy, draggedTask, moveTaskOut, setDraggedTask } from "../drag";
 import { taskAsCard } from "../sidebar/core/task-move";
 import { matchTaskLine } from "../sidebar/core/tasks";
-import { dragAction, startBoardDrag, tasksEditLine, tasksToggle } from "../sidebar/internals";
+import { dragAction, startBoardDrag, tasksEditLine, tasksFormat, tasksToggle } from "../sidebar/internals";
+import { TaskFormat } from "../sidebar/core/task-fields";
+import { CardDrag, renderTimeline, TimelineState } from "./timeline-view";
+import { Unit } from "./timeline";
 import { CodeModal } from "../sidebar/modals";
 import { CardEditor, openCardEditor } from "./card-editor";
-import { boardPages } from "./page";
+import { BOARD_SETTINGS_EVENT, boardPages } from "./page";
 import {
   App,
   Component,
+  Events,
   getFrontMatterInfo,
   Keymap,
   MarkdownRenderChild,
@@ -83,6 +87,9 @@ const STATUSES = [
  * change straight back to it, and redraws whenever the file changes, from
  * here, from the Kanban plugin or from anywhere else.
  */
+/** The timeline's groups, as named under View. */
+const UNIT_NAMES: Record<Unit, string> = { day: "Days", week: "Weeks", month: "Months" };
+
 export class BoardView extends MarkdownRenderChild {
   private file: TFile | null = null;
   private lines: string[] = [];
@@ -101,6 +108,15 @@ export class BoardView extends MarkdownRenderChild {
   private embeddedKey: string | null = null;
   /** A list was just added: open its name for typing after the next redraw. */
   private nameNewList = false;
+  /** Shown as lists of cards, or on a timeline. */
+  private mode: "board" | "timeline";
+  private timeline: TimelineState = { zoom: null, scroll: null };
+  /** What the View button says is shown. */
+  private viewName: HTMLElement | null = null;
+  /** The timeline's groups as last drawn. */
+  private shownUnit: Unit | null = null;
+  /** The format the timeline writes new dates in. */
+  private format: TaskFormat = "emoji";
 
   constructor(
     private app: App,
@@ -113,9 +129,13 @@ export class BoardView extends MarkdownRenderChild {
     /** Given on the board's own page: it shows the board's description, tags and where it's embedded. */
     private host?: BoardHost,
     /** Given in a note: show the embed block's own text. */
-    private embedCode?: () => void
+    private embedCode?: () => void,
+    /** How it's shown first: the embed block's `view:`. */
+    view: { mode: "board" | "timeline"; zoom: Unit | null } = { mode: "board", zoom: null }
   ) {
     super(containerEl);
+    this.mode = view.mode;
+    this.timeline.zoom = view.zoom;
   }
 
   onload(): void {
@@ -156,6 +176,8 @@ export class BoardView extends MarkdownRenderChild {
       doc.addEventListener(type, leave, true);
       this.register(() => doc.removeEventListener(type, leave, true));
     }
+    // The timeline's done cards come and go with the settings.
+    this.registerEvent((this.app.workspace as Events).on(BOARD_SETTINGS_EVENT, () => this.mode === "timeline" && void this.refresh()));
     // Covers a board created, renamed or deleted after the note was opened.
     this.registerEvent(this.app.metadataCache.on("resolved", () => !this.file && void this.refresh()));
     void this.refresh();
@@ -180,6 +202,7 @@ export class BoardView extends MarkdownRenderChild {
       this.target instanceof TFile ? this.target : this.app.metadataCache.getFirstLinkpathDest(this.target, this.sourcePath);
     if (!this.file || !this.app.vault.getAbstractFileByPath(this.file.path)) return this.renderMissing();
     const text = await this.app.vault.cachedRead(this.file);
+    if (this.mode === "timeline") this.format = await tasksFormat(this.app);
     this.lines = text.split(/\r?\n/);
     this.render(parseBoard(text), properties(text));
   }
@@ -238,6 +261,7 @@ export class BoardView extends MarkdownRenderChild {
         this.open(file, Keymap.isModEvent(evt));
       });
       head.createSpan({ cls: "psb-count", text: cards });
+      this.viewSwitch(head);
       if (this.embedCode) {
         const embed = head.createEl("button", { cls: "psb-code", attr: { "aria-label": "Embed code" } });
         setIcon(embed, "code");
@@ -256,6 +280,30 @@ export class BoardView extends MarkdownRenderChild {
             if (!saved) throw new Error("the board changed while this was open");
           }).open();
         });
+    }
+
+    if (this.mode === "timeline") {
+      this.nameNewList = false;
+      this.reopenAdd = null;
+      const unit = renderTimeline(
+        this.containerEl,
+        {
+          app: this.app,
+          file,
+          lines: this.lines,
+          board,
+          coloured: this.coloured,
+          showDone: boardPages.timelineDone,
+          format: this.format,
+          write: (op) => this.write(op),
+          viaTasks: this.viaTasks,
+          renderCard: (parent, lane, card, drag) => this.renderCard(parent, board, lane, card, drag),
+        },
+        this.timeline
+      );
+      this.shownUnit = unit;
+      this.viewName?.setText(UNIT_NAMES[unit]);
+      return;
     }
 
     const lanesEl = this.containerEl.createDiv("psb-lanes");
@@ -340,6 +388,31 @@ export class BoardView extends MarkdownRenderChild {
       });
     }
     row.createSpan({ cls: "psb-count", text: cards });
+    this.viewSwitch(row);
+  }
+
+  /** View: the board, or the timeline by days, weeks or months; switched here, for as long as it's shown. */
+  private viewSwitch(parent: HTMLElement): void {
+    const button = parent.createEl("button", { cls: "psb-code psb-view", attr: { "aria-label": "Show the board as" } });
+    button.createSpan({ text: "View:" });
+    // Named for the timeline once it's drawn: its days, weeks or months.
+    this.viewName = button.createSpan({ cls: "psb-view-name", text: "Board" });
+    setIcon(button.createSpan("psb-view-icon"), "chevron-down");
+    button.addEventListener("click", (evt) => {
+      const menu = new Menu();
+      const show = (mode: "board" | "timeline", zoom: Unit | null) => {
+        this.mode = mode;
+        this.timeline = { zoom, scroll: null };
+        void this.refresh();
+      };
+      menu.addItem((i) => i.setTitle("Board").setChecked(this.mode === "board").onClick(() => show("board", null)));
+      menu.addSeparator();
+      for (const unit of ["day", "week", "month"] as const) {
+        const on = this.mode === "timeline" && this.shownUnit === unit;
+        menu.addItem((i) => i.setTitle(UNIT_NAMES[unit]).setChecked(on).onClick(() => show("timeline", unit)));
+      }
+      menu.showAtMouseEvent(evt);
+    });
   }
 
   /** Rename the board's file, as the sidebar's Rename does; links to it follow. */
@@ -419,14 +492,15 @@ export class BoardView extends MarkdownRenderChild {
     add.addEventListener("click", () => this.addCardInput(el, add, ref));
   }
 
-  private renderCard(parent: HTMLElement, board: Board, lane: number, index: number): void {
+  /** `drag`: what dragging the card does, where it isn't the board's own drag (on the timeline). */
+  private renderCard(parent: HTMLElement, board: Board, lane: number, index: number, drag?: CardDrag): HTMLElement {
     const card = board.lanes[lane].cards[index];
     const ref: CardRef = { lane, card: index, raw: this.lines[card.line] };
     const done = isDone(card.check);
     const el = parent.createDiv({ cls: "psb-card", attr: { draggable: "true", "data-status": card.check ?? " " } });
     el.toggleClass("is-done", done || card.check === "-");
-    el.addEventListener("dragstart", (evt) => this.startDrag(evt, el, { kind: "card", ref, line: card.line }));
-    el.addEventListener("dragend", () => this.endDrag());
+    el.addEventListener("dragstart", (evt) => (drag ? drag.start(evt, el) : this.startDrag(evt, el, { kind: "card", ref, line: card.line })));
+    el.addEventListener("dragend", () => (drag ? drag.end() : this.endDrag()));
 
     const box = el.createEl("button", {
       cls: "psb-check",
@@ -482,6 +556,7 @@ export class BoardView extends MarkdownRenderChild {
     if (time) badge(foot, "clock", time, `Time ${time}`);
     taskBadges(foot, details, done || card.check === "-", localISODate(), {}, this.cardEdits(card.text, card.check, ref));
     if (!foot.childElementCount) foot.remove();
+    return el;
   }
 
   /** A card's badges change the first line of its text, as Edit does. */

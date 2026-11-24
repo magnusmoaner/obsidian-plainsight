@@ -108,6 +108,8 @@ export interface WysiwygSettings {
   boardCardsInTasks: boolean;
   /** Where a card goes when it's ticked on a board: the done list (else the bottom of its list), the bottom of its list, or nowhere. */
   boardDoneCards: "done" | "bottom" | "stay";
+  /** Done and cancelled cards are shown on a board's timeline. */
+  boardTimelineDone: boolean;
   /** Where a task goes when it's ticked in a note: the bottom of its task list, or nowhere. */
   noteDoneTasks: "bottom" | "stay";
   /** Page Preview when the mouse rests on a note card or a task. */
@@ -149,6 +151,7 @@ export const DEFAULT_SETTINGS: WysiwygSettings = {
   showBoardsRow: true,
   boardCardsInTasks: false,
   boardDoneCards: "stay",
+  boardTimelineDone: false,
   noteDoneTasks: "stay",
   hoverPreviews: true,
   listInsetTop: false,

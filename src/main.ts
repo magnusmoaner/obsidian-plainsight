@@ -23,7 +23,7 @@ import {
   toggleEm,
   toggleStrong,
 } from "./editor/commands";
-import { boardPages } from "./boards/page";
+import { BOARD_SETTINGS_EVENT, boardPages } from "./boards/page";
 import { registerBoards } from "./boards/register";
 import { wysiwyg } from "./editor/extension";
 import { listMinWidth, parseSettings, serializeSettings } from "./settings-data";
@@ -339,6 +339,8 @@ export default class WysiwygPlugin extends Plugin {
     boardPages.enabled = this.settings.boards;
     boardPages.kanban = this.settings.kanbanBoards;
     boardPages.doneCards = this.settings.boardDoneCards;
+    boardPages.timelineDone = this.settings.boardTimelineDone;
+    this.app.workspace.trigger(BOARD_SETTINGS_EVENT);
     // Read by the boards' styles.
     // shortcut: set on the main window only; a board in a pop-out window keeps the default width until boards there need it.
     document.body.style.setProperty("--psb-list-min", `${listMinWidth(this.settings)}px`);
@@ -367,7 +369,7 @@ export default class WysiwygPlugin extends Plugin {
     // Which boards are on changes what every board file is: read them all again.
     const boardKinds = ["boards", "kanbanBoards", "taskListBoards"] as const;
     const boardsChanged = boardKinds.some((key) => before[key] !== now[key]);
-    if (boardsChanged || before.boardListMinWidth !== now.boardListMinWidth || before.boardDoneCards !== now.boardDoneCards) this.applyBoardPages();
+    if (boardsChanged || before.boardListMinWidth !== now.boardListMinWidth || before.boardDoneCards !== now.boardDoneCards || before.boardTimelineDone !== now.boardTimelineDone) this.applyBoardPages();
     if (boardsChanged) void this.indexer.build();
     if (
       boardsChanged ||

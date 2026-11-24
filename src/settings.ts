@@ -178,6 +178,7 @@ export class WysiwygSettingTab extends PluginSettingTab {
               })
           )
       );
+      this.toggle(boards, "boardTimelineDone", "Done cards on the timeline", "Done and cancelled cards are shown on a board's timeline, on the day they were finished.");
       // From the templates folder, when the Templates core plugin has one; else any note.
       const folder = templateOptions(this.app).folder;
       const isTemplate = (file: unknown): file is TFile =>
