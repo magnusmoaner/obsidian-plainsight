@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { dayNumber, isoDay, moveCardDates, stackBoxes, placeCard, bucketAt, bucketsFor, unitFor, weekday } from "../../boards/timeline";
+import { dayNumber, dayIn, isoDay, moveCardDates, placeCard, bucketAt, unitFor, weekday } from "../../boards/timeline";
 
 describe("placeCard", () => {
   test("start and due make a bar", () => {
@@ -57,19 +57,6 @@ describe("moveCardDates", () => {
   });
 });
 
-describe("stackBoxes", () => {
-  test("a box beside another goes under it; one clear of it stays at the top", () => {
-    expect(stackBoxes([[0, 100, 40], [50, 150, 30], [200, 300, 20]], 4)).toEqual([0, 44, 0]);
-  });
-  test("a short box fits in a gap left above", () => {
-    // B sits under A; C is beside B only, so it takes the top, which A has left free over there.
-    expect(stackBoxes([[0, 100, 40], [80, 180, 30], [120, 220, 20]], 0)).toEqual([0, 40, 0]);
-  });
-  test("answers in the order given", () => {
-    expect(stackBoxes([[50, 150, 30], [0, 100, 40]], 0)).toEqual([40, 0]);
-  });
-});
-
 describe("columns", () => {
   const d = dayNumber;
   test("a week runs Monday to Sunday", () => {
@@ -79,10 +66,12 @@ describe("columns", () => {
     expect(bucketAt("month", d("2026-12-15"))).toEqual({ start: d("2026-12-01"), end: d("2026-12-31") });
     expect(bucketAt("month", d("2027-02-10"))).toEqual({ start: d("2027-02-01"), end: d("2027-02-28") });
   });
-  test("columns cover the dates and come to at least as many as asked", () => {
-    const weeks = bucketsFor("week", d("2026-11-18"), d("2026-12-02"), 0);
-    expect(weeks.map((b) => isoDay(b.start))).toEqual(["2026-11-16", "2026-11-23", "2026-11-30"]);
-    expect(bucketsFor("day", d("2026-11-18"), d("2026-11-18"), 4)).toHaveLength(4);
+  test("a card dropped in another group keeps its place in it", () => {
+    // Thursday 2026-11-26 into the week of Monday 2026-12-07: Thursday 2026-12-10.
+    expect(isoDay(dayIn("week", d("2026-11-26"), bucketAt("week", d("2026-12-07"))))).toBe("2026-12-10");
+    // The 31st into a 30-day month: its last day.
+    expect(isoDay(dayIn("month", d("2026-12-31"), bucketAt("month", d("2026-11-01"))))).toBe("2026-11-30");
+    expect(isoDay(dayIn("day", d("2026-12-31"), bucketAt("day", d("2026-11-05"))))).toBe("2026-11-05");
   });
   test("the column size suits how far the dates spread", () => {
     expect(unitFor(d("2026-11-20"), d("2026-11-25"))).toBe("day");

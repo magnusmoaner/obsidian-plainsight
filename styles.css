@@ -1671,7 +1671,8 @@
   contain: none !important;
   overflow: visible !important;
 }
-.workspace-leaf-content :is(.cm-embed-block, .markdown-preview-sizer > div) > .psb-board > :is(.psb-lanes, .psb-timeline > .psb-tl-scroll) {
+.workspace-leaf-content :is(.cm-embed-block, .markdown-preview-sizer > div) > .psb-board > .psb-lanes,
+.workspace-leaf-content :is(.cm-embed-block, .markdown-preview-sizer > div) > .psb-board > .psb-timeline > .psb-tl-scroll {
   --psb-bleed: max(0px, (100cqw - 100%) / 2);
   margin-inline: calc(-1 * var(--psb-bleed));
   padding-inline: var(--psb-bleed);
@@ -2384,73 +2385,23 @@
   justify-content: flex-end;
   margin-bottom: 6px;
 }
+/* The groups scroll sideways, as a board's lists do. */
 .psb-tl-scroll {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   overflow-x: auto;
   padding-bottom: 6px;
 }
-.psb-tl-grid {
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 10px;
-  background: var(--background-secondary);
-  overflow: hidden;
+/* A group is drawn as a list, but isn't one: nothing to drag or rename. */
+.psb-timeline .psb-lane-head,
+.psb-timeline .psb-lane-title { cursor: default; }
+.psb-timeline .psb-lane.is-today .psb-lane-title { color: var(--text-accent); }
+.psb-timeline .psb-lane.is-drop-target {
+  outline: 2px dashed var(--interactive-accent);
+  outline-offset: -2px;
 }
-.psb-tl-heads {
-  display: flex;
-  border-bottom: 1px solid var(--background-modifier-border);
-  background: var(--background-primary);
-}
-.psb-tl-head {
-  flex: 0 0 var(--psb-tl-col);
-  padding: 6px 10px;
-  border-left: 1px solid var(--background-modifier-border);
-}
-.psb-tl-head:first-child { border-left: 0; }
-.psb-tl-head-title { font-size: var(--font-ui-small); font-weight: 600; }
-.psb-tl-head-sub { font-size: var(--font-ui-smaller); color: var(--text-faint); }
-.psb-tl-head.is-weekend { background: var(--background-modifier-hover); }
-.psb-tl-head.is-today .psb-tl-head-title { color: var(--text-error); }
-.psb-tl-track {
-  position: relative;
-  min-height: 56px;
-  /* A line between columns. */
-  background: repeating-linear-gradient(to right, transparent 0 calc(var(--psb-tl-col) - 1px), var(--background-modifier-border) calc(var(--psb-tl-col) - 1px) var(--psb-tl-col));
-}
-.psb-tl-now {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  border-left: 2px solid var(--text-error);
-  opacity: 0.7;
-  pointer-events: none;
-}
-.psb-tl-item {
-  --psb-lane-rgb: var(--mono-rgb-100);
-  position: absolute;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
+.psb-tl-item { --psb-lane-rgb: var(--mono-rgb-100); }
 /* A card in a coloured list is edged in that colour. */
 .psb-tl-item[data-colour] > .psb-card { border-color: rgba(var(--psb-lane-rgb), 0.75); }
-.psb-tl-slot {
-  position: absolute;
-  top: 8px;
-  border-radius: 8px;
-  border: 2px dashed var(--interactive-accent);
-  pointer-events: none;
-}
-.psb-tl-tray { margin-top: 10px; }
-.psb-tl-tray-label {
-  margin-bottom: 6px;
-  color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
-  font-weight: 600;
-}
-.psb-tl-tray-cards {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 8px;
-}
-.psb-tl-tray .psb-tl-item { position: static; }
+.psb-tl-empty { color: var(--text-muted); }

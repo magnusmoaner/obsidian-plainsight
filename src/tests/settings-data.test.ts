@@ -21,6 +21,7 @@ describe("parseSettings", () => {
       showBoardsRow: false,
       boardCardsInTasks: true,
       boardDoneCards: "done",
+      boardTimelineDone: true,
       noteDoneTasks: "bottom",
       hoverPreviews: false,
       listInsetTop: true,

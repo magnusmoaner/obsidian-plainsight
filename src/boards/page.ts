@@ -6,10 +6,17 @@ export const BOARD_VIEW = "plainsight-board";
 
 /**
  * Whether boards open on Plainsight's own page (the "Show boards" setting),
- * whether the Kanban plugin's boards count as boards (its own setting), and
- * where a ticked card goes.
+ * whether the Kanban plugin's boards count as boards (its own setting),
+ * where a ticked card goes, and whether the timeline shows done cards.
  */
-export const boardPages: { enabled: boolean; kanban: boolean; doneCards: "done" | "bottom" | "stay" } = { enabled: true, kanban: true, doneCards: "stay" };
+export const boardPages: { enabled: boolean; kanban: boolean; doneCards: "done" | "bottom" | "stay"; timelineDone: boolean } = {
+  enabled: true,
+  kanban: true,
+  doneCards: "stay",
+  timelineDone: false,
+};
+/** Fired on the workspace when the board settings change, so open boards redraw. */
+export const BOARD_SETTINGS_EVENT = "plainsight:board-settings";
 
 /**
  * Whether Plainsight's page shows a note with this frontmatter: its own

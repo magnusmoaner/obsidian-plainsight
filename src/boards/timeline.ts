@@ -71,31 +71,10 @@ export function moveCardDates(
   }
 }
 
-/**
- * Where boxes laid out from left to right go down, so none overlap: each
- * as high as it fits among the ones placed before it. `boxes` are
- * [left, right, height], in any order; `gap` is kept between boxes, and the
- * result is each box's top, in the same order.
- */
-export function stackBoxes(boxes: [number, number, number][], gap: number): number[] {
-  const order = boxes.map((_, i) => i).sort((a, b) => boxes[a][0] - boxes[b][0] || a - b);
-  const tops: number[] = new Array<number>(boxes.length);
-  const placed: number[] = [];
-  for (const i of order) {
-    const [left, right, height] = boxes[i];
-    // The boxes beside this one, and the first top that clears them all.
-    const beside = placed.filter((p) => boxes[p][0] < right + gap && left < boxes[p][1] + gap);
-    const fits = (top: number) => beside.every((p) => top + height + gap <= tops[p] || tops[p] + boxes[p][2] + gap <= top);
-    tops[i] = [0, ...beside.map((p) => tops[p] + boxes[p][2] + gap)].sort((a, b) => a - b).find(fits)!;
-    placed.push(i);
-  }
-  return tops;
-}
-
-/** A column of the timeline: a day, a week (Monday to Sunday) or a calendar month. */
+/** A group of the timeline: a day, a week (Monday to Sunday) or a calendar month. */
 export type Unit = "day" | "week" | "month";
 
-/** The column of `unit` that `day` falls in, as its first and last day numbers. */
+/** The group of `unit` that `day` falls in, as its first and last day numbers. */
 export function bucketAt(unit: Unit, day: number): { start: number; end: number } {
   if (unit === "day") return { start: day, end: day };
   if (unit === "week") {
@@ -109,14 +88,16 @@ export function bucketAt(unit: Unit, day: number): { start: number; end: number 
   return { start: dayNumber(`${iso.slice(0, 7)}-01`), end: dayNumber(next) - 1 };
 }
 
-/** The columns from the one holding `from` until `to` is covered and there are at least `min`. */
-export function bucketsFor(unit: Unit, from: number, to: number, min: number): { start: number; end: number }[] {
-  const out = [bucketAt(unit, from)];
-  while (out[out.length - 1].end < to || out.length < min) out.push(bucketAt(unit, out[out.length - 1].end + 1));
-  return out;
+/**
+ * The day a card starting on `from` starts on when it's dropped in `group`:
+ * as far into the group as it was into its own (Tuesday stays Tuesday, the
+ * 26th stays the 26th), kept within the group.
+ */
+export function dayIn(unit: Unit, from: number, group: { start: number; end: number }): number {
+  return group.start + Math.min(from - bucketAt(unit, from).start, group.end - group.start);
 }
 
-/** The column a board's dates read best in: days for a week or so, weeks for a few months, months beyond. */
+/** The group size a board's dates read best in: days for a week or so, weeks for a few months, months beyond. */
 export function unitFor(from: number, to: number): Unit {
   const days = to - from + 1;
   return days <= 7 ? "day" : days <= 84 ? "week" : "month";

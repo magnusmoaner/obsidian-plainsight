@@ -10,10 +10,11 @@ import { TaskFormat } from "../sidebar/core/task-fields";
 import { CardDrag, renderTimeline, segmented, TimelineState } from "./timeline-view";
 import { CodeModal } from "../sidebar/modals";
 import { CardEditor, openCardEditor } from "./card-editor";
-import { boardPages } from "./page";
+import { BOARD_SETTINGS_EVENT, boardPages } from "./page";
 import {
   App,
   Component,
+  Events,
   getFrontMatterInfo,
   Keymap,
   MarkdownRenderChild,
@@ -166,13 +167,14 @@ export class BoardView extends MarkdownRenderChild {
       doc.addEventListener(type, leave, true);
       this.register(() => doc.removeEventListener(type, leave, true));
     }
+    // The timeline's done cards come and go with the settings.
+    this.registerEvent((this.app.workspace as Events).on(BOARD_SETTINGS_EVENT, () => this.mode === "timeline" && void this.refresh()));
     // Covers a board created, renamed or deleted after the note was opened.
     this.registerEvent(this.app.metadataCache.on("resolved", () => !this.file && void this.refresh()));
     void this.refresh();
   }
 
   onunload(): void {
-    this.timeline.stop?.();
     this.cards.unload();
   }
 
@@ -282,6 +284,7 @@ export class BoardView extends MarkdownRenderChild {
           lines: this.lines,
           board,
           coloured: this.coloured,
+          showDone: boardPages.timelineDone,
           format: this.format,
           write: (op) => this.write(op),
           viaTasks: this.viaTasks,
