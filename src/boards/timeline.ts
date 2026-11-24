@@ -46,29 +46,16 @@ export const isoDay = (day: number): string => new Date(day * 86400000).toISOStr
 /** 0 for Monday … 6 for Sunday. */
 export const weekday = (day: number): number => (day + 3) % 7;
 
+/** The day a card is grouped on: its due date when it has one, else its first date. */
+export const timelineDay = (place: Placement): string => (place.end === "due" ? place.to : place.from);
+
 /**
- * A card's first line after it's moved on the timeline to start on `day`
- * (a day number). A card with
- * no dates gets that day as its due date; a finished card keeps its dates.
+ * A card's first line after it's dropped on `day` (a day number) on the
+ * timeline: that becomes its due date, and its other dates stay. A finished
+ * card keeps its dates.
  */
-export function moveCardDates(
-  firstLine: string,
-  place: Placement | null,
-  day: number,
-  format: TaskFormat
-): string {
-  const set = (line: string, field: "due" | "scheduled" | "start", to: number) => setTaskField(line, field, isoDay(to), format);
-  if (!place) return set(firstLine, "due", day);
-  const from = dayNumber(place.from);
-  const to = dayNumber(place.to);
-  switch (place.kind) {
-    case "done":
-      return firstLine;
-    case "bar":
-      return set(set(firstLine, "start", day), place.end!, day + to - from);
-    default:
-      return set(firstLine, place.kind, day);
-  }
+export function moveCardDates(firstLine: string, place: Placement | null, day: number, format: TaskFormat): string {
+  return place?.kind === "done" ? firstLine : setTaskField(firstLine, "due", isoDay(day), format);
 }
 
 /** A group of the timeline: a day, a week (Monday to Sunday) or a calendar month. */
@@ -86,15 +73,6 @@ export function bucketAt(unit: Unit, day: number): { start: number; end: number 
   const m = +iso.slice(5, 7);
   const next = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
   return { start: dayNumber(`${iso.slice(0, 7)}-01`), end: dayNumber(next) - 1 };
-}
-
-/**
- * The day a card starting on `from` starts on when it's dropped in `group`:
- * as far into the group as it was into its own (Tuesday stays Tuesday, the
- * 26th stays the 26th), kept within the group.
- */
-export function dayIn(unit: Unit, from: number, group: { start: number; end: number }): number {
-  return group.start + Math.min(from - bucketAt(unit, from).start, group.end - group.start);
 }
 
 /** The group size a board's dates read best in: days for a week or so, weeks for a few months, months beyond. */

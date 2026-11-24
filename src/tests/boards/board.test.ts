@@ -10,6 +10,7 @@ import {
   editCard,
   embedBlock,
   embedTarget,
+  embedView,
   insertCard,
   LaneRef,
   moveCard,
@@ -331,6 +332,15 @@ describe("embed blocks", () => {
     expect(embedTarget("board: Garden/Plan board.md")).toBe("Garden/Plan board.md");
     expect(embedTarget("lanes: Todo")).toBeNull();
     expect(embedTarget(embedBlock("Plan board").split("\n")[1])).toBe("Plan board");
+  });
+
+  test("a block's view: a board, or a timeline grouped by days, weeks, months, or as suits it", () => {
+    expect(embedView("board: [[Plan]]")).toEqual({ mode: "board", zoom: null });
+    expect(embedView("board: [[Plan]]\nview: timeline")).toEqual({ mode: "timeline", zoom: null });
+    expect(embedView("board: [[Plan]]\nview: Weeks")).toEqual({ mode: "timeline", zoom: "week" });
+    expect(embedView("view: days\nboard: [[Plan]]")).toEqual({ mode: "timeline", zoom: "day" });
+    expect(embedView("view: months")).toEqual({ mode: "timeline", zoom: "month" });
+    expect(embedView("view: years")).toEqual({ mode: "board", zoom: null });
   });
 
   test("a board is embedded at the end of a note, after a blank line", () => {

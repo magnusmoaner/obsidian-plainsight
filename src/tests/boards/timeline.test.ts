@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { dayNumber, dayIn, isoDay, moveCardDates, placeCard, bucketAt, unitFor, weekday } from "../../boards/timeline";
+import { dayNumber, isoDay, moveCardDates, timelineDay, placeCard, bucketAt, unitFor, weekday } from "../../boards/timeline";
 
 describe("placeCard", () => {
   test("start and due make a bar", () => {
@@ -39,21 +39,24 @@ describe("days", () => {
 
 describe("moveCardDates", () => {
   const day = (iso: string) => dayNumber(iso);
-  test("a bar keeps its length", () => {
+  test("only the due date moves", () => {
     const line = "Bake 🛫 2026-11-20 📅 2026-11-24";
-    expect(moveCardDates(line, placeCard(line, false), day("2026-11-27"), "emoji")).toBe("Bake 🛫 2026-11-27 📅 2026-12-01");
+    expect(moveCardDates(line, placeCard(line, false), day("2026-11-27"), "emoji")).toBe("Bake 🛫 2026-11-20 📅 2026-11-27");
   });
-  test("a mark moves its own date, in the format it's written in", () => {
+  test("a card without a due date gets one, in the format it's written in", () => {
     const line = "Call  [scheduled:: 2026-11-24]";
-    expect(moveCardDates(line, placeCard(line, false), day("2026-11-26"), "emoji")).toBe("Call  [scheduled:: 2026-11-26]");
-  });
-  test("a card with no dates gets a due date", () => {
+    expect(moveCardDates(line, placeCard(line, false), day("2026-11-26"), "emoji")).toBe("Call  [scheduled:: 2026-11-24]  [due:: 2026-11-26]");
     expect(moveCardDates("Find a venue", null, day("2026-11-26"), "dataview")).toBe("Find a venue  [due:: 2026-11-26]");
     expect(moveCardDates("Find a venue", null, day("2026-11-26"), "emoji")).toBe("Find a venue 📅 2026-11-26");
   });
   test("a finished card keeps its dates", () => {
     const line = "Done ✅ 2026-11-21";
     expect(moveCardDates(line, placeCard(line, true), day("2026-11-26"), "emoji")).toBe(line);
+  });
+  test("a card is grouped on its due date, else its first date", () => {
+    expect(timelineDay(placeCard("Bake 🛫 2026-11-20 📅 2026-11-24", false)!)).toBe("2026-11-24");
+    expect(timelineDay(placeCard("Bake 🛫 2026-11-20 ⏳ 2026-11-24", false)!)).toBe("2026-11-20");
+    expect(timelineDay(placeCard("Call ⏳ 2026-11-24", false)!)).toBe("2026-11-24");
   });
 });
 
@@ -65,13 +68,6 @@ describe("columns", () => {
   test("a month runs from its first day to its last, over a new year too", () => {
     expect(bucketAt("month", d("2026-12-15"))).toEqual({ start: d("2026-12-01"), end: d("2026-12-31") });
     expect(bucketAt("month", d("2027-02-10"))).toEqual({ start: d("2027-02-01"), end: d("2027-02-28") });
-  });
-  test("a card dropped in another group keeps its place in it", () => {
-    // Thursday 2026-11-26 into the week of Monday 2026-12-07: Thursday 2026-12-10.
-    expect(isoDay(dayIn("week", d("2026-11-26"), bucketAt("week", d("2026-12-07"))))).toBe("2026-12-10");
-    // The 31st into a 30-day month: its last day.
-    expect(isoDay(dayIn("month", d("2026-12-31"), bucketAt("month", d("2026-11-01"))))).toBe("2026-11-30");
-    expect(isoDay(dayIn("day", d("2026-12-31"), bucketAt("day", d("2026-11-05"))))).toBe("2026-11-05");
   });
   test("the column size suits how far the dates spread", () => {
     expect(unitFor(d("2026-11-20"), d("2026-11-25"))).toBe("day");

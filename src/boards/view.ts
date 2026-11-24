@@ -7,7 +7,8 @@ import { taskAsCard } from "../sidebar/core/task-move";
 import { matchTaskLine } from "../sidebar/core/tasks";
 import { dragAction, startBoardDrag, tasksEditLine, tasksFormat, tasksToggle } from "../sidebar/internals";
 import { TaskFormat } from "../sidebar/core/task-fields";
-import { CardDrag, renderTimeline, segmented, TimelineState } from "./timeline-view";
+import { CardDrag, renderTimeline, TimelineState } from "./timeline-view";
+import { Unit } from "./timeline";
 import { CodeModal } from "../sidebar/modals";
 import { CardEditor, openCardEditor } from "./card-editor";
 import { BOARD_SETTINGS_EVENT, boardPages } from "./page";
@@ -86,6 +87,9 @@ const STATUSES = [
  * change straight back to it, and redraws whenever the file changes, from
  * here, from the Kanban plugin or from anywhere else.
  */
+/** The timeline's groups, as named under View. */
+const UNIT_NAMES: Record<Unit, string> = { day: "Days", week: "Weeks", month: "Months" };
+
 export class BoardView extends MarkdownRenderChild {
   private file: TFile | null = null;
   private lines: string[] = [];
@@ -107,6 +111,10 @@ export class BoardView extends MarkdownRenderChild {
   /** Shown as lists of cards, or on a timeline. */
   private mode: "board" | "timeline";
   private timeline: TimelineState = { zoom: null, scroll: null };
+  /** What the View button says is shown. */
+  private viewName: HTMLElement | null = null;
+  /** The timeline's groups as last drawn. */
+  private shownUnit: Unit | null = null;
   /** The format the timeline writes new dates in. */
   private format: TaskFormat = "emoji";
 
@@ -123,10 +131,11 @@ export class BoardView extends MarkdownRenderChild {
     /** Given in a note: show the embed block's own text. */
     private embedCode?: () => void,
     /** How it's shown first: the embed block's `view:`. */
-    view: "board" | "timeline" = "board"
+    view: { mode: "board" | "timeline"; zoom: Unit | null } = { mode: "board", zoom: null }
   ) {
     super(containerEl);
-    this.mode = view;
+    this.mode = view.mode;
+    this.timeline.zoom = view.zoom;
   }
 
   onload(): void {
@@ -276,7 +285,7 @@ export class BoardView extends MarkdownRenderChild {
     if (this.mode === "timeline") {
       this.nameNewList = false;
       this.reopenAdd = null;
-      renderTimeline(
+      const unit = renderTimeline(
         this.containerEl,
         {
           app: this.app,
@@ -292,6 +301,8 @@ export class BoardView extends MarkdownRenderChild {
         },
         this.timeline
       );
+      this.shownUnit = unit;
+      this.viewName?.setText(UNIT_NAMES[unit]);
       return;
     }
 
@@ -380,12 +391,27 @@ export class BoardView extends MarkdownRenderChild {
     this.viewSwitch(row);
   }
 
-  /** Board or timeline: switched here, for as long as it's shown. */
+  /** View: the board, or the timeline by days, weeks or months; switched here, for as long as it's shown. */
   private viewSwitch(parent: HTMLElement): void {
-    const views: ["board" | "timeline", string][] = [["board", "Board"], ["timeline", "Timeline"]];
-    segmented(parent, views, this.mode, (view) => {
-      this.mode = view;
-      void this.refresh();
+    const button = parent.createEl("button", { cls: "psb-code psb-view", attr: { "aria-label": "Show the board as" } });
+    button.createSpan({ text: "View:" });
+    // Named for the timeline once it's drawn: its days, weeks or months.
+    this.viewName = button.createSpan({ cls: "psb-view-name", text: "Board" });
+    setIcon(button.createSpan("psb-view-icon"), "chevron-down");
+    button.addEventListener("click", (evt) => {
+      const menu = new Menu();
+      const show = (mode: "board" | "timeline", zoom: Unit | null) => {
+        this.mode = mode;
+        this.timeline = { zoom, scroll: null };
+        void this.refresh();
+      };
+      menu.addItem((i) => i.setTitle("Board").setChecked(this.mode === "board").onClick(() => show("board", null)));
+      menu.addSeparator();
+      for (const unit of ["day", "week", "month"] as const) {
+        const on = this.mode === "timeline" && this.shownUnit === unit;
+        menu.addItem((i) => i.setTitle(UNIT_NAMES[unit]).setChecked(on).onClick(() => show("timeline", unit)));
+      }
+      menu.showAtMouseEvent(evt);
     });
   }
 

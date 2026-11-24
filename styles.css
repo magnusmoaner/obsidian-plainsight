@@ -2355,36 +2355,16 @@
 
 /* ---- Board: timeline ---------------------------------------------------- */
 
-.psb-seg {
+.psb-view {
   display: inline-flex;
-  flex: 0 0 auto;
-  padding: 2px;
-  border-radius: var(--radius-s);
-  background: var(--background-modifier-hover);
+  align-items: center;
+  gap: 4px;
 }
-.psb-seg button {
-  height: auto;
-  padding: 2px 10px;
-  border: 0;
-  border-radius: calc(var(--radius-s) - 2px);
-  background: none;
-  box-shadow: none;
-  color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
-  cursor: pointer;
-}
-.psb-seg button.is-active {
-  background: var(--background-primary);
-  color: var(--text-normal);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-}
-.psb-about-row .psb-seg { margin-left: auto; }
+.psb-view .psb-view-name { font-weight: var(--font-bold); }
+.psb-view .psb-view-icon { display: inline-flex; color: var(--text-muted); }
+.psb-view .psb-view-icon svg { width: 14px; height: 14px; }
+.psb-about-row .psb-view { margin-left: auto; }
 
-.psb-tl-bar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 6px;
-}
 /* The groups scroll sideways, as a board's lists do. */
 .psb-tl-scroll {
   display: flex;
@@ -2401,7 +2381,57 @@
   outline: 2px dashed var(--interactive-accent);
   outline-offset: -2px;
 }
+/* Time with no cards: a narrow strip, like a minimized list, with the time running down it. */
+.psb-tl-gap {
+  flex: 0 0 auto;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border: 1px dashed var(--background-modifier-border-hover);
+  border-radius: 10px;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+.psb-tl-gap-icon { display: inline-flex; }
+.psb-tl-gap-icon svg { width: 14px; height: 14px; }
+.psb-tl-gap-title {
+  writing-mode: vertical-rl;
+  white-space: nowrap;
+}
+/* Only colours change, so nothing shifts while a card is held over it. */
+.psb-tl-gap.is-drop-target {
+  border-color: var(--interactive-accent);
+  background: rgba(var(--interactive-accent-rgb), 0.1);
+  color: var(--text-accent);
+}
 .psb-tl-item { --psb-lane-rgb: var(--mono-rgb-100); }
-/* A card in a coloured list is edged in that colour. */
-.psb-tl-item[data-colour] > .psb-card { border-color: rgba(var(--psb-lane-rgb), 0.75); }
+/* A card being dragged leaves an empty place, its size, until it's dropped. */
+.psb-tl-item.is-dragging {
+  border-radius: 8px;
+  background: var(--background-modifier-hover);
+}
+/* The board hides a dragged card; here it stays, unseen, to keep the place its size. */
+.psb-tl-item.is-dragging > .psb-card { display: flex; visibility: hidden; }
+/* The card's list, along its foot from edge to edge (the card's padding is 8px). */
+.psb-tl-list {
+  flex: 1 0 calc(100% + 16px);
+  margin: 0 -8px -8px;
+  padding: 1px 8px;
+  border-radius: 0 0 7px 7px;
+  background: rgba(var(--psb-lane-rgb), 0.12);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.psb-tl-item[data-colour] .psb-tl-list { background: rgba(var(--psb-lane-rgb), 0.22); }
 .psb-tl-empty { color: var(--text-muted); }
