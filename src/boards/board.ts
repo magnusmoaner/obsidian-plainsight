@@ -497,12 +497,19 @@ export function embedTarget(source: string): string | null {
   return match ? (match[1] ?? match[2]).trim() : null;
 }
 
-/** How an embed block shows its board: `view: days`, `weeks` or `months` on a timeline grouped so, `view: timeline` grouped as suits its dates, else as a board. */
+/** How an embed block shows its board: `view: days`, `weeks`, `months` or `years` on a timeline grouped so, `view: timeline` grouped as suits its dates, else as a board. */
 export function embedView(source: string): { mode: "board" | "timeline"; zoom: Unit | null } {
-  const view = /^view\s*:\s*(timeline|days|weeks|months)\s*$/im.exec(source)?.[1].toLowerCase();
+  const view = /^view\s*:\s*(timeline|days|weeks|months|years)\s*$/im.exec(source)?.[1].toLowerCase();
   if (!view) return { mode: "board", zoom: null };
-  const zoom = view === "days" ? "day" : view === "weeks" ? "week" : view === "months" ? "month" : null;
+  const zoom = view === "days" ? "day" : view === "weeks" ? "week" : view === "months" ? "month" : view === "years" ? "year" : null;
   return { mode: "timeline", zoom };
+}
+
+/** An embed block's text showing its board as `view` (days, weeks, months or years), or as a board for null, which needs no line. */
+export function setEmbedView(source: string, view: `${Unit}s` | null): string {
+  if (/^view\s*:/im.test(source)) return view ? source.replace(/^view\s*:.*$/im, `view: ${view}`) : source.replace(/^view\s*:.*(\r?\n|$)/im, "");
+  if (!view) return source;
+  return source.replace(/\s*$/, "") + `\nview: ${view}` + (source.endsWith("\n") ? "\n" : "");
 }
 
 /** The embed block for a board, as inserted into a note. */

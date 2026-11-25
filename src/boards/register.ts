@@ -3,9 +3,10 @@ import { addTagToNote, createBoard, openFile } from "../sidebar/actions";
 import { addListItem } from "../sidebar/core/edits";
 import { NoteIndex } from "../sidebar/core/note-index";
 import { CodeModal, NotePickerModal, TagModal } from "../sidebar/modals";
-import { appendEmbed, embedBlock, embedTarget, embedView, isBoardFrontmatter, replaceBlock, retargetEmbeds } from "./board";
+import { appendEmbed, embedBlock, embedTarget, embedView, isBoardFrontmatter, replaceBlock, retargetEmbeds, setEmbedView } from "./board";
 import { BOARD_VIEW, BoardPage, keptAsMarkdown, openBoardPage, ownsBoard } from "./page";
 import { BoardHost, BoardView } from "./view";
+import type { Unit } from "./timeline";
 
 /** The board property that names the notes embedding it; the embed block names the board. */
 const EMBEDDED_IN = "embedded-in";
@@ -66,7 +67,18 @@ export function registerBoards(plugin: Plugin, boardsOn: () => boolean, template
     const target = embedTarget(source);
     if (!boardsOn()) el.createEl("pre", { text: source });
     else if (!target) el.createDiv({ cls: "psb-missing", text: "Name the board to show, like this: board: [[Board name]]" });
-    else ctx.addChild(new BoardView(app, el, target, ctx.sourcePath, open, undefined, embedCode(source, el, ctx), embedView(source)));
+    else ctx.addChild(new BoardView(app, el, target, ctx.sourcePath, open, undefined, embedCode(source, el, ctx), embedView(source), embedSaveView(source, el, ctx)));
+  };
+  // The view picked under View, written into the block so the note opens that way next time.
+  const embedSaveView = (source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => {
+    const note = app.vault.getAbstractFileByPath(ctx.sourcePath);
+    if (!(note instanceof TFile)) return undefined;
+    return (zoom: Unit | null) => {
+      const at = ctx.getSectionInfo(el);
+      const next = setEmbedView(source, zoom ? (`${zoom}s` as const) : null);
+      if (!at || next === source) return;
+      void app.vault.process(note, (t) => replaceBlock(t, at, source, next)).catch((err: Error) => new Notice(`Couldn't save the view in the note: ${err.message}`));
+    };
   };
   // The embed block's text, saved back over the block in the note.
   const embedCode = (source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => {

@@ -69,6 +69,9 @@ describe("columns", () => {
     expect(bucketAt("month", d("2026-12-15"))).toEqual({ start: d("2026-12-01"), end: d("2026-12-31") });
     expect(bucketAt("month", d("2027-02-10"))).toEqual({ start: d("2027-02-01"), end: d("2027-02-28") });
   });
+  test("a year runs from January 1 to December 31", () => {
+    expect(bucketAt("year", d("2028-06-15"))).toEqual({ start: d("2028-01-01"), end: d("2028-12-31") });
+  });
   test("the column size suits how far the dates spread", () => {
     expect(unitFor(d("2026-11-20"), d("2026-11-25"))).toBe("day");
     expect(unitFor(d("2026-11-01"), d("2026-12-20"))).toBe("week");

@@ -58,8 +58,8 @@ export function moveCardDates(firstLine: string, place: Placement | null, day: n
   return place?.kind === "done" ? firstLine : setTaskField(firstLine, "due", isoDay(day), format);
 }
 
-/** A group of the timeline: a day, a week (Monday to Sunday) or a calendar month. */
-export type Unit = "day" | "week" | "month";
+/** A group of the timeline: a day, a week (Monday to Sunday), a calendar month or a year. */
+export type Unit = "day" | "week" | "month" | "year";
 
 /** The group of `unit` that `day` falls in, as its first and last day numbers. */
 export function bucketAt(unit: Unit, day: number): { start: number; end: number } {
@@ -70,6 +70,7 @@ export function bucketAt(unit: Unit, day: number): { start: number; end: number 
   }
   const iso = isoDay(day);
   const y = +iso.slice(0, 4);
+  if (unit === "year") return { start: dayNumber(`${y}-01-01`), end: dayNumber(`${y + 1}-01-01`) - 1 };
   const m = +iso.slice(5, 7);
   const next = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
   return { start: dayNumber(`${iso.slice(0, 7)}-01`), end: dayNumber(next) - 1 };
