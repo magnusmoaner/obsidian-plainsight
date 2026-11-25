@@ -11,7 +11,7 @@ import { bucketAt, dayNumber, isoDay, moveCardDates, Placement, placeCard, timel
 
 /** What the timeline keeps between redraws of its board. */
 export interface TimelineState {
-  /** Cards grouped by day, week or month, as picked under View; null to suit the board's dates. */
+  /** Cards grouped by day, week, month or year, as picked under View; null to suit the board's dates. */
   zoom: Unit | null;
   /** How far it's scrolled; null to start at today. */
   scroll: number | null;
@@ -235,7 +235,7 @@ export function renderTimeline(parent: HTMLElement, host: TimelineHost, state: T
         [`End of the ${group.unit}`, group.end],
       ];
       for (const [label, day] of choices) {
-        const date = dayLabel(day, { weekday: "short", month: "short", day: "numeric" });
+        const date = dayLabel(day, { weekday: "short", month: "short", day: "numeric", ...(group.unit === "year" && { year: "numeric" }) });
         menu.addItem((i) => i.setTitle(`${label}, ${date}`).onClick(() => place(m, task, day)));
       }
       menu.addItem((i) => i.setTitle("Pick a date…").onClick(() => pick(group.start)));
@@ -276,8 +276,12 @@ export function renderTimeline(parent: HTMLElement, host: TimelineHost, state: T
   return draw();
 }
 
-/** The time from `from` to `to`, whole groups of `unit`: "Thu, Nov 26", "Nov 26 – Dec 1", "December" or "Dec – Feb". */
+/** The time from `from` to `to`, whole groups of `unit`: "Thu, Nov 26", "Nov 26 – Dec 1", "December", "Dec – Feb", "2028" or "2028 – 2030". */
 function rangeTitle(unit: Unit, from: number, to: number): string {
+  if (unit === "year") {
+    const year = (day: number) => isoDay(day).slice(0, 4);
+    return year(from) === year(to) ? year(from) : `${year(from)} – ${year(to)}`;
+  }
   if (unit === "month") {
     const month = (day: number, long: boolean) => dayLabel(day, { month: long ? "long" : "short" });
     return bucketAt("month", from).start === bucketAt("month", to).start ? month(from, true) : `${month(from, false)} – ${month(to, false)}`;
@@ -286,9 +290,10 @@ function rangeTitle(unit: Unit, from: number, to: number): string {
   return `${dayLabel(from, { month: "short", day: "numeric" })} – ${dayLabel(to, { month: "short", day: "numeric" })}`;
 }
 
-/** A group's name: "Tue 24 Nov", "23–29 Nov" or "November 2026", as the locale writes them. */
+/** A group's name: "Tue 24 Nov", "23–29 Nov", "November 2026" or "2026", as the locale writes them. */
 function groupTitle(unit: Unit, start: number, end: number): string {
   if (unit === "day") return dayLabel(start, { weekday: "short", day: "numeric", month: "short" });
   if (unit === "week") return `${dayLabel(start, { day: "numeric", month: "short" })} – ${dayLabel(end, { day: "numeric", month: "short" })}`;
-  return dayLabel(start, { month: "long", year: "numeric" });
+  if (unit === "month") return dayLabel(start, { month: "long", year: "numeric" });
+  return isoDay(start).slice(0, 4);
 }

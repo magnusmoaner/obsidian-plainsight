@@ -88,7 +88,7 @@ const STATUSES = [
  * here, from the Kanban plugin or from anywhere else.
  */
 /** The timeline's groups, as named under View. */
-const UNIT_NAMES: Record<Unit, string> = { day: "Days", week: "Weeks", month: "Months" };
+const UNIT_NAMES: Record<Unit, string> = { day: "Days", week: "Weeks", month: "Months", year: "Years" };
 
 export class BoardView extends MarkdownRenderChild {
   private file: TFile | null = null;
@@ -131,7 +131,9 @@ export class BoardView extends MarkdownRenderChild {
     /** Given in a note: show the embed block's own text. */
     private embedCode?: () => void,
     /** How it's shown first: the embed block's `view:`. */
-    view: { mode: "board" | "timeline"; zoom: Unit | null } = { mode: "board", zoom: null }
+    view: { mode: "board" | "timeline"; zoom: Unit | null } = { mode: "board", zoom: null },
+    /** Given in a note: write the view picked under View into the embed block; null for Board. */
+    private saveView?: (zoom: Unit | null) => void
   ) {
     super(containerEl);
     this.mode = view.mode;
@@ -391,11 +393,11 @@ export class BoardView extends MarkdownRenderChild {
     this.viewSwitch(row);
   }
 
-  /** View: the board, or the timeline by days, weeks or months; switched here, for as long as it's shown. */
+  /** View: the board, or the timeline by days, weeks, months or years; switched here, for as long as it's shown. */
   private viewSwitch(parent: HTMLElement): void {
     const button = parent.createEl("button", { cls: "psb-code psb-view", attr: { "aria-label": "Show the board as" } });
     button.createSpan({ text: "View:" });
-    // Named for the timeline once it's drawn: its days, weeks or months.
+    // Named for the timeline once it's drawn: its days, weeks, months or years.
     this.viewName = button.createSpan({ cls: "psb-view-name", text: "Board" });
     setIcon(button.createSpan("psb-view-icon"), "chevron-down");
     button.addEventListener("click", (evt) => {
@@ -404,10 +406,11 @@ export class BoardView extends MarkdownRenderChild {
         this.mode = mode;
         this.timeline = { zoom, scroll: null };
         void this.refresh();
+        this.saveView?.(zoom);
       };
       menu.addItem((i) => i.setTitle("Board").setChecked(this.mode === "board").onClick(() => show("board", null)));
       menu.addSeparator();
-      for (const unit of ["day", "week", "month"] as const) {
+      for (const unit of ["day", "week", "month", "year"] as const) {
         const on = this.mode === "timeline" && this.shownUnit === unit;
         menu.addItem((i) => i.setTitle(UNIT_NAMES[unit]).setChecked(on).onClick(() => show("timeline", unit)));
       }

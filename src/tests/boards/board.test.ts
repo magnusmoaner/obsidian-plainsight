@@ -11,6 +11,7 @@ import {
   embedBlock,
   embedTarget,
   embedView,
+  setEmbedView,
   insertCard,
   LaneRef,
   moveCard,
@@ -340,7 +341,19 @@ describe("embed blocks", () => {
     expect(embedView("board: [[Plan]]\nview: Weeks")).toEqual({ mode: "timeline", zoom: "week" });
     expect(embedView("view: days\nboard: [[Plan]]")).toEqual({ mode: "timeline", zoom: "day" });
     expect(embedView("view: months")).toEqual({ mode: "timeline", zoom: "month" });
-    expect(embedView("view: years")).toEqual({ mode: "board", zoom: null });
+    expect(embedView("view: years")).toEqual({ mode: "timeline", zoom: "year" });
+    expect(embedView("view: decades")).toEqual({ mode: "board", zoom: null });
+  });
+
+  test("the view picked on an embed is written into its block", () => {
+    expect(setEmbedView("board: [[Plan]]\n", "weeks")).toBe("board: [[Plan]]\nview: weeks\n");
+    expect(setEmbedView("board: [[Plan]]", "days")).toBe("board: [[Plan]]\nview: days");
+    // An existing view line is changed where it is.
+    expect(setEmbedView("view: timeline\nboard: [[Plan]]\n", "months")).toBe("view: months\nboard: [[Plan]]\n");
+    // Board is the default: the line goes.
+    expect(setEmbedView("board: [[Plan]]\nview: Weeks\n", null)).toBe("board: [[Plan]]\n");
+    expect(setEmbedView("view: days\nboard: [[Plan]]", null)).toBe("board: [[Plan]]");
+    expect(setEmbedView("board: [[Plan]]\n", null)).toBe("board: [[Plan]]\n");
   });
 
   test("a board is embedded at the end of a note, after a blank line", () => {
